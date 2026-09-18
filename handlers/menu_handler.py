@@ -337,8 +337,12 @@ async def rk_memory(message: Message) -> None:
 
 @router.message(ADMIN_FILTER, F.text.in_({"📊 Holat & Statistika", "Holat & Statistika", "holat & statistika", "Statistika", "statistika", "Holat", "holat", "/status"}))
 async def rk_status(message: Message, ai_manager: AIManager) -> None:
+    from core.cleaner_agent import get_system_storage_info
     status_info = ai_manager.status()
     stats = await db.get_stats_summary()
+    storage = get_system_storage_info()
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="🧹 Server Keshini Tozalash", callback_data="clean:server"))
     text = (
         f"{status_info}\n\n"
         f"📊 **Bugungi Statistika:**\n"
@@ -346,10 +350,12 @@ async def rk_status(message: Message, ai_manager: AIManager) -> None:
         f"• Userbot yuboruvlari: `{stats['today_userbot_sends']}` ta\n"
         f"• Doimiy xotira (RAG): `{stats['knowledge_count']}` ta fakt\n"
         f"• Rejalashtirilgan postlar: `{stats['pending_posts']}` ta\n"
-        f"• Raqobatchi kanallar: `{stats['competitors_count']}` ta\n"
-        f"• Anti-Ban himoyasi: `Faol (3-7s delay)`"
+        f"• Raqobatchi kanallar: `{stats['competitors_count']}` ta\n\n"
+        f"🖥 **Server Xotirasi (Disk):**\n"
+        f"• Jami: `{storage['total_gb']} GB` | Bo'sh: `{storage['free_gb']} GB` (`{storage['percent']}% band`)\n"
+        f"• Asosiy baza: `{storage['db_size_mb']} MB`"
     )
-    await message.answer(text, parse_mode="Markdown")
+    await message.answer(text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
 @router.message(ADMIN_FILTER, F.text.in_({"📧 Email Pochta", "Email Pochta", "email pochta", "Pochta", "pochta", "Email", "email", "/email"}))
@@ -692,11 +698,19 @@ async def cb_roles(cb: CallbackQuery) -> None:
 @router.callback_query(ADMIN_FILTER, F.data == "menu:status")
 async def cb_status(cb: CallbackQuery, ai_manager: AIManager) -> None:
     await cb.answer()
+    from core.cleaner_agent import get_system_storage_info
+    storage = get_system_storage_info()
     builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="🧹 Server Keshini Tozalash", callback_data="clean:server"))
     builder.row(InlineKeyboardButton(text="◀️ Orqaga", callback_data="menu:main"))
+    text = (
+        f"{ai_manager.status()}\n\n"
+        f"🖥 **Server Diski:** `{storage['used_gb']} GB / {storage['total_gb']} GB` (Bo'sh: `{storage['free_gb']} GB`)\n"
+        f"🤖 **Baza hajmi:** `{storage['db_size_mb']} MB`"
+    )
     await safe_edit_text(
         cb,
-        ai_manager.status(),
+        text,
         reply_markup=builder.as_markup(),
         parse_mode="Markdown",
     )

@@ -402,6 +402,36 @@ async def cb_read_voice_msg(cb: CallbackQuery) -> None:
         await cb.answer("❌ Ovoz generatsiya qilib bo'lmadi.", show_alert=True)
 
 
+# ─── Serverni Tozalash & Disk Holati Callbacks ────────────────
+
+@router.callback_query(ADMIN_FILTER, F.data == "clean:server")
+async def cb_clean_server(cb: CallbackQuery) -> None:
+    await cb.answer("🧹 Tozalanmoqda...")
+    from core.cleaner_agent import safe_clean_server_storage
+    await safe_edit_text(cb, "🧹 **Server kesh va vaqtinchalik fayllari xavfsiz tozalanmoqda...**")
+    res = await safe_clean_server_storage()
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="📊 Disk Holatini Ko'rish", callback_data="disk:status"))
+    text = (
+        f"✅ **Server Xavfsiz Tozalandi!**\n\n"
+        f"• 🗑 Bo'shatilgan hajm: `{res['freed_mb']} MB`\n"
+        f"• 🟢 Hozirgi bo'sh joy: `{res['after_free_gb']} GB`\n"
+        f"• 📊 Disk bandligi: `{res['percent']}%`\n\n"
+        f"🔒 _Asosiy baza (`superagent.db`) va tizim sozlamalariga hech qanday ziyon yetmadi._"
+    )
+    await safe_edit_text(cb, text, reply_markup=builder.as_markup(), parse_mode="Markdown")
+
+
+@router.callback_query(ADMIN_FILTER, F.data == "disk:status")
+async def cb_disk_status(cb: CallbackQuery) -> None:
+    await cb.answer()
+    from core.cleaner_agent import format_storage_status_report
+    report = format_storage_status_report()
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="🧹 Server Keshini Tozalash", callback_data="clean:server"))
+    await safe_edit_text(cb, report, reply_markup=builder.as_markup(), parse_mode="Markdown")
+
+
 # ─── Eslatmalar Callbacks ──────────────────────────────────────
 
 @router.callback_query(ADMIN_FILTER, F.data.startswith("done_rem:"))
@@ -829,6 +859,29 @@ async def handle_ai_chat(message: Message, ai_manager: AIManager) -> None:
             await save_profile_fact(k, v)
             await message.answer(f"✅ **Mem0 Profilingizga saqlandi:**\n• **{k.strip().capitalize()}:** {v.strip()}", parse_mode="Markdown")
             return
+
+    # 4.8 Server Xavfsiz Tozalash & Disk Holati (/disk, /clean_server, server holati, serverni tozala)
+    if lower_u in ("/disk", "disk", "server holati", "xotira holati", "disk holati"):
+        from core.cleaner_agent import format_storage_status_report
+        report = format_storage_status_report()
+        builder = InlineKeyboardBuilder()
+        builder.row(InlineKeyboardButton(text="🧹 Server Keshini Tozalash", callback_data="clean:server"))
+        await message.answer(report, reply_markup=builder.as_markup(), parse_mode="Markdown")
+        return
+
+    if lower_u in ("/clean_server", "/cleandisk", "serverni tozala", "keshni tozala", "server tozalash"):
+        from core.cleaner_agent import safe_clean_server_storage
+        wait_msg = await message.answer("🧹 **Serverdagi keraksiz kesh va vaqtinchalik fayllar xavfsiz tozalanmoqda...**\n_(Ma'lumotlar bazasi va doimiy fayllarga tegilmaydi)_", parse_mode="Markdown")
+        res = await safe_clean_server_storage()
+        text = (
+            f"✅ **Server Xavfsiz Tozalandi!**\n\n"
+            f"• 🗑 Bo'shatilgan joy: `{res['freed_mb']} MB`\n"
+            f"• 🟢 Hozirgi bo'sh xotira: `{res['after_free_gb']} GB`\n"
+            f"• 📊 Disk bandligi: `{res['percent']}%`\n\n"
+            f"🔒 _Barcha shaxsiy xabarlar, SQLite bazasi va sozlamalar 100% xavfsiz saqlanib qoldi._"
+        )
+        await safe_edit_text(wait_msg, text, parse_mode="Markdown")
+        return
 
     # 5. Rasm qidirish va yuborish ("rasmini top: Toshkent", "rasm: Lamborghini", "Eiffel rasmini tashla")
     if re.search(r"(?:rasmini\s+(?:top|tashla|yukla|korsat|ko'rsat)|rasm[:\s]+)", user_text, re.IGNORECASE):
