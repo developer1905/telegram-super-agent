@@ -153,9 +153,8 @@ class DatabaseManager:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_chat_hist_chat ON chat_history (chat_id, id DESC);")
 
-            # Mavjud bazani yangi ustunlar bilan xavfsiz kengaytirish
+            # Mavjud eski bazani yangi ustunlar bilan xavfsiz kengaytirish (migration)
             for col, col_def in [
                 ("chat_id", "TEXT DEFAULT '0'"),
                 ("user_id", "TEXT DEFAULT ''"),
@@ -166,6 +165,11 @@ class DatabaseManager:
                     cursor.execute(f"ALTER TABLE chat_history ADD COLUMN {col} {col_def};")
                 except Exception:
                     pass
+
+            try:
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_chat_hist_chat ON chat_history (chat_id, id DESC);")
+            except Exception:
+                pass
 
             # 8. Tasks (TodoList & Notion sinxronizatsiyasi)
             cursor.execute("""
