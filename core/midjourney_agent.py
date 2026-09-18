@@ -303,8 +303,8 @@ def parse_aspect_ratio_and_style(prompt: str) -> tuple[str, str, str]:
 
 async def enhance_midjourney_prompt(raw_prompt: str, ai_manager: "AIManager", style: str = "photo") -> str:
     """
-    Foydalanuvchi yozgan oddiy matnni (o'zbekcha, ruscha yoki inglizcha)
-    Midjourney v6 va FLUX.1 uchun eng yuqori sifatli inglizcha promptga aylantiradi.
+    Foydalanuvchi yozgan oddiy matnni Midjourney v6 / FLUX.1 uchun professional inglizcha promptga aylantiradi.
+    Suhbat tarixi, RAG va system rollarni chetlab o'tib to'g'ridan-to'g'ri Gemini API orqali chaqiriladi.
     """
     style_guidelines = {
         "anime": "Masterpiece anime art, Makoto Shinkai and Ufotable cinematic lighting, vibrant detailed colors, crisp line art, atmospheric particles",
@@ -312,33 +312,70 @@ async def enhance_midjourney_prompt(raw_prompt: str, ai_manager: "AIManager", st
         "cyberpunk": "Cyberpunk 2077 aesthetic, neon glowing reflections, rain-slicked city streets, high-tech dystopian details, volumetric smoke, cinematic anamorphic lens flare",
         "art": "Oil on canvas, classical Renaissance masterpiece, rich textured brushstrokes, dramatic chiaroscuro lighting, intricate details",
         "vector": "Clean modern vector illustration, bold clean outlines, vibrant flat colors, minimalist aesthetic, professional graphic design",
-        "photo": "Ultra-realistic, 8k resolution, Hasselblad medium format photography, 85mm f/1.4 lens, natural skin textures, dramatic cinematic studio lighting, photorealistic masterwork"
+        "photo": "Ultra-realistic, 8k resolution, Hasselblad medium format photography, 85mm f/1.4 lens, natural skin textures, dramatic cinematic studio lighting, photorealistic masterwork",
     }
-
     selected_style_guide = style_guidelines.get(style, style_guidelines["photo"])
-
-    sys_instruction = (
-        f"You are an elite Prompt Engineer and World-Class Art Director specialized in Midjourney v6 and FLUX.1.\n"
-        f"Transform the user's description into a breathtaking, ultra-detailed English prompt.\n"
+    system_instruction = (
+        "You are an elite Prompt Engineer specialized in Midjourney v6 and FLUX.1.\n"
         f"Target Style: {selected_style_guide}.\n"
-        f"Guidelines:\n"
-        f"1. Describe subject, setting, intricate textures, camera angle, and lighting atmosphere.\n"
-        f"2. Keep the prompt punchy, expressive, and around 35-65 words.\n"
-        f"3. Output ONLY the raw prompt in English without quotes, markdown, or explanations."
+        "Rules:\n"
+        "1. Describe subject, setting, textures, camera angle, and lighting in vivid detail.\n"
+        "2. Keep it concise: 35-65 words.\n"
+        "3. Output ONLY the raw English prompt — no quotes, no markdown, no plans, no explanations."
     )
+    user_content = f'Transform this description into a FLUX.1/Midjourney image prompt: "{raw_prompt}"'
 
+    # To'g'ridan-to'g'ri Gemini API — suhbat tarixi yoki RAG dan mustaqil
     try:
-        enhanced = await ai_manager.generate(
-            user_message=f"{sys_instruction}\n\nUser request: \"{raw_prompt}\"",
-            save_history=False,
-        )
-        cleaned = enhanced.strip().strip('"\'`').replace("\n", " ")
-        if len(cleaned) > 400:
-            cleaned = cleaned[:400].rsplit(" ", 1)[0]
-        return cleaned or raw_prompt
+        from config import GEMINI_MODEL, GEMINI_FALLBACK_MODELS
+        from google.genai import types as _gt
+        if ai_manager._gemini_client:
+            models_to_try = [GEMINI_MODEL] + [m for m in GEMINI_FALLBACK_MODELS if m != GEMINI_MODEL]
+            for model_name in models_to_try:
+                try:
+                    response = await ai_manager._gemini_client.aio.models.generate_content(
+                        model=model_name,
+                        contents=[_gt.Content(role="user", parts=[_gt.Part(text=user_content)])],
+                        config=_gt.GenerateContentConfig(
+                            system_instruction=system_instruction,
+                            temperature=0.4,
+                            max_output_tokens=200,
+                        ),
+                    )
+                    answer = (response.text or "").strip().strip('"\'`').replace("\n", " ")
+                    if answer and len(answer) > 10:
+                        if len(answer) > 400:
+                            answer = answer[:400].rsplit(" ", 1)[0]
+                        logger.info("✅ Prompt Gemini bilan boyitildi: %s...", answer[:60])
+                        return answer
+                except Exception as m_exc:
+                    logger.debug("Gemini enhance (%s) xatosi: %s", model_name, m_exc)
+                    continue
     except Exception as exc:
-        logger.warning("Prompt enhancer xatosi: %s", exc)
-        return raw_prompt
+        logger.warning("Prompt enhancer Gemini xatosi: %s", exc)
+
+    # Zaxira: OpenRouter (tarix yoki RAG yo'q)
+    try:
+        messages = [
+            {"role": "system", "content": system_instruction},
+            {"role": "user", "content": user_content},
+        ]
+        resp = await ai_manager._openrouter_client.chat.completions.create(
+            model="nousresearch/hermes-3-llama-3.1-405b:free",
+            messages=messages,
+            temperature=0.4,
+            max_tokens=200,
+        )
+        answer = (resp.choices[0].message.content or "").strip().strip('"\'`').replace("\n", " ")
+        if answer and len(answer) > 10:
+            return answer[:400].rsplit(" ", 1)[0] if len(answer) > 400 else answer
+    except Exception as or_exc:
+        logger.debug("OpenRouter enhance xatosi: %s", or_exc)
+
+    # Fallback: asl promptni qaytarish
+    return raw_prompt
+
+
 
 
 # ─────────────────────────────────────────────────────────────
