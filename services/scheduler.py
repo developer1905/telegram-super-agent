@@ -526,8 +526,37 @@ def setup_scheduler(bot: "Bot", ai_manager: "AIManager") -> AsyncIOScheduler:
         misfire_grace_time=60,
     )
 
+    # 7. Real Madrid o'yin kuni eslatmasi (har kuni soat 10:30 da)
+    scheduler.add_job(
+        check_real_madrid_schedule_job,
+        trigger=CronTrigger(
+            hour=10,
+            minute=30,
+            timezone="Asia/Tashkent",
+        ),
+        args=[bot],
+        id="rm_schedule_check",
+        name="Real Madrid O'yin Kuni Eslatmasi",
+        replace_existing=True,
+        misfire_grace_time=300,
+    )
+
+    # 8. Real Madrid jonli o'yin hodisalari tekshiruvi (har 3 daqiqada)
+    scheduler.add_job(
+        check_real_madrid_live_events_job,
+        trigger=IntervalTrigger(
+            minutes=3,
+            timezone="Asia/Tashkent",
+        ),
+        args=[bot],
+        id="rm_live_check",
+        name="Real Madrid Jonli O'yin Kuzatuvi",
+        replace_existing=True,
+        misfire_grace_time=60,
+    )
+
     logger.info(
-        "Scheduler sozlandi: Hisobot %02d:%02d da, Email har %d daqiqada, Uptime har %d daqiqada, SMM postlar 60s da, Eslatmalar 20s da",
+        "Scheduler sozlandi: Hisobot %02d:%02d da, Email har %d daqiqada, Uptime har %d daqiqada, Real Madrid jonli kuzatuv faol",
         REPORT_HOUR, REPORT_MINUTE, EMAIL_CHECK_INTERVAL, UPTIME_CHECK_INTERVAL,
     )
     return scheduler

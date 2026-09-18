@@ -398,6 +398,162 @@ async def api_chat_agent_handler(request: web.Request) -> web.Response:
         return web.json_response({"status": "error", "message": str(exc)}, status=500)
 
 
+async def api_realmadrid_live_handler(request: web.Request) -> web.Response:
+    """Mini App: Real Madrid jonli o'yin statusi va yulduzlar."""
+    try:
+        from core.real_madrid_live import get_live_match_status_json
+        data = await get_live_match_status_json()
+        return web.json_response(data)
+    except Exception as exc:
+        logger.error("api_realmadrid_live xatosi: %s", exc)
+        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+
+
+async def api_tasks_get_handler(request: web.Request) -> web.Response:
+    """Mini App: Notion / Todo vazifalar ro'yxati."""
+    try:
+        tasks = await db.get_tasks(ADMIN_ID)
+        return web.json_response({"status": "ok", "tasks": tasks})
+    except Exception as exc:
+        logger.error("api_tasks_get xatosi: %s", exc)
+        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+
+
+async def api_tasks_add_handler(request: web.Request) -> web.Response:
+    """Mini App: Yangi vazifa qo'shish."""
+    try:
+        data = await request.json()
+        title = data.get("title", "").strip()
+        due_date = data.get("due_date", "")
+        if not title:
+            return web.json_response({"status": "error", "message": "Vazifa nomi bo'sh"}, status=400)
+        task_id = await db.add_task(ADMIN_ID, title, due_date=due_date)
+        return web.json_response({"status": "ok", "task_id": task_id})
+    except Exception as exc:
+        logger.error("api_tasks_add xatosi: %s", exc)
+        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+
+
+async def api_tasks_toggle_handler(request: web.Request) -> web.Response:
+    """Mini App: Vazifani bajarilgan deb belgilash yoki o'chirish."""
+    try:
+        data = await request.json()
+        task_id = int(data.get("task_id", 0))
+        action = data.get("action", "complete")
+        if action == "complete":
+            await db.complete_task(task_id)
+        elif action == "delete":
+            await db.delete_task(task_id)
+        return web.json_response({"status": "ok"})
+    except Exception as exc:
+        logger.error("api_tasks_toggle xatosi: %s", exc)
+        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+
+
+async def api_uptime_get_handler(request: web.Request) -> web.Response:
+    """Mini App: Uptime monitor saytlar ro'yxati."""
+    try:
+        monitors = await db.get_uptime_monitors(ADMIN_ID)
+        return web.json_response({"status": "ok", "monitors": monitors})
+    except Exception as exc:
+        logger.error("api_uptime_get xatosi: %s", exc)
+        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+
+
+async def api_uptime_add_handler(request: web.Request) -> web.Response:
+    """Mini App: Uptime monitorga yangi sayt qo'shish."""
+    try:
+        data = await request.json()
+        url = data.get("url", "").strip()
+        name = data.get("name", "").strip() or url
+        if not url:
+            return web.json_response({"status": "error", "message": "URL kiritilmadi"}, status=400)
+        from core.uptime_agent import check_url_health
+        status_code, latency = await check_url_health(url)
+        mon_id = await db.add_uptime_monitor(ADMIN_ID, url, name)
+        await db.update_uptime_status(mon_id, status_code, latency)
+        return web.json_response({
+            "status": "ok",
+            "id": mon_id,
+            "url": url,
+            "name": name,
+            "last_status": status_code,
+            "latency_ms": latency
+        })
+    except Exception as exc:
+        logger.error("api_uptime_add xatosi: %s", exc)
+        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+
+
+async def api_uptime_delete_handler(request: web.Request) -> web.Response:
+    """Mini App: Uptime monitorni o'chirish."""
+    try:
+        data = await request.json()
+        mon_id = int(data.get("id", 0))
+        await db.delete_uptime_monitor(mon_id)
+        return web.json_response({"status": "ok"})
+    except Exception as exc:
+        logger.error("api_uptime_del xatosi: %s", exc)
+        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+
+
+async def api_clean_server_handler(request: web.Request) -> web.Response:
+    """Mini App: Serverni xavfsiz tozalash va disk holati."""
+    try:
+        from core.cleaner_agent import safe_clean_server_storage, get_system_storage_info
+        res = await safe_clean_server_storage()
+        storage = get_system_storage_info()
+        return web.json_response({"status": "ok", "cleaned": res, "storage": storage})
+    except Exception as exc:
+        logger.error("api_clean_server xatosi: %s", exc)
+        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+
+
+async def api_profile_handler(request: web.Request) -> web.Response:
+    """Mini App: Mem0 shaxsiy profil faktlari."""
+    try:
+        facts = await db.get_all_facts()
+        profile_facts = [
+            f for f in facts
+            if f.get("category") == "mem0_profile" or f.get("key", "").startswith("profile_")
+        ]
+        return web.json_response({
+            "status": "ok",
+            "profile_facts": profile_facts,
+            "total_facts": len(facts)
+        })
+    except Exception as exc:
+        logger.error("api_profile xatosi: %s", exc)
+        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+
+
+async def api_generate_image_handler(request: web.Request) -> web.Response:
+    """Mini App: Midjourney v6 AI Rasm yaratish."""
+    ai_manager: AIManager = request.app["ai_manager"]
+    try:
+        data = await request.json()
+        prompt = data.get("prompt", "").strip()
+        aspect_ratio = data.get("aspect_ratio", "1:1")
+        if not prompt:
+            return web.json_response({"status": "error", "message": "Prompt kiritilmadi"}, status=400)
+        from core.midjourney_agent import draw_midjourney_image
+        import base64
+        img_bytes, enhanced, ar, seed = await draw_midjourney_image(prompt, ai_manager, aspect_ratio=aspect_ratio)
+        if img_bytes:
+            b64_img = base64.b64encode(img_bytes).decode("utf-8")
+            return web.json_response({
+                "status": "ok",
+                "image_base64": f"data:image/jpeg;base64,{b64_img}",
+                "enhanced_prompt": enhanced,
+                "aspect_ratio": ar,
+                "seed": seed
+            })
+        return web.json_response({"status": "error", "message": "Rasm yaratishda xatolik"}, status=500)
+    except Exception as exc:
+        logger.error("api_generate_image xatosi: %s", exc)
+        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+
+
 async def start_web_server(ai_manager: AIManager, bot: Optional[Bot] = None) -> web.AppRunner:
     """aiohttp web server va Mini App endpointlarini ishga tushiradi."""
     app = web.Application()
@@ -426,6 +582,18 @@ async def start_web_server(ai_manager: AIManager, bot: Optional[Bot] = None) -> 
     app.router.add_get("/api/system_info", api_system_info_handler)
     app.router.add_get("/api/managed_chats", api_managed_chats_handler)
     app.router.add_post("/api/chat_agent", api_chat_agent_handler)
+
+    # Yangi Super-Agent Vositalari
+    app.router.add_get("/api/realmadrid_live", api_realmadrid_live_handler)
+    app.router.add_get("/api/tasks", api_tasks_get_handler)
+    app.router.add_post("/api/tasks/add", api_tasks_add_handler)
+    app.router.add_post("/api/tasks/toggle", api_tasks_toggle_handler)
+    app.router.add_get("/api/uptime", api_uptime_get_handler)
+    app.router.add_post("/api/uptime/add", api_uptime_add_handler)
+    app.router.add_post("/api/uptime/delete", api_uptime_delete_handler)
+    app.router.add_post("/api/clean_server", api_clean_server_handler)
+    app.router.add_get("/api/profile", api_profile_handler)
+    app.router.add_post("/api/generate_image", api_generate_image_handler)
 
     port = int(os.getenv("PORT", "8080"))
     runner = web.AppRunner(app)
