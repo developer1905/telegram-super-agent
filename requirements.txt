@@ -54,4 +54,5 @@ markitdown>=0.0.1
 
 # Ijtimoiy Tarmoqlar Video Yuklovchisi (Instagram, TikTok, YouTube)
 yt-dlp>=2024.0.0
+instaloader>=4.10.0
 

@@ -64,7 +64,7 @@ def build_reply_keyboard_menu() -> ReplyKeyboardMarkup:
             KeyboardButton(text="🌐 Saytlar (Uptime)"),
         ],
         [
-            KeyboardButton(text="⚽ Real Madrid & Xabarlar"),
+            KeyboardButton(text="📰 Yangiliklar & Tahlil"),
             KeyboardButton(text="👤 Shaxsiy Profil (Mem0)"),
         ],
         [
@@ -128,7 +128,7 @@ def build_main_menu() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="🌐 Saytlar Uptime", callback_data="menu:uptime"),
     )
     builder.row(
-        InlineKeyboardButton(text="⚽ Real Madrid & Xabarlar", callback_data="menu:news"),
+        InlineKeyboardButton(text="📰 Yangiliklar & Tahlil", callback_data="menu:news"),
         InlineKeyboardButton(text="👤 Profilim (Mem0)", callback_data="menu:mem0_profile"),
     )
     builder.row(
@@ -304,10 +304,10 @@ async def rk_uptime(message: Message) -> None:
     await message.answer(text, reply_markup=markup, parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"⚽ Real Madrid & Xabarlar", "Real Madrid & Xabarlar", "real madrid", "halamadrid", "/realmadrid", "/news"}))
+@router.message(ADMIN_FILTER, F.text.in_({"📰 Yangiliklar & Tahlil", "Yangiliklar & Tahlil", "yangiliklar", "yangilik", "/news"}))
 async def rk_news(message: Message, ai_manager: AIManager) -> None:
     from core.news_football_agent import get_topic_news
-    text, markup = await get_topic_news("realmadrid", ai_manager)
+    text, markup = await get_topic_news("dasturlash", ai_manager)
     await message.answer(text, reply_markup=markup, parse_mode="Markdown")
 
 
@@ -563,8 +563,7 @@ async def cmd_help(message: Message) -> None:
         "• `/profile` — Mem0 shaxsiy adaptiv xotira va profilingiz tahlili\n"
         "• `/todo` — Aqlli TodoList va Notion vazifalar menejeri\n"
         "• `/uptime` — Veb-saytlar va serverlar monitoringi (har 10 daqiqada tekshiruv)\n"
-        "• `/realmadrid` — Real Madrid natijalari, to'purarlar va o'yinlar taqvimi\n"
-        "• `/news` — Dasturlash, O'zbekiston, kitoblar va sport yangiliklari\n"
+        "• `/news` — Dasturlash, O'zbekiston va kitoblar bo'yicha jonli tahliliy yangiliklar\n"
         "• `/disk` & `/clean_server` — Server disk monitoringi va xavfsiz tozalash\n"
         "• `/crawl [url]` — Crawl4AI orqali saytni LLM uchun toza Markdown formatida o'qish\n"
         "• `/screenshot [url]` — Browser-use orqali real-time veb-sayt skrinshotini olish\n"
@@ -680,7 +679,7 @@ async def cb_menu_uptime(cb: CallbackQuery) -> None:
 async def cb_menu_news(cb: CallbackQuery, ai_manager: AIManager) -> None:
     await cb.answer()
     from core.news_football_agent import get_topic_news
-    text, markup = await get_topic_news("realmadrid", ai_manager)
+    text, markup = await get_topic_news("dasturlash", ai_manager)
     await safe_edit_text(cb, text, reply_markup=markup, parse_mode="Markdown")
 
 

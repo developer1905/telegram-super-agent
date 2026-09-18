@@ -29,7 +29,7 @@ fi
 if ! command -v caddy &> /dev/null; then
     echo "📥 Caddy server o'rnatilmoqda..."
     sudo apt update -qq
-    sudo apt install -y -qq debian-keyring debian-archive-keyring apt-transport-https curl
+    sudo apt install -y -qq debian-keyring debian-archive-keyring apt-transport-https curl ffmpeg
     curl -1sLF 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg --yes 2>/dev/null
     curl -1sLF 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list > /dev/null
     sudo apt update -qq

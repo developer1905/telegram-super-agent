@@ -254,69 +254,6 @@
       box-shadow: 0 0 8px rgba(13, 110, 253, 0.2);
     }
 
-    /* Real Madrid Hub Styling */
-    .madrid-hero-card {
-      background: linear-gradient(135deg, #07152b 0%, #0d3b66 50%, #004b87 100%);
-      color: #ffffff;
-      border-radius: var(--radius-custom);
-      border: 1px solid rgba(255, 215, 0, 0.25);
-      box-shadow: 0 10px 25px rgba(7, 21, 43, 0.25);
-      position: relative;
-      overflow: hidden;
-    }
-    .madrid-badge-gold {
-      background: linear-gradient(135deg, #ffd700 0%, #ffb703 100%);
-      color: #07152b;
-      font-weight: 800;
-      font-size: 11px;
-      padding: 4px 10px;
-      border-radius: 20px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      box-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
-    }
-    .scoreboard-box {
-      background: rgba(255, 255, 255, 0.08);
-      backdrop-filter: blur(8px);
-      border-radius: 14px;
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      padding: 16px;
-      text-align: center;
-    }
-    .score-digit {
-      font-family: 'Outfit', sans-serif;
-      font-size: 34px;
-      font-weight: 800;
-      color: #ffffff;
-      text-shadow: 0 0 15px rgba(0, 210, 255, 0.6);
-    }
-    .player-card {
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-      border-radius: 14px;
-      padding: 10px;
-      text-align: center;
-      transition: all 0.2s ease;
-      cursor: pointer;
-    }
-    .player-card:hover {
-      border-color: #0d6efd;
-      transform: translateY(-2px);
-      box-shadow: 0 6px 16px rgba(13, 110, 253, 0.1);
-    }
-    .player-number {
-      display: inline-block;
-      width: 26px;
-      height: 26px;
-      line-height: 26px;
-      border-radius: 50%;
-      background: #0d6efd;
-      color: #ffffff;
-      font-weight: 700;
-      font-size: 11px;
-      margin-bottom: 4px;
-    }
-
     /* Tasks / Notion list styling */
     .task-item {
       background: #ffffff;
@@ -935,114 +872,6 @@
       </div>
     </div>
 
-    <!-- ══════════════ TAB: REAL MADRID LIVE HUB ══════════════ -->
-    <div class="tab-pane-content" id="tab-madrid">
-      <!-- Match Day Hero Card -->
-      <div class="madrid-hero-card p-3 mb-3">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <div class="d-flex align-items-center gap-2">
-            <span class="fs-4">👑</span>
-            <div>
-              <div class="fw-bold text-white small">Real Madrid Hub</div>
-              <div class="text-white-50" style="font-size: 11px;">Jonli O'yin & Hodisalar Agenti</div>
-            </div>
-          </div>
-          <span class="madrid-badge-gold" id="rm-match-status-badge">Tekshirilmoqda</span>
-        </div>
-
-        <div class="scoreboard-box mb-3">
-          <div class="d-flex justify-content-around align-items-center">
-            <div class="text-center">
-              <div class="fs-2 mb-1">⚪</div>
-              <div class="fw-bold small text-white">Real Madrid</div>
-            </div>
-            <div class="text-center px-2">
-              <div class="score-digit" id="rm-score-display">0 : 0</div>
-              <span class="badge bg-warning text-dark px-2 py-1" id="rm-minute-badge" style="font-size: 10px;">—</span>
-            </div>
-            <div class="text-center">
-              <div class="fs-2 mb-1" id="rm-opp-logo">🛡️</div>
-              <div class="fw-bold small text-white" id="rm-opp-name">Raqib</div>
-            </div>
-          </div>
-          <div class="mt-2 text-white-50 small" id="rm-tournament-info">La Liga / Chempionlar Ligasi</div>
-        </div>
-
-        <!-- Action Controls -->
-        <div class="d-flex justify-content-between align-items-center pt-2 border-top border-white-subtle">
-          <div class="form-check form-switch mb-0">
-            <input class="form-check-input" type="checkbox" id="rm-notify-toggle" checked>
-            <label class="form-check-label text-white small" for="rm-notify-toggle" style="font-size: 12px;">Telegram push-xabarnoma</label>
-          </div>
-          <button class="btn btn-sm btn-outline-light rounded-pill px-3 py-1" id="btn-refresh-madrid" onclick="loadRealMadridLive(true)">
-            <i class="bi bi-arrow-clockwise me-1"></i> Yangilash
-          </button>
-        </div>
-      </div>
-
-      <!-- Live Match Events Feed -->
-      <div class="neon-card p-3 mb-3">
-        <div class="neon-card-header">
-          <span><i class="bi bi-broadcast me-2 text-danger"></i>Jonli O'yin Hodisalari</span>
-          <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Real-Time</span>
-        </div>
-        <div id="rm-events-feed" class="d-flex flex-column gap-2">
-          <div class="text-center text-muted py-3">O'yin ma'lumotlari yangilanmoqda...</div>
-        </div>
-      </div>
-
-      <!-- Star Players -->
-      <div class="neon-card p-3 mb-3">
-        <div class="neon-card-header">
-          <span><i class="bi bi-star-fill me-2 text-warning"></i>Real Madrid Yulduzlari</span>
-        </div>
-        <div class="row g-2">
-          <div class="col-4">
-            <div class="player-card" onclick="askAboutPlayer('Vinicius Jr bugungi forma va statistikasi')">
-              <div class="player-number">7</div>
-              <div class="fw-bold small">Vinicius Jr</div>
-              <div class="text-muted" style="font-size: 10px;">Hujumchi</div>
-            </div>
-          </div>
-          <div class="col-4">
-            <div class="player-card" onclick="askAboutPlayer('Kylian Mbappe bugungi gollari va statistikasi')">
-              <div class="player-number">9</div>
-              <div class="fw-bold small">Mbappé</div>
-              <div class="text-muted" style="font-size: 10px;">Hujumchi</div>
-            </div>
-          </div>
-          <div class="col-4">
-            <div class="player-card" onclick="askAboutPlayer('Jude Bellingham statistikasi')">
-              <div class="player-number">5</div>
-              <div class="fw-bold small">Bellingham</div>
-              <div class="text-muted" style="font-size: 10px;">Yarim himoya</div>
-            </div>
-          </div>
-          <div class="col-4">
-            <div class="player-card" onclick="askAboutPlayer('Rodrygo Goes formasi')">
-              <div class="player-number">11</div>
-              <div class="fw-bold small">Rodrygo</div>
-              <div class="text-muted" style="font-size: 10px;">Qanot hujumchi</div>
-            </div>
-          </div>
-          <div class="col-4">
-            <div class="player-card" onclick="askAboutPlayer('Federico Valverde statistikasi')">
-              <div class="player-number">8</div>
-              <div class="fw-bold small">Valverde</div>
-              <div class="text-muted" style="font-size: 10px;">Yarim himoya</div>
-            </div>
-          </div>
-          <div class="col-4">
-            <div class="player-card" onclick="askAboutPlayer('Luka Modric bugungi o\'yini')">
-              <div class="player-number">10</div>
-              <div class="fw-bold small">Luka Modrić</div>
-              <div class="text-muted" style="font-size: 10px;">Kapitan</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- ══════════════ TAB: NOTION & TODO LIST ══════════════ -->
     <div class="tab-pane-content" id="tab-tasks">
       <!-- Add Task Card -->
@@ -1067,7 +896,7 @@
         <!-- Quick Preset Chips -->
         <div class="d-flex gap-1 overflow-x-auto text-nowrap pt-1">
           <span class="quick-chip" onclick="setQuickTask('Bugun yangi pochtalarni tekshirish')">📩 Pochta</span>
-          <span class="quick-chip" onclick="setQuickTask('Real Madrid jonli o\'yinini kuzatish')">⚽ Real Madrid</span>
+          <span class="quick-chip" onclick="setQuickTask('Dasturlash va AI yangiliklarini tahlil qilish')">💻 Dasturlash</span>
           <span class="quick-chip" onclick="setQuickTask('Serverni xavfsiz tozalash va diskni bo\'shatish')">🧹 Server</span>
           <span class="quick-chip" onclick="setQuickTask('Telegram kanalga IT yangiliklar posti chiqarish')">📱 Kanal Post</span>
         </div>
@@ -1126,7 +955,7 @@
           <!-- Quick Idea Chips -->
           <div class="d-flex gap-1 overflow-x-auto text-nowrap mb-2">
             <span class="quick-chip" onclick="setQuickMjPrompt('Futuristik Toshkent 2050, uchuvchi elektromobillar, neon minoralar')">🏙️ Toshkent 2050</span>
-            <span class="quick-chip" onclick="setQuickMjPrompt('Real Madrid Chempionlar ligasi kubogi bilan Santiago Bernabeuda')">🏆 Real Madrid Kubok</span>
+            <span class="quick-chip" onclick="setQuickMjPrompt('Alisher Navoiy kutubxonasi futuristik kiberpank uslubida, 8k ultra-detailed')">🏛️ Kiber Kutubxona</span>
             <span class="quick-chip" onclick="setQuickMjPrompt('Cyberpunk samuray yomg\'ir ostida kiber shahar ko\'chasida')">⚔️ Kiber Samuray</span>
             <span class="quick-chip" onclick="setQuickMjPrompt('Kosmik tadqiqot kemasi qora tuynuk yaqinida, 8k cinematic')">🚀 Kosmik Kema</span>
           </div>
@@ -1382,10 +1211,6 @@
       <i class="bi bi-chat-dots-fill"></i>
       <span>AI Agent</span>
     </button>
-    <button type="button" class="dock-tab" data-tab="madrid">
-      <i class="bi bi-trophy-fill"></i>
-      <span>Madrid ⚽</span>
-    </button>
     <button type="button" class="dock-tab" data-tab="tasks">
       <i class="bi bi-check2-square"></i>
       <span>Vazifalar</span>
@@ -1466,7 +1291,6 @@
 
       haptic('light');
 
-      if (tabId === 'madrid') loadRealMadridLive();
       if (tabId === 'tasks') loadTasks();
       if (tabId === 'tools') initToolsTab();
       if (tabId === 'reminders') loadReminders();
@@ -2041,97 +1865,7 @@
         .replace(/'/g, '&#039;');
     }
 
-    // ─── 1. REAL MADRID LIVE & MATCH HUB ────────────────────────
-    let rmInterval = null;
-
-    async function loadRealMadridLive(force = false) {
-      const badge = document.getElementById('rm-match-status-badge');
-      const scoreDisplay = document.getElementById('rm-score-display');
-      const minuteBadge = document.getElementById('rm-minute-badge');
-      const oppName = document.getElementById('rm-opp-name');
-      const tourInfo = document.getElementById('rm-tournament-info');
-      const eventsFeed = document.getElementById('rm-events-feed');
-
-      if (!badge) return;
-
-      if (force) {
-        haptic('light');
-        badge.innerText = 'Tekshirilmoqda...';
-      }
-
-      try {
-        const res = await fetch('/api/realmadrid_live');
-        if (res.ok) {
-          const data = await res.json();
-          if (data.is_match_today) {
-            badge.innerText = data.is_live ? 'JONLI EFIR 🔴' : 'BUGUN O\'YIN! 🔥';
-            badge.className = data.is_live ? 'badge bg-danger text-white px-2 py-1' : 'madrid-badge-gold';
-          } else {
-            badge.innerText = 'Navbatdagi O\'yin';
-            badge.className = 'badge bg-secondary text-white px-2 py-1';
-          }
-
-          scoreDisplay.innerText = data.score || '0 : 0';
-          minuteBadge.innerText = data.minute ? `${data.minute}'` : (data.status || 'Kutilmoqda');
-          oppName.innerText = data.opponent || 'Raqib';
-          tourInfo.innerText = `${data.tournament || 'La Liga'} • ${data.kickoff_time || '23:00 (Toshkent)'}`;
-
-          const events = data.events || [];
-          if (events.length === 0) {
-            eventsFeed.innerHTML = `
-              <div class="text-center text-muted py-3">
-                <i class="bi bi-shield-check fs-4 text-primary d-block mb-1"></i>
-                ${data.is_live ? 'O\'yin davom etmoqda, hodisalar kutilmoqda...' : 'Bugun o\'yin paytida jonli gollar va xavfli vaziyatlar shu yerda chiqadi.'}
-              </div>
-            `;
-          } else {
-            let html = '';
-            events.slice(-8).reverse().forEach(ev => {
-              let icon = 'bi-bell-fill text-primary';
-              let badgeBg = 'bg-primary-subtle text-primary';
-              if (ev.includes('Gol') || ev.includes('⚽')) {
-                icon = 'bi-trophy-fill text-success';
-                badgeBg = 'bg-success-subtle text-success';
-              } else if (ev.includes('Qizil') || ev.includes('qizil') || ev.includes('🟥')) {
-                icon = 'bi-slash-circle-fill text-danger';
-                badgeBg = 'bg-danger-subtle text-danger';
-              } else if (ev.includes('Xavfli') || ev.includes('⚠️')) {
-                icon = 'bi-exclamation-triangle-fill text-warning';
-                badgeBg = 'bg-warning-subtle text-warning';
-              }
-
-              html += `
-                <div class="white-list-item py-2 px-3">
-                  <div class="d-flex align-items-center gap-2">
-                    <i class="bi ${icon}"></i>
-                    <span class="small fw-semibold text-dark">${escapeHtml(ev)}</span>
-                  </div>
-                  <span class="badge ${badgeBg} border px-2 py-1" style="font-size: 10px;">Jonli</span>
-                </div>
-              `;
-            });
-            eventsFeed.innerHTML = html;
-          }
-
-          if (force) showToast('Real Madrid statusi yangilandi!');
-        }
-      } catch (err) {
-        console.warn('Real Madrid yuklash xatosi:', err);
-      }
-    }
-
-    function askAboutPlayer(query) {
-      haptic('medium');
-      switchTab('agent');
-      const input = document.getElementById('agent-input');
-      if (input) {
-        input.value = query;
-        const sendBtn = document.getElementById('btn-send-agent');
-        if (sendBtn) sendBtn.click();
-      }
-    }
-
-    // ─── 2. NOTION & SMART TODO LIST ────────────────────────────
+    // ─── 1. NOTION & SMART TODO LIST ────────────────────────────
     let allTasksData = [];
     let currentTaskFilter = 'all';
 
@@ -2626,9 +2360,7 @@
 
     // Initial load
     loadStats();
-    loadRealMadridLive();
     setInterval(loadStats, 15000);
-    setInterval(loadRealMadridLive, 60000);
   </script>
 </body>
 </html>

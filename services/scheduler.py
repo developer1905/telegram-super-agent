@@ -423,46 +423,6 @@ async def check_uptime_monitors_job(bot: "Bot") -> None:
         logger.debug("check_uptime_monitors_job xatosi: %s", exc)
 
 
-async def check_real_madrid_schedule_job(bot: "Bot") -> None:
-    """Real Madrid o'yin kuni ekanligini tekshirib, agar o'yin bo'lsa adminga eslatma yuborish."""
-    try:
-        from core.real_madrid_live import check_morning_match_announcement
-        announcement = await check_morning_match_announcement()
-        if announcement:
-            from core.safe_send import safe_send_message
-            await safe_send_message(
-                bot=bot,
-                chat_id=ADMIN_ID,
-                text=announcement,
-                parse_mode="Markdown",
-            )
-            logger.info("Real Madrid o'yin kuni eslatmasi adminga yuborildi.")
-    except Exception as exc:
-        logger.debug("check_real_madrid_schedule_job xatosi: %s", exc)
-
-
-async def check_real_madrid_live_events_job(bot: "Bot") -> None:
-    """Real Madrid o'yinidagi jonli hodisalarni (Boshlandi, Gol, Tugadi) tekshirib yuborish."""
-    try:
-        from core.real_madrid_live import poll_live_match_events
-        alerts = await poll_live_match_events()
-        for alert_text in alerts:
-            try:
-                from core.safe_send import safe_send_message
-                await safe_send_message(
-                    bot=bot,
-                    chat_id=ADMIN_ID,
-                    text=alert_text,
-                    parse_mode="Markdown",
-                )
-                logger.info("Real Madrid jonli o'yin hodisasi yuborildi.")
-                await asyncio.sleep(0.5)
-            except Exception as send_err:
-                logger.debug("Real Madrid alert yuborishda xato: %s", send_err)
-    except Exception as exc:
-        logger.debug("check_real_madrid_live_events_job xatosi: %s", exc)
-
-
 # ─── Scheduler Sozlash ────────────────────────────────────────
 
 def setup_scheduler(bot: "Bot", ai_manager: "AIManager") -> AsyncIOScheduler:
@@ -566,37 +526,8 @@ def setup_scheduler(bot: "Bot", ai_manager: "AIManager") -> AsyncIOScheduler:
         misfire_grace_time=60,
     )
 
-    # 7. Real Madrid o'yin kuni eslatmasi (har kuni soat 10:30 da)
-    scheduler.add_job(
-        check_real_madrid_schedule_job,
-        trigger=CronTrigger(
-            hour=10,
-            minute=30,
-            timezone="Asia/Tashkent",
-        ),
-        args=[bot],
-        id="rm_schedule_check",
-        name="Real Madrid O'yin Kuni Eslatmasi",
-        replace_existing=True,
-        misfire_grace_time=300,
-    )
-
-    # 8. Real Madrid jonli o'yin hodisalari tekshiruvi (har 3 daqiqada)
-    scheduler.add_job(
-        check_real_madrid_live_events_job,
-        trigger=IntervalTrigger(
-            minutes=3,
-            timezone="Asia/Tashkent",
-        ),
-        args=[bot],
-        id="rm_live_check",
-        name="Real Madrid Jonli O'yin Kuzatuvi",
-        replace_existing=True,
-        misfire_grace_time=60,
-    )
-
     logger.info(
-        "Scheduler sozlandi: Hisobot %02d:%02d da, Email har %d daqiqada, Uptime har %d daqiqada, Real Madrid jonli kuzatuv faol",
+        "Scheduler sozlandi: Hisobot %02d:%02d da, Email har %d daqiqada, Uptime har %d daqiqada faol",
         REPORT_HOUR, REPORT_MINUTE, EMAIL_CHECK_INTERVAL, UPTIME_CHECK_INTERVAL,
     )
     return scheduler

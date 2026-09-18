@@ -1062,18 +1062,11 @@ async def handle_ai_chat(message: Message, ai_manager: AIManager) -> None:
             await message.answer("❌ Noto'g'ri ID. Masalan: `/del_site 1`")
         return
 
-    # 4.11 Real Madrid & RSS Yangiliklar (/realmadrid, /news, yangiliklar)
-    if lower_u in ("/realmadrid", "realmadrid", "real madrid", "halamadrid", "hala madrid", "real natijalari", "real o'yini"):
-        wait_msg = await message.answer("🔍 **Real Madrid bo'yicha jonli internet qidiruv va AI tahlili olib borilmoqda...**", parse_mode="Markdown")
-        from core.news_football_agent import get_real_madrid_report, build_news_keyboard
-        report_text = await get_real_madrid_report(ai_manager)
-        await safe_edit_text(wait_msg, report_text, reply_markup=build_news_keyboard("realmadrid"), parse_mode="Markdown")
-        return
-
-    if lower_u in ("/news", "news", "yangiliklar", "xabarlar"):
+    # 4.11 RSS Yangiliklar & Tahlil (/news, yangiliklar)
+    if lower_u in ("/news", "news", "yangiliklar", "yangilik", "xabarlar"):
         wait_msg = await message.answer("🔍 **Internetdan eng so'nggi yangiliklar yig'ilmoqda va tahlil qilinmoqda...**", parse_mode="Markdown")
         from core.news_football_agent import get_topic_news
-        report_text, markup = await get_topic_news("realmadrid", ai_manager)
+        report_text, markup = await get_topic_news("dasturlash", ai_manager)
         await safe_edit_text(wait_msg, report_text, reply_markup=markup, parse_mode="Markdown")
         return
 

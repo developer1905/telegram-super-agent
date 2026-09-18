@@ -40,10 +40,6 @@ RSS_SOURCES = {
     "uzbekistan": [
         "https://kun.uz/rss",
         "https://daryo.uz/rss",
-    ],
-    "realmadrid": [
-        "https://www.goal.com/feeds/en/news",
-        "https://www.marca.com/rss/futbol/real-madrid.xml",
     ]
 }
 
@@ -75,26 +71,22 @@ async def fetch_rss_feed_items(url: str, limit: int = 4) -> List[Dict[str, str]]
     return items
 
 
-def build_news_keyboard(current_topic: str = "realmadrid") -> InlineKeyboardMarkup:
-    """Mavzular bo'yicha navigatsiya tugmalari."""
+def build_news_keyboard(current_topic: str = "dasturlash") -> InlineKeyboardMarkup:
+    """Mavzular bo'yicha navigatsiya tugmalari (Dasturlash, O'zbekiston, Kitoblar)."""
     builder = InlineKeyboardBuilder()
     builder.row(
         InlineKeyboardButton(
-            text="👑 Real Madrid" if current_topic != "realmadrid" else "👑 Real Madrid (Tanlangan)",
-            callback_data="news:realmadrid"
+            text="💻 Dasturlash & IT" if current_topic != "dasturlash" else "💻 Dasturlash (Faol)",
+            callback_data="news:dasturlash"
         ),
         InlineKeyboardButton(
-            text="💻 Dasturlash" if current_topic != "dasturlash" else "💻 Dasturlash (Tanlangan)",
-            callback_data="news:dasturlash"
+            text="🇺🇿 O'zbekiston" if current_topic != "uzbekistan" else "🇺🇿 O'zbekiston (Faol)",
+            callback_data="news:uzbekistan"
         ),
     )
     builder.row(
         InlineKeyboardButton(
-            text="🇺🇿 O'zbekiston" if current_topic != "uzbekistan" else "🇺🇿 O'zbekiston (Tanlangan)",
-            callback_data="news:uzbekistan"
-        ),
-        InlineKeyboardButton(
-            text="📚 Kitoblar" if current_topic != "books" else "📚 Kitoblar (Tanlangan)",
+            text="📚 Kitoblar & Bestseller" if current_topic != "books" else "📚 Kitoblar (Faol)",
             callback_data="news:books"
         ),
     )
@@ -105,60 +97,7 @@ def build_news_keyboard(current_topic: str = "realmadrid") -> InlineKeyboardMark
     return builder.as_markup()
 
 
-# ─── 1. REAL MADRID JONLI INTEL AGENTI ─────────────────────────
-
-async def get_real_madrid_report(ai_manager: Optional["AIManager"] = None) -> str:
-    """
-    Internetdan Real Madridning so'nggi o'yinlari, natijalari, to'purarlari va
-    kelgusi o'yinlari haqida jonli ma'lumot qidirib, AI orqali professional
-    va faktlarga to'la hisobot tayyorlaydi.
-    """
-    from core.search_agent import search_realtime_news
-    import datetime
-
-    today_str = datetime.datetime.now().strftime("%Y-yil %d-%B")
-
-    # 1. Internetdan real vaqtda jonli qidiruv (Google News RSS + Fresh DDG)
-    search_query = "Real Madrid latest match result score goals scorers La Liga Champions League"
-    live_web_data = await search_realtime_news(search_query, category="football", max_results=6)
-
-    if not ai_manager:
-        return f"👑 **REAL MADRID C.F. — Jonli Natijalar ({today_str}):**\n\n{live_web_data}"
-
-    prompt = (
-        f"Bugungi sana: {today_str}.\n"
-        "Siz erkin fikrlaydigan, chuqur mantiqli, professional futbol tahlilchisi va Real Madrid klubining "
-        "bosh ekspert agentsiz.\n\n"
-        f"Internetdan olingan eng so'nggi jonli qidiruv va yangiliklar natijalari quyidagicha:\n{live_web_data}\n\n"
-        "VAZIFA: Ushbu yangi ma'lumotlar asosida Real Madrid muxlislari uchun "
-        "to'liq, professional, raqamlar va aniq faktlar bilan boyitilgan batafsil hisobot tayyorlang.\n\n"
-        "QAT'IY QOIDALAR:\n"
-        f"1. Siz hozir {today_str} holatida tahlil qilyapsiz. Faqat eng so'nggi bo'lib o'tgan o'yin natijasini tahlil qiling.\n"
-        "2. Eski yillardagi (2022, 2023, 2024 yoki 2025 boshidagi) o'yinlarni yangi deb ko'rsatmang! "
-        "Manbalardagi [Sana: ...] ko'rsatkichiga qarang.\n"
-        "3. Raqib nomi, aniq hisob, gollar mualliflari va daqiqalari aniq yozilsin.\n\n"
-        "Hisobot quyidagi bo'limlardan iborat bo'lsin:\n"
-        "1. 🏆 **So'nggi O'yin Natijasi:** Raqib, yakuniy hisob, gollarni kim nechanchi daqiqada urgani va o'yin qisqacha mazmuni.\n"
-        "2. 📊 **Musobaqalardagi Holat (Raqamlar bilan):**\n"
-        "   • **La Liga EA Sports:** O'rni, ochkolar, gollar nisbati\n"
-        "   • **UEFA Champions League:** Holat va navbatdagi bosqich\n"
-        "   • **Copa del Rey & Supercopa de España:** Yangiliklar\n"
-        "3. ⚽ **Jamoa To'purarlari & Yulduzlar:**\n"
-        "   • Kylian Mbappé, Vinícius Júnior, Jude Bellingham, Rodrygo va boshqalarning natijalari\n"
-        "4. 🏟 **Navbatdagi O'yin:** Raqib jamoa, o'tkazilish sanasi va kutilayotgan taktika\n"
-        "5. 🎙 **Ekspert Agent Xulosasi:** 2-3 jumlada erkin, jonli va jamoaning kuchli tomonlarini baholovchi fikr ('¡Hala Madrid!').\n\n"
-        "Barcha ma'lumotlar aniq o'zbek tilida, chiroyli emojilar va aniq raqamlar bilan yozilsin."
-    )
-
-    try:
-        report = await ai_manager.generate(prompt, save_history=False)
-        return report.strip()
-    except Exception as exc:
-        logger.error("Real Madrid AI tahlil xatosi: %s", exc)
-        return f"👑 **REAL MADRID — Jonli Qidiruv ({today_str}):**\n\n{live_web_data}"
-
-
-# ─── 2. DASTURLASH VA TEXNOLOGIYALAR ──────────────────────────
+# ─── 1. DASTURLASH VA TEXNOLOGIYALAR ──────────────────────────
 
 async def get_programming_news(ai_manager: Optional["AIManager"] = None) -> str:
     """Dasturlash va IT yangiliklarini internetdan qidirib AI orqali tahlil qilish."""
@@ -253,25 +192,19 @@ async def get_books_recommendations(ai_manager: Optional["AIManager"] = None) ->
         return "📚 Kitoblar tavsiyasi tayyorlanmoqda."
 
 
-# ─── 5. ASOSIY DISPETCHER ─────────────────────────────────────
+# ─── 4. ASOSIY DISPETCHER ─────────────────────────────────────
 
 async def get_topic_news(topic: str, ai_manager: Optional["AIManager"] = None) -> tuple[str, InlineKeyboardMarkup]:
     """Tanlangan mavzu bo'yicha internetdan izlab, AI bilan qayta ishlangan hisobot qaytaradi."""
     clean_t = topic.lower().strip()
-    if clean_t in ("realmadrid", "real", "madrid", "futbol"):
-        text = await get_real_madrid_report(ai_manager)
-        current = "realmadrid"
-    elif clean_t in ("dasturlash", "tech", "it", "kod"):
-        text = await get_programming_news(ai_manager)
-        current = "dasturlash"
-    elif clean_t in ("uzbekistan", "uz", "ozbekiston"):
+    if clean_t in ("uzbekistan", "uz", "ozbekiston"):
         text = await get_uzbekistan_news(ai_manager)
         current = "uzbekistan"
     elif clean_t in ("books", "kitoblar", "kitob"):
         text = await get_books_recommendations(ai_manager)
         current = "books"
     else:
-        text = await get_real_madrid_report(ai_manager)
-        current = "realmadrid"
+        text = await get_programming_news(ai_manager)
+        current = "dasturlash"
 
     return text, build_news_keyboard(current)

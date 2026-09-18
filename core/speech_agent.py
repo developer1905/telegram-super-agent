@@ -168,16 +168,6 @@ async def process_voice_agent_message(
                     await message.reply_voice(voice=BufferedInputFile(file=v_bytes, filename="rem.mp3"))
                 return
 
-        # 4.3 Real Madrid so'rovi
-        if any(w in user_text.lower() for w in ["real madrid", "madrid", "hisob", "o'yin", "gol"]):
-            from core.real_madrid_live import get_live_match_status_json
-            from core.news_football_agent import get_real_madrid_briefing
-            briefing = await get_real_madrid_briefing(ai_manager)
-            await safe_edit_text(status_msg, briefing, parse_mode="Markdown")
-            v_bytes = await generate_speech_audio(briefing[:600])
-            if v_bytes:
-                await message.reply_voice(voice=BufferedInputFile(file=v_bytes, filename="rm.mp3"))
-            return
 
         # 4.4 Midjourney rasm chizish
         if any(w in user_text.lower() for w in ["rasm chiz", "chizib ber", "chiz", "imagine"]):

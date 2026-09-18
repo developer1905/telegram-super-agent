@@ -398,15 +398,6 @@ async def api_chat_agent_handler(request: web.Request) -> web.Response:
         return web.json_response({"status": "error", "message": str(exc)}, status=500)
 
 
-async def api_realmadrid_live_handler(request: web.Request) -> web.Response:
-    """Mini App: Real Madrid jonli o'yin statusi va yulduzlar."""
-    try:
-        from core.real_madrid_live import get_live_match_status_json
-        data = await get_live_match_status_json()
-        return web.json_response(data)
-    except Exception as exc:
-        logger.error("api_realmadrid_live xatosi: %s", exc)
-        return web.json_response({"status": "error", "message": str(exc)}, status=500)
 
 
 async def api_tasks_get_handler(request: web.Request) -> web.Response:
@@ -630,7 +621,6 @@ async def start_web_server(ai_manager: AIManager, bot: Optional[Bot] = None) -> 
     app.router.add_post("/api/chat_agent", api_chat_agent_handler)
 
     # Yangi Super-Agent Vositalari
-    app.router.add_get("/api/realmadrid_live", api_realmadrid_live_handler)
     app.router.add_get("/api/tasks", api_tasks_get_handler)
     app.router.add_post("/api/tasks/add", api_tasks_add_handler)
     app.router.add_post("/api/tasks/toggle", api_tasks_toggle_handler)
