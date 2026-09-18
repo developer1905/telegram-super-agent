@@ -325,7 +325,7 @@ async def api_chat_agent_handler(request: web.Request) -> web.Response:
         try:
             from core.midjourney_agent import draw_midjourney_image
             import base64
-            img_bytes, enhanced, ar, seed = await draw_midjourney_image(raw_prompt, ai_manager)
+            img_bytes, enhanced, ar, seed, *_ = await draw_midjourney_image(raw_prompt, ai_manager)
             if img_bytes:
                 b64_img = base64.b64encode(img_bytes).decode("utf-8")
                 return web.json_response({
@@ -526,12 +526,15 @@ async def api_generate_image_handler(request: web.Request) -> web.Response:
         prompt = data.get("prompt", "").strip()
         aspect_ratio = data.get("aspect_ratio", "1:1")
         style = data.get("style", "photo")
+        model = data.get("model", "flux")
         if not prompt:
             return web.json_response({"status": "error", "message": "Prompt kiritilmadi"}, status=400)
         from core.midjourney_agent import draw_midjourney_image
         import base64
         full_prompt = prompt if "--style" in prompt else f"{prompt} --style {style}"
-        img_bytes, enhanced, ar, seed = await draw_midjourney_image(full_prompt, ai_manager, aspect_ratio=aspect_ratio)
+        img_bytes, enhanced, ar, seed, used_model, *_ = await draw_midjourney_image(
+            full_prompt, ai_manager, aspect_ratio=aspect_ratio, model=model
+        )
         if img_bytes:
             b64_img = base64.b64encode(img_bytes).decode("utf-8")
             return web.json_response({
@@ -539,7 +542,8 @@ async def api_generate_image_handler(request: web.Request) -> web.Response:
                 "image_base64": f"data:image/jpeg;base64,{b64_img}",
                 "enhanced_prompt": enhanced,
                 "aspect_ratio": ar,
-                "seed": seed
+                "seed": seed,
+                "model": used_model,
             })
         return web.json_response({"status": "error", "message": "Rasm yaratishda xatolik"}, status=500)
     except Exception as exc:

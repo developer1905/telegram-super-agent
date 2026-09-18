@@ -5,11 +5,12 @@ Imkoniyatlar:
 1. Foydalanuvchi so'rovini Midjourney v6 / FLUX.1 darajasidagi professional promptga aylantirish (AI Prompt Enhancer)
 2. Pollinations Keyed Gateway (Haqiqiy FLUX.1-schnell, GPT-Image-2, Z-Image Turbo) — 100% fotorealistik, yuzlar va detallar benuqson
 3. Cloudflare Workers AI (@cf/black-forest-labs/flux-1-schnell) integratsiyasi
-4. GPT4Free (g4f) Image Engine — GitHub xtekky/gpt4free dvigateli
+4. GPT4Free (g4f) Image Engine — GitHub xtekky/gpt4free dvigateli (qotib qolishdan himoyalangan)
 5. Hugging Face Serverless Inference integratsiyasi
-6. Turli badiiy uslublar: --style photo, --style anime, --style 3d, --style cyberpunk, --style art, --style vector
-7. Turli proporsiyalar: --ar 1:1, 16:9, 9:16, 4:3, 3:4
-8. 5 bosqichli avtomatik zaxira (Multi-tier Failover) — har doim eng yuqori sifatda ishlaydi
+6. Model tanlash: flux (FLUX.1 Schnell), gpt-image-2 (GPT-Image-2), z-image (Z-Image Turbo), flux-klein (FLUX.2 Klein)
+7. Turli badiiy uslublar: --style photo, --style anime, --style 3d, --style cyberpunk, --style art, --style vector
+8. Turli proporsiyalar: --ar 1:1, 16:9, 9:16, 4:3, 3:4
+9. 5 bosqichli tezkor avtomatik zaxira (Multi-tier Failover) — har doim eng yuqori sifatda ishlaydi
 """
 
 from __future__ import annotations
@@ -34,6 +35,9 @@ from config import (
     CLOUDFLARE_IMAGE_MODEL,
 )
 
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+
 if TYPE_CHECKING:
     from core.ai_manager import AIManager
 
@@ -48,6 +52,13 @@ ASPECT_RATIOS = {
     "3:4":  (768, 1024),
 }
 
+AVAILABLE_MODELS = {
+    "flux": "⚡ FLUX.1 Schnell (Fotorealistik)",
+    "gpt-image-2": "🤖 GPT-Image-2 (Vektor & Grafik)",
+    "z-image": "🎌 Z-Image Turbo (Anime & Tezkor)",
+    "flux-klein": "🔮 FLUX.2 Klein 4B",
+}
+
 STYLE_MODELS = {
     "anime": "z-image",
     "3d": "flux",
@@ -58,15 +69,89 @@ STYLE_MODELS = {
     "default": "flux",
 }
 
+MJ_TASKS: dict[str, dict] = {}
 
-def parse_aspect_ratio_and_style(prompt: str) -> tuple[str, str, str]:
+
+def build_mj_keyboard(
+    task_id: str,
+    current_model: str = "flux",
+    current_ar: str = "1:1",
+    current_style: str = "photo",
+) -> InlineKeyboardMarkup:
     """
-    Prompt ichidan --ar va --style parametrlarini ajratib oladi.
-    Masalan: 'samurai --ar 16:9 --style anime' -> ('samurai', '16:9', 'anime')
+    Rasm tagidagi interaktiv boshqaruv paneli:
+    - 🔄 Qayta chizish / 🎲 Yangi Seed
+    - Modellar: FLUX.1 / GPT-Image / Z-Anime / Klein
+    - O'lchamlar: 1:1 / 9:16 / 16:9 / 4:3 / 3:4
+    - Uslublar: Realizm / 3D Disney / Cyberpunk / Badiiy Art
+    """
+    builder = InlineKeyboardBuilder()
+
+    # 1-qator: Qayta chizish va Seed
+    builder.row(
+        InlineKeyboardButton(text="🔄 Qaytadan chizish", callback_data=f"mj:redraw:{task_id}"),
+        InlineKeyboardButton(text="🎲 Yangi Seed", callback_data=f"mj:seed:{task_id}"),
+    )
+
+    # 2-qator: Modellar tanlovi
+    models = [
+        ("flux", "⚡ FLUX.1"),
+        ("gpt-image-2", "🤖 GPT-Img"),
+        ("z-image", "🎌 Z-Anime"),
+        ("flux-klein", "🔮 Klein"),
+    ]
+    model_btns = []
+    for m_code, m_title in models:
+        prefix = "✅ " if current_model == m_code else ""
+        model_btns.append(
+            InlineKeyboardButton(text=f"{prefix}{m_title}", callback_data=f"mj:model:{m_code}:{task_id}")
+        )
+    builder.row(*model_btns)
+
+    # 3-qator: O'lchamlar (Proporsiyalar)
+    ratios = [
+        ("1:1", "📐 1:1"),
+        ("9:16", "📱 9:16"),
+        ("16:9", "🖥️ 16:9"),
+        ("4:3", "🖼️ 4:3"),
+        ("3:4", "📄 3:4"),
+    ]
+    ratio_btns = []
+    for ar_code, ar_title in ratios:
+        prefix = "✅ " if current_ar == ar_code else ""
+        ratio_btns.append(
+            InlineKeyboardButton(text=f"{prefix}{ar_title}", callback_data=f"mj:ar:{ar_code}:{task_id}")
+        )
+    builder.row(*ratio_btns[:3])
+    builder.row(*ratio_btns[3:])
+
+    # 4-qator: Badiiy Uslublar
+    styles = [
+        ("photo", "📸 Real"),
+        ("3d", "✨ 3D"),
+        ("cyberpunk", "👾 Kiber"),
+        ("art", "🎨 Art"),
+    ]
+    style_btns = []
+    for s_code, s_title in styles:
+        prefix = "✅ " if current_style == s_code else ""
+        style_btns.append(
+            InlineKeyboardButton(text=f"{prefix}{s_title}", callback_data=f"mj:style:{s_code}:{task_id}")
+        )
+    builder.row(*style_btns)
+
+    return builder.as_markup()
+
+
+def parse_prompt_params(prompt: str) -> tuple[str, str, str, Optional[str]]:
+    """
+    Prompt ichidan --ar, --style va --model parametrlarini ajratib oladi.
+    Masalan: 'samurai --ar 16:9 --style anime --model z-image' -> ('samurai', '16:9', 'anime', 'z-image')
     """
     cleaned = prompt
     chosen_ar = "1:1"
     chosen_style = "photo"
+    chosen_model = None
 
     ar_match = re.search(r"--ar\s+(\d+:\d+)", cleaned, re.IGNORECASE)
     if ar_match:
@@ -82,6 +167,18 @@ def parse_aspect_ratio_and_style(prompt: str) -> tuple[str, str, str]:
             chosen_style = style_candidate
         cleaned = re.sub(r"--style\s+[a-zA-Z0-9_-]+", "", cleaned, flags=re.IGNORECASE).strip()
 
+    model_match = re.search(r"--model\s+([a-zA-Z0-9_-]+)", cleaned, re.IGNORECASE)
+    if model_match:
+        model_candidate = model_match.group(1).lower().strip()
+        if model_candidate in AVAILABLE_MODELS:
+            chosen_model = model_candidate
+        cleaned = re.sub(r"--model\s+[a-zA-Z0-9_-]+", "", cleaned, flags=re.IGNORECASE).strip()
+
+    return cleaned, chosen_ar, chosen_style, chosen_model
+
+
+def parse_aspect_ratio_and_style(prompt: str) -> tuple[str, str, str]:
+    cleaned, chosen_ar, chosen_style, _ = parse_prompt_params(prompt)
     return cleaned, chosen_ar, chosen_style
 
 
@@ -139,9 +236,7 @@ async def _generate_pollinations_keyed(
     Pollinations Yangi Shlyuzi (https://gen.pollinations.ai) orqali toza FLUX.1 / GPT-Image chizish.
     Sana ga o'tib ketmaydi, 100% fotorealistik natija beradi.
     """
-    key = POLLINATIONS_API_KEY
-    if not key:
-        return None
+    key = POLLINATIONS_API_KEY or "sk_rxjymssWbXEDF7Fn6awf3iwNI82aeAfZ"
     encoded_prompt = urllib.parse.quote(prompt)
     url = (
         f"https://gen.pollinations.ai/image/{encoded_prompt}"
@@ -153,7 +248,7 @@ async def _generate_pollinations_keyed(
         "Accept": "image/webp,image/apng,image/*,*/*;q=0.8",
     }
     try:
-        timeout = aiohttp.ClientTimeout(total=40)
+        timeout = aiohttp.ClientTimeout(total=25)
         async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
             async with session.get(url) as resp:
                 if resp.status == 200:
@@ -189,7 +284,7 @@ async def _generate_cloudflare_flux(prompt: str) -> Optional[bytes]:
     }
 
     try:
-        timeout = aiohttp.ClientTimeout(total=35)
+        timeout = aiohttp.ClientTimeout(total=20)
         async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
             async with session.post(url, json=payload) as resp:
                 if resp.status == 200:
@@ -204,11 +299,12 @@ async def _generate_cloudflare_flux(prompt: str) -> Optional[bytes]:
 
 
 # ─────────────────────────────────────────────────────────────
-#  3. GPT4FREE (g4f) IMAGE ENGINE (GitHub: xtekky/gpt4free)
+#  3. GPT4FREE (g4f) IMAGE ENGINE (Qotib qolishdan himoyalangan)
 # ─────────────────────────────────────────────────────────────
 async def _generate_g4f_image(prompt: str) -> Optional[bytes]:
     """
     GitHub xtekky/gpt4free kutubxonasi orqali bepul FLUX / DALL-E rasm chizish.
+    8 soniyalik timeout bilan cheklangan (botni qotirmaydi).
     """
     try:
         from g4f.client import Client
@@ -224,15 +320,18 @@ async def _generate_g4f_image(prompt: str) -> Optional[bytes]:
                 return res.data[0].url
             return None
 
-        img_url = await asyncio.to_thread(_sync_g4f_gen)
+        # 8 soniyalik qat'iy timeout bilan bajarish
+        img_url = await asyncio.wait_for(asyncio.to_thread(_sync_g4f_gen), timeout=8.0)
         if img_url:
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=25)) as session:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as session:
                 async with session.get(img_url) as resp:
                     if resp.status == 200:
                         data = await resp.read()
                         if len(data) > 5120:
                             logger.info("✅ GPT4Free (g4f) orqali rasm olindi (%d bayt)", len(data))
                             return data
+    except asyncio.TimeoutError:
+        logger.warning("g4f image generation vaqt tugadi (timeout: 8s), zaxiraga o'tilmoqda")
     except Exception as exc:
         logger.warning("g4f image engine xatosi: %s", exc)
     return None
@@ -261,7 +360,7 @@ async def _generate_huggingface_image(prompt: str) -> Optional[bytes]:
 
     for ep in hf_endpoints:
         try:
-            timeout = aiohttp.ClientTimeout(total=30)
+            timeout = aiohttp.ClientTimeout(total=20)
             async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
                 async with session.post(ep, json=payload) as resp:
                     if resp.status == 200:
@@ -282,6 +381,7 @@ async def generate_free_midjourney_image(
     aspect_ratio: str = "1:1",
     style: str = "photo",
     seed: Optional[int] = None,
+    model: Optional[str] = None,
 ) -> Optional[bytes]:
     """
     Yuqori sifatli FLUX.1, Midjourney v6, Cloudflare, g4f va Pollinations Keyed dvigatellari.
@@ -291,15 +391,15 @@ async def generate_free_midjourney_image(
     if seed is None:
         seed = random.randint(100000, 99999999)
 
-    model_name = STYLE_MODELS.get(style, "flux")
+    target_model = model or STYLE_MODELS.get(style, "flux")
 
     # 1-QATLAM: Pollinations Yangi Shlyuzi (API Kalit bilan — toza FLUX.1 / GPT-Image-2)
-    img_data = await _generate_pollinations_keyed(prompt, width, height, model_name, seed)
+    img_data = await _generate_pollinations_keyed(prompt, width, height, target_model, seed)
     if img_data:
         return img_data
 
-    # Agar tanlangan model 'z-image' yoki boshqa bo'lsa va ishlamasa, 'flux' bilan qayta urinish
-    if model_name != "flux":
+    # Agar tanlangan model boshqa bo'lsa va ishlamasa, 'flux' bilan sinab ko'rish
+    if target_model != "flux":
         img_data = await _generate_pollinations_keyed(prompt, width, height, "flux", seed)
         if img_data:
             return img_data
@@ -329,7 +429,7 @@ async def generate_free_midjourney_image(
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
         }
-        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=25), headers=headers) as session:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20), headers=headers) as session:
             async with session.get(url_fallback) as resp:
                 if resp.status == 200:
                     data = await resp.read()
@@ -360,7 +460,7 @@ async def generate_paid_midjourney_api(prompt: str, aspect_ratio: str = "1:1") -
     }
 
     try:
-        timeout = aiohttp.ClientTimeout(total=45)
+        timeout = aiohttp.ClientTimeout(total=35)
         async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
             async with session.post(MIDJOURNEY_API_URL, json=payload) as resp:
                 if resp.status in (200, 201):
@@ -386,16 +486,18 @@ async def draw_midjourney_image(
     aspect_ratio: str = "1:1",
     seed: Optional[int] = None,
     enhance: bool = True,
-) -> tuple[Optional[bytes], str, str, int]:
+    model: Optional[str] = None,
+) -> tuple[Optional[bytes], str, str, int, str]:
     """
     Midjourney / FLUX.1 orqali rasm chizishning asosiy integratsiya funksiyasi.
     
     Qaytaradi:
-        (image_bytes, enhanced_prompt, aspect_ratio, seed)
+        (image_bytes, enhanced_prompt, aspect_ratio, seed, used_model)
     """
-    # 1. Proporsiya va uslubni ajratib olish
-    cleaned_prompt, extracted_ar, extracted_style = parse_aspect_ratio_and_style(raw_prompt)
+    # 1. Proporsiya, uslub va model parametrlarini ajratib olish
+    cleaned_prompt, extracted_ar, extracted_style, extracted_model = parse_prompt_params(raw_prompt)
     chosen_ar = extracted_ar if extracted_ar != "1:1" else aspect_ratio
+    chosen_model = model or extracted_model
 
     # 2. Promptni tanlangan uslub bo'yicha AI bilan boyitish
     if enhance:
@@ -408,8 +510,11 @@ async def draw_midjourney_image(
 
     # 3. Rasm generatsiyasi
     image_bytes = None
+    used_model = chosen_model or "flux"
     if MIDJOURNEY_API_KEY:
         image_bytes = await generate_paid_midjourney_api(prompt_to_use, chosen_ar)
+        if image_bytes:
+            used_model = "midjourney_v6"
 
     if not image_bytes:
         image_bytes = await generate_free_midjourney_image(
@@ -417,6 +522,7 @@ async def draw_midjourney_image(
             aspect_ratio=chosen_ar,
             style=extracted_style,
             seed=seed,
+            model=chosen_model,
         )
 
-    return image_bytes, prompt_to_use, chosen_ar, seed
+    return image_bytes, prompt_to_use, chosen_ar, seed, used_model

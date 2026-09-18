@@ -22,6 +22,7 @@ Imkoniyatlar:
 from __future__ import annotations
 
 import datetime
+import html
 import io
 import logging
 import os
@@ -47,7 +48,7 @@ from core.expert_agents import (
     ViralSMMAgent,
 )
 from core.media_downloader import extract_media_url, download_social_video
-from core.midjourney_agent import draw_midjourney_image
+from core.midjourney_agent import draw_midjourney_image, MJ_TASKS, build_mj_keyboard, AVAILABLE_MODELS
 from core.reminder_manager import parse_reminder_smart
 from core.safe_send import safe_send_message, safe_message_reply, safe_message_answer
 from services.scheduler import LogCollector
@@ -346,24 +347,35 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
         if not prompt_query and message.reply_to_message:
             prompt_query = message.reply_to_message.text or message.reply_to_message.caption or ""
         if prompt_query:
-            wait_m = await message.reply("🎨 **FLUX.1 rasm chizmoqda...** Bir necha soniya kuting...")
+            wait_m = await message.reply("🎨 <b>Super-Agent Studio rasm chizmoqda...</b> Bir necha soniya kuting...", parse_mode="HTML")
             try:
                 await bot.send_chat_action(message.chat.id, "upload_photo")
-                img_bytes, enhanced_p, ar, seed = await draw_midjourney_image(
+                img_bytes, enhanced_p, ar, seed, used_model, *_ = await draw_midjourney_image(
                     raw_prompt=prompt_query,
                     ai_manager=ai_manager,
                     enhance=True,
                 )
                 if img_bytes:
-                    photo_file = BufferedInputFile(file=img_bytes, filename=f"flux_{uuid.uuid4().hex[:6]}.jpg")
+                    task_id = uuid.uuid4().hex[:8]
+                    MJ_TASKS[task_id] = {
+                        "prompt": prompt_query,
+                        "enhanced": enhanced_p,
+                        "ar": ar,
+                        "seed": seed,
+                        "model": used_model,
+                        "style": "photo",
+                    }
+                    reply_markup = build_mj_keyboard(task_id, current_model=used_model, current_ar=ar, current_style="photo")
+                    photo_file = BufferedInputFile(file=img_bytes, filename=f"flux_{task_id}.jpg")
+                    model_title = AVAILABLE_MODELS.get(used_model, used_model).split("(")[0].strip()
                     caption = (
-                        f"🎨 **FLUX.1 Badiiy Asari:**\n\n"
+                        f"🎨 <b>Super-Agent Studio: {html.escape(model_title)}</b>\n\n"
                         f"📝 <i>{html.escape(prompt_query)}</i>\n"
                         f"📐 O'lcham: <code>{ar}</code> | 🎲 Seed: <code>{seed}</code>\n"
-                        f"🤖 <b>Super-Agent Studio</b>"
+                        f"🤖 <b>Super-Agent</b>"
                     )
                     await wait_m.delete()
-                    await message.reply_photo(photo=photo_file, caption=caption, parse_mode="HTML")
+                    await message.reply_photo(photo=photo_file, caption=caption, reply_markup=reply_markup, parse_mode="HTML")
                     return
                 else:
                     await wait_m.edit_text("❌ Rasm chizishda xatolik yuz berdi. Iltimos, qayta urinib ko'ring.")
@@ -673,7 +685,7 @@ async def handle_channel_post(message: Message, ai_manager: AIManager, bot: Bot)
         p_query = clean_text or raw_text
         try:
             await bot.send_chat_action(message.chat.id, "upload_photo")
-            img_bytes, enhanced_p, ar, seed = await draw_midjourney_image(raw_prompt=p_query, ai_manager=ai_manager, enhance=True)
+            img_bytes, enhanced_p, ar, seed, *_ = await draw_midjourney_image(raw_prompt=p_query, ai_manager=ai_manager, enhance=True)
             if img_bytes:
                 photo_file = BufferedInputFile(file=img_bytes, filename=f"channel_flux_{uuid.uuid4().hex[:6]}.jpg")
                 caption = (

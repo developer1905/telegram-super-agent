@@ -174,10 +174,10 @@ async def process_voice_agent_message(
             raw_prompt = re.sub(r"^(?:rasm\s+chiz|chizib\s+ber|chiz|imagine)[:\s]+", "", user_text, flags=re.IGNORECASE).strip()
             from core.midjourney_agent import draw_midjourney_image
             await safe_edit_text(status_msg, f"🎨 **Midjourney v6 rasm chizmoqda:**\n_{raw_prompt}_", parse_mode="Markdown")
-            img_bytes, enhanced, ar, seed = await draw_midjourney_image(raw_prompt, ai_manager)
+            img_bytes, enhanced, ar, seed, *_ = await draw_midjourney_image(raw_prompt, ai_manager)
             if img_bytes:
                 photo_file = BufferedInputFile(file=img_bytes, filename="art.jpg")
-                caption = f"🎨 **Midjourney v6:**\n📝 _{enhanced}_\n📐 O'lcham: `{ar}` | 🎲 Seed: `{seed}`"
+                caption = f"🎨 **FLUX.1 & Midjourney:**\n📝 _{enhanced}_\n📐 O'lcham: `{ar}` | 🎲 Seed: `{seed}`"
                 await message.reply_photo(photo=photo_file, caption=caption, parse_mode="Markdown")
                 await status_msg.delete()
                 return

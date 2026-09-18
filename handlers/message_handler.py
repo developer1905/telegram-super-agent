@@ -12,6 +12,7 @@ Imkoniyatlar:
 
 from __future__ import annotations
 
+import html
 import logging
 import re
 import uuid
@@ -43,7 +44,14 @@ from core.userbot import (
 )
 from core.search_agent import search_image_url, answer_with_web_search, download_image_bytes
 from core.reminder_manager import parse_reminder_smart
-from core.midjourney_agent import draw_midjourney_image, generate_free_midjourney_image
+from core.midjourney_agent import (
+    draw_midjourney_image,
+    generate_free_midjourney_image,
+    MJ_TASKS,
+    build_mj_keyboard,
+    AVAILABLE_MODELS,
+    ASPECT_RATIOS,
+)
 from core.hermes_agent import run_hermes_agent
 from core.tts_agent import generate_speech_audio
 from core.crawl_agent import crawl_web_page
@@ -285,104 +293,99 @@ async def cb_dismiss_inbox_draft(cb: CallbackQuery) -> None:
     draft_id = cb.data.replace("dismiss_draft:", "")
     remove_pending_draft(draft_id)
     await cb.message.edit_text("❌ Qoralama xabar bekor qilindi.")
-# ─── Midjourney Boshqaruvi (Qayta chizish / O'lcham) ─────────
 
-@router.callback_query(ADMIN_FILTER, F.data.startswith("mj:"))
+# ─── Midjourney / FLUX.1 Studio Boshqaruvi (Model, O'lcham, Uslub) ───
+
+@router.callback_query(F.data.startswith("mj:"))
 async def cb_midjourney_action(cb: CallbackQuery, ai_manager: AIManager) -> None:
-    await cb.answer("🎨 Midjourney ishlamoqda...")
     parts = cb.data.split(":")
     action = parts[1] if len(parts) > 1 else ""
 
     import random
+    from aiogram.types import InputMediaPhoto
+
     if action in ("redraw", "seed"):
         task_id = parts[2] if len(parts) > 2 else ""
-        task_data = _mj_tasks.get(task_id)
-        if not task_data:
-            await cb.answer("⚠️ Rasm ma'lumoti eskirgan. Yangi buyruq yozing.", show_alert=True)
-            return
+        param = ""
+    elif action in ("model", "ar", "style"):
+        param = parts[2] if len(parts) > 2 else ""
+        task_id = parts[3] if len(parts) > 3 else ""
+    else:
+        return
 
-        prompt = task_data["prompt"]
-        ar = task_data.get("ar", "1:1")
-        new_seed = random.randint(100000, 99999999)
-        enhanced = task_data.get("enhanced", prompt)
+    task_data = _mj_tasks.get(task_id)
+    if not task_data:
+        await cb.answer("⚠️ Rasm ma'lumoti eskirgan. Yangi buyruq yozing.", show_alert=True)
+        return
 
-        img_bytes = await generate_free_midjourney_image(enhanced, aspect_ratio=ar, seed=new_seed)
-        if not img_bytes:
-            await cb.answer("❌ Qayta chizishda xatolik bo'ldi.", show_alert=True)
-            return
+    prompt = task_data["prompt"]
+    enhanced = task_data.get("enhanced", prompt)
+    ar = task_data.get("ar", "1:1")
+    model = task_data.get("model", "flux")
+    style = task_data.get("style", "photo")
+    seed = task_data.get("seed", random.randint(100000, 99999999))
 
-        new_task_id = uuid.uuid4().hex[:8]
-        _mj_tasks[new_task_id] = {"prompt": prompt, "enhanced": enhanced, "ar": ar, "seed": new_seed}
-
-        builder = InlineKeyboardBuilder()
-        builder.row(
-            InlineKeyboardButton(text="🔄 Qaytadan chizish", callback_data=f"mj:redraw:{new_task_id}"),
-            InlineKeyboardButton(text="🎲 Yangi Seed", callback_data=f"mj:seed:{new_task_id}"),
-        )
-        builder.row(
-            InlineKeyboardButton(text="📐 16:9", callback_data=f"mj:ar:16:9:{new_task_id}"),
-            InlineKeyboardButton(text="📐 1:1", callback_data=f"mj:ar:1:1:{new_task_id}"),
-            InlineKeyboardButton(text="📐 9:16", callback_data=f"mj:ar:9:16:{new_task_id}"),
-        )
-
-        input_file = BufferedInputFile(file=img_bytes, filename=f"mj_{new_task_id}.jpg")
-        caption = (
-            f"🎨 **Midjourney v6 Asari**\n\n"
-            f"📝 **So'rov:** _{prompt}_\n"
-            f"✨ **Midjourney Prompt:** _{enhanced[:200]}..._\n"
-            f"📐 O'lcham: `{ar}` | 🎲 Seed: `{new_seed}`"
-        )
-        try:
-            await cb.message.delete()
-        except Exception:
-            pass
-        await cb.message.answer_photo(photo=input_file, caption=caption, reply_markup=builder.as_markup(), parse_mode="Markdown")
-
+    if action == "seed":
+        seed = random.randint(100000, 99999999)
+    elif action == "redraw":
+        pass
+    elif action == "model":
+        model = param
     elif action == "ar":
-        if len(parts) < 4:
-            return
-        new_ar = parts[2]
-        task_id = parts[3]
-        task_data = _mj_tasks.get(task_id)
-        if not task_data:
-            await cb.answer("⚠️ Rasm ma'lumoti eskirgan. Yangi buyruq yozing.", show_alert=True)
-            return
+        ar = param
+    elif action == "style":
+        style = param
 
-        prompt = task_data["prompt"]
-        seed = task_data.get("seed", random.randint(100000, 99999999))
-        enhanced = task_data.get("enhanced", prompt)
+    model_title = AVAILABLE_MODELS.get(model, model).split("(")[0].strip()
+    await cb.answer(f"🎨 {model_title} ({ar}) ishlamoqda...")
 
-        img_bytes = await generate_free_midjourney_image(enhanced, aspect_ratio=new_ar, seed=seed)
-        if not img_bytes:
-            await cb.answer("❌ O'lchamni o'zgartirishda xatolik.", show_alert=True)
-            return
+    img_bytes = await generate_free_midjourney_image(
+        prompt=enhanced,
+        aspect_ratio=ar,
+        style=style,
+        seed=seed,
+        model=model,
+    )
+    if not img_bytes:
+        await cb.answer("❌ Rasm yaratishda xatolik yuz berdi. Qaytadan urinib ko'ring.", show_alert=True)
+        return
 
-        new_task_id = uuid.uuid4().hex[:8]
-        _mj_tasks[new_task_id] = {"prompt": prompt, "enhanced": enhanced, "ar": new_ar, "seed": seed}
+    new_task_id = uuid.uuid4().hex[:8]
+    _mj_tasks[new_task_id] = {
+        "prompt": prompt,
+        "enhanced": enhanced,
+        "ar": ar,
+        "seed": seed,
+        "model": model,
+        "style": style,
+    }
 
-        builder = InlineKeyboardBuilder()
-        builder.row(
-            InlineKeyboardButton(text="🔄 Qaytadan chizish", callback_data=f"mj:redraw:{new_task_id}"),
-            InlineKeyboardButton(text="🎲 Yangi Seed", callback_data=f"mj:seed:{new_task_id}"),
+    reply_markup = build_mj_keyboard(new_task_id, current_model=model, current_ar=ar, current_style=style)
+    input_file = BufferedInputFile(file=img_bytes, filename=f"mj_{new_task_id}.jpg")
+    p_esc = html.escape(prompt)
+    caption = (
+        f"🎨 <b>Super-Agent Studio: {html.escape(model_title)}</b>\n\n"
+        f"📝 <b>So'rov:</b> <i>{p_esc}</i>\n"
+        f"📐 O'lcham: <code>{ar}</code> | 🎲 Seed: <code>{seed}</code> | 🎭 Uslub: <code>{style}</code>\n\n"
+        f"<i>Quyidagi tugmalar orqali model, o'lcham yoki uslubni bir bosishda o'zgartiring:</i>"
+    )
+
+    try:
+        await cb.message.edit_media(
+            media=InputMediaPhoto(media=input_file, caption=caption, parse_mode="HTML"),
+            reply_markup=reply_markup,
         )
-        builder.row(
-            InlineKeyboardButton(text="📐 16:9", callback_data=f"mj:ar:16:9:{new_task_id}"),
-            InlineKeyboardButton(text="📐 1:1", callback_data=f"mj:ar:1:1:{new_task_id}"),
-            InlineKeyboardButton(text="📐 9:16", callback_data=f"mj:ar:9:16:{new_task_id}"),
-        )
-
-        input_file = BufferedInputFile(file=img_bytes, filename=f"mj_{new_task_id}.jpg")
-        caption = (
-            f"🎨 **Midjourney v6 Asari (Yangi O'lcham)**\n\n"
-            f"📝 **So'rov:** _{prompt}_\n"
-            f"✨ **Midjourney Prompt:** _{enhanced[:200]}..._\n"
-            f"📐 O'lcham: `{new_ar}` | 🎲 Seed: `{seed}`"
-        )
+    except Exception:
         try:
             await cb.message.delete()
         except Exception:
             pass
-        await cb.message.answer_photo(photo=input_file, caption=caption, reply_markup=builder.as_markup(), parse_mode="Markdown")
+        await cb.message.answer_photo(
+            photo=input_file,
+            caption=caption,
+            reply_markup=reply_markup,
+            parse_mode="HTML",
+        )
 
 
 # ─── Video Musiqa va MP3 Callbacklari ────────────────────────
@@ -922,66 +925,83 @@ async def handle_ai_chat(message: Message, ai_manager: AIManager) -> None:
         await safe_edit_text(wait_msg, result_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
         return
 
-    # 4.1 FLUX.1 & Midjourney v6 AI Rasm Chizish Skilli (/flux, /draw, /imagine, /midjourney, chiz:, rasm chiz:)
-    mj_match = re.match(r"^(?:/imagine|/midjourney|/flux|/draw|/art|chiz|rasm\s+chiz|rasm\s+yarat|chizib\s+ber|draw)[:\s]+(.+)$", user_text, re.IGNORECASE | re.DOTALL)
+    # 4.1 FLUX.1 & Midjourney v6 AI Rasm Chizish Skilli (/flux, /draw, /imagine, /midjourney, /image, chiz:, rasm chiz:)
+    mj_match = re.match(r"^(?:/imagine|/midjourney|/flux|/draw|/art|/image|chiz|rasm\s+chiz|rasm\s+yarat|chizib\s+ber|draw)(?:[:\s]+(.*)|$)", user_text, re.IGNORECASE | re.DOTALL)
     if mj_match:
-        raw_prompt = mj_match.group(1).strip()
-        if raw_prompt:
-            wait_msg = await message.answer(
-                "🎨 <b>FLUX.1 & Midjourney v6 rasm chizmoqda...</b>\n\n"
-                "✨ <i>Prompt AI tomonidan kinoxit darajasiga boyitilmoqda va fotorealistik ishlanmoqda...</i>",
-                parse_mode="HTML",
+        raw_prompt = (mj_match.group(1) or "").strip()
+        if not raw_prompt:
+            helper_text = (
+                "🎨 <b>Super-Agent Studio — AI Rasm Markazi</b>\n\n"
+                "Qanday rasm chizmoqchisiz? Buyruqdan so'ng xohlagan tasavvuringizni yozing:\n\n"
+                "💡 <i>Masalan:</i>\n"
+                "<code>/draw Samarqand Registon maydoni kechasi, kiberpank uslubida</code>\n"
+                "<code>/flux Kosmik kema qora tuynuk yaqinida --ar 16:9 --model flux</code>\n\n"
+                "⚙️ <b>Qo'shimcha parametrlar:</b>\n"
+                "• <b>O'lchamlar:</b> <code>--ar 1:1</code>, <code>--ar 16:9</code>, <code>--ar 9:16</code>, <code>--ar 4:3</code>, <code>--ar 3:4</code>\n"
+                "• <b>Modellar:</b> <code>--model flux</code>, <code>--model gpt-image-2</code>, <code>--model z-image</code>, <code>--model flux-klein</code>\n"
+                "• <b>Uslublar:</b> <code>--style photo</code>, <code>--style anime</code>, <code>--style 3d</code>, <code>--style cyberpunk</code>, <code>--style art</code>\n\n"
+                "<i>Rasm chizilgach, ostidagi tugmalar orqali model va o'lchamni bir zumda almashtira olasiz!</i>"
             )
-            await message.bot.send_chat_action(message.chat.id, "upload_photo")
-            img_bytes, enhanced_prompt, ar, seed = await draw_midjourney_image(
+            await message.answer(helper_text, parse_mode="HTML")
+            return
+
+        wait_msg = await message.answer(
+            "🎨 <b>Super-Agent Studio rasm chizmoqda...</b>\n\n"
+            "✨ <i>Prompt AI tomonidan kinoxit darajasiga boyitilmoqda va fotorealistik ishlanmoqda...</i>",
+            parse_mode="HTML",
+        )
+        await message.bot.send_chat_action(message.chat.id, "upload_photo")
+        try:
+            img_bytes, enhanced_prompt, ar, seed, used_model, *_ = await draw_midjourney_image(
                 raw_prompt=raw_prompt,
                 ai_manager=ai_manager,
                 enhance=True,
             )
-            if img_bytes:
-                task_id = uuid.uuid4().hex[:8]
-                _mj_tasks[task_id] = {
-                    "prompt": raw_prompt,
-                    "enhanced": enhanced_prompt,
-                    "ar": ar,
-                    "seed": seed,
-                }
-                builder = InlineKeyboardBuilder()
-                builder.row(
-                    InlineKeyboardButton(text="🔄 Qaytadan chizish", callback_data=f"mj:redraw:{task_id}"),
-                    InlineKeyboardButton(text="🎲 Yangi Seed", callback_data=f"mj:seed:{task_id}"),
-                )
-                builder.row(
-                    InlineKeyboardButton(text="📐 16:9", callback_data=f"mj:ar:16:9:{task_id}"),
-                    InlineKeyboardButton(text="📐 1:1", callback_data=f"mj:ar:1:1:{task_id}"),
-                    InlineKeyboardButton(text="📐 9:16", callback_data=f"mj:ar:9:16:{task_id}"),
-                )
-                input_file = BufferedInputFile(file=img_bytes, filename=f"flux_{task_id}.jpg")
-                p_esc = html.escape(raw_prompt)
-                enh_esc = html.escape(enhanced_prompt[:250])
-                caption = (
-                    f"🎨 <b>FLUX.1 & Midjourney Badiiy Asari:</b>\n\n"
-                    f"📝 <b>Asl so'rov:</b> <i>{p_esc}</i>\n"
-                    f"✨ <b>AI Prompt:</b> <i>{enh_esc}...</i>\n"
-                    f"📐 O'lcham: <code>{ar}</code> | 🎲 Seed: <code>{seed}</code>\n\n"
-                    f"🤖 <b>Super-Agent Studio</b>"
-                )
+        except Exception as draw_err:
+            logger.error("Rasm chizishda xatolik: %s", draw_err)
+            img_bytes = None
+
+        if img_bytes:
+            task_id = uuid.uuid4().hex[:8]
+            _mj_tasks[task_id] = {
+                "prompt": raw_prompt,
+                "enhanced": enhanced_prompt,
+                "ar": ar,
+                "seed": seed,
+                "model": used_model,
+                "style": "photo",
+            }
+            reply_markup = build_mj_keyboard(task_id, current_model=used_model, current_ar=ar, current_style="photo")
+            input_file = BufferedInputFile(file=img_bytes, filename=f"studio_{task_id}.jpg")
+            p_esc = html.escape(raw_prompt)
+            enh_esc = html.escape(enhanced_prompt[:220])
+            model_title = AVAILABLE_MODELS.get(used_model, used_model).split("(")[0].strip()
+            caption = (
+                f"🎨 <b>Super-Agent Studio: {html.escape(model_title)}</b>\n\n"
+                f"📝 <b>So'rov:</b> <i>{p_esc}</i>\n"
+                f"✨ <b>AI Prompt:</b> <i>{enh_esc}...</i>\n"
+                f"📐 O'lcham: <code>{ar}</code> | 🎲 Seed: <code>{seed}</code>\n\n"
+                f"<i>Quyidagi tugmalar orqali model yoki proporsiyani almashtirishingiz mumkin:</i>"
+            )
+            try:
                 await wait_msg.delete()
-                await message.answer_photo(
-                    photo=input_file,
-                    caption=caption,
-                    reply_markup=builder.as_markup(),
-                    parse_mode="HTML",
-                )
-                LogCollector().add(
-                    action_type="midjourney_image",
-                    description=f"FLUX: {raw_prompt[:40]}",
-                    model_used="flux_midjourney",
-                )
-                return
-            else:
-                await safe_edit_text(wait_msg, "❌ Rasm chizishda xatolik yuz berdi. Iltimos qaytadan urinib ko'ring.", parse_mode=None)
-                return
+            except Exception:
+                pass
+            await message.answer_photo(
+                photo=input_file,
+                caption=caption,
+                reply_markup=reply_markup,
+                parse_mode="HTML",
+            )
+            LogCollector().add(
+                action_type="midjourney_image",
+                description=f"Studio: {raw_prompt[:40]}",
+                model_used=used_model,
+            )
+            return
+        else:
+            await safe_edit_text(wait_msg, "❌ Rasm chizishda xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring.", parse_mode=None)
+            return
 
     # 4.2 Nous Hermes 3 Avtonom Agent Topshirig'i (/hermes, hermes:)
     hermes_match = re.match(r"^(?:/hermes|hermes)[:\s]+(.+)$", user_text, re.IGNORECASE | re.DOTALL)

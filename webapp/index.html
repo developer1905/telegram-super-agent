@@ -972,6 +972,17 @@
             <span class="quick-chip" onclick="setQuickMjPrompt('Kosmik tadqiqot kemasi qora tuynuk yaqinida, 8k cinematic')">🚀 Kosmik Kema</span>
           </div>
 
+          <!-- Model Selector -->
+          <div class="mb-3">
+            <label class="form-label small text-muted mb-1">AI Dvigatel (Model):</label>
+            <div class="d-flex gap-2 flex-wrap" id="mj-model-selector">
+              <span class="subtab-pill active" data-model="flux" onclick="setMjModel('flux', this)">⚡ FLUX.1 Schnell</span>
+              <span class="subtab-pill" data-model="gpt-image-2" onclick="setMjModel('gpt-image-2', this)">🤖 GPT-Image-2</span>
+              <span class="subtab-pill" data-model="z-image" onclick="setMjModel('z-image', this)">🎌 Z-Image Turbo</span>
+              <span class="subtab-pill" data-model="flux-klein" onclick="setMjModel('flux-klein', this)">🔮 FLUX.2 Klein</span>
+            </div>
+          </div>
+
           <!-- Aspect Ratio Selector -->
           <div class="mb-3">
             <label class="form-label small text-muted mb-1">Proporsiya (Aspect Ratio):</label>
@@ -980,6 +991,7 @@
               <span class="subtab-pill" data-ar="16:9" onclick="setMjAr('16:9', this)">16:9 (Keng ekran)</span>
               <span class="subtab-pill" data-ar="9:16" onclick="setMjAr('9:16', this)">9:16 (Story / Reels)</span>
               <span class="subtab-pill" data-ar="4:3" onclick="setMjAr('4:3', this)">4:3 (Klassik)</span>
+              <span class="subtab-pill" data-ar="3:4" onclick="setMjAr('3:4', this)">3:4 (Portret)</span>
             </div>
           </div>
 
@@ -2196,6 +2208,7 @@
     let currentActiveTool = 'midjourney';
     let currentMjAr = '1:1';
     let currentMjStyle = 'photo';
+    let currentMjModel = 'flux';
 
     function initToolsTab() {
       if (currentActiveTool === 'midjourney') {
@@ -2232,6 +2245,13 @@
     }
 
     // Midjourney / FLUX.1 Studio In-App Generator
+    function setMjModel(model, el) {
+      haptic('light');
+      currentMjModel = model;
+      document.querySelectorAll('#mj-model-selector .subtab-pill').forEach(p => p.classList.remove('active'));
+      if (el) el.classList.add('active');
+    }
+
     function setMjAr(ar, el) {
       haptic('light');
       currentMjAr = ar;
@@ -2270,13 +2290,18 @@
 
       haptic('medium');
       btn.disabled = true;
-      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> FLUX.1 chizmoqda (8-20s)...';
+      btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span> ${currentMjModel.toUpperCase()} chizmoqda (5-18s)...`;
 
       try {
         const res = await fetch('/api/generate_image', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ prompt: prompt, aspect_ratio: currentMjAr, style: currentMjStyle })
+          body: JSON.stringify({
+            prompt: prompt,
+            aspect_ratio: currentMjAr,
+            style: currentMjStyle,
+            model: currentMjModel
+          })
         });
 
         if (res.ok) {
@@ -2285,7 +2310,7 @@
           downloadLink.href = data.image_base64;
           lastGeneratedPrompt = data.enhanced_prompt || prompt;
           promptBox.innerText = `Prompt: ${lastGeneratedPrompt}`;
-          seedBadge.innerText = `Seed: ${data.seed || 'Flux'}`;
+          seedBadge.innerText = `${(data.model || currentMjModel).toUpperCase()} | Seed: ${data.seed || 'Flux'}`;
           resultBox.style.display = 'block';
           showToast('Rasm muvaffaqiyatli chizildi!');
           haptic('success');
