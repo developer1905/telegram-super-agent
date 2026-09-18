@@ -16,7 +16,7 @@ from typing import Optional, TYPE_CHECKING
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from config import ADMIN_ID, LOG_CHANNEL_ID, REPORT_HOUR, REPORT_MINUTE
+from config import ADMIN_ID, LOG_CHANNEL_ID, REPORT_HOUR, REPORT_MINUTE, UPTIME_CHECK_INTERVAL
 
 if TYPE_CHECKING:
     from aiogram import Bot
@@ -392,6 +392,37 @@ async def check_reminders_job(bot: "Bot") -> None:
             logger.error("Eslatmani yuborishda xato (#%d): %s", rem_id, exc)
 
 
+async def check_uptime_monitors_job(bot: "Bot") -> None:
+    """Veb-saytlar va serverlar holatini avtomat tekshirib, xato bo'lsa adminga xabar yuborish."""
+    try:
+        from core.uptime_agent import run_uptime_batch_check
+        alerts = await run_uptime_batch_check()
+        for a in alerts:
+            if a["type"] == "DOWN":
+                msg = (
+                    f"🚨 **FAVQULODDA: Veb-sayt o'chdi!**\n\n"
+                    f"🌐 **Sayt:** `{a['name']}`\n"
+                    f"🔗 **URL:** {a['url']}\n"
+                    f"❌ **Xatolik kodi:** `{a['status']}`\n"
+                    f"⏱ **Kechikish:** `{a['time_ms']} ms`\n\n"
+                    f"Server yoki xostingizni zudlik bilan tekshiring!"
+                )
+            else:
+                msg = (
+                    f"🟢 **XUSHXABAR: Veb-sayt qayta tiklandi!**\n\n"
+                    f"🌐 **Sayt:** `{a['name']}`\n"
+                    f"🔗 **URL:** {a['url']}\n"
+                    f"✅ **Holat:** Onlayn (`{a['status']}`)\n"
+                    f"⏱ **Kechikish:** `{a['time_ms']} ms`"
+                )
+            try:
+                await bot.send_message(chat_id=ADMIN_ID, text=msg, parse_mode="Markdown")
+            except Exception as e:
+                logger.error("Uptime alert yuborishda xato: %s", e)
+    except Exception as exc:
+        logger.debug("check_uptime_monitors_job xatosi: %s", exc)
+
+
 # ─── Scheduler Sozlash ────────────────────────────────────────
 
 def setup_scheduler(bot: "Bot", ai_manager: "AIManager") -> AsyncIOScheduler:
@@ -402,6 +433,7 @@ def setup_scheduler(bot: "Bot", ai_manager: "AIManager") -> AsyncIOScheduler:
     3. Har 60 soniyada taymerli postlarni tekshirish (SMM Avtopilot)
     4. Har kuni soat 10:00 da raqobatchilar tahlili
     5. Har 20 soniyada eslatmalarni tekshirish (Real-time Reminders)
+    6. Har UPTIME_CHECK_INTERVAL daqiqada veb-saytlar uptime monitoringi
     """
     from apscheduler.triggers.interval import IntervalTrigger
     from config import EMAIL_CHECK_INTERVAL
@@ -480,8 +512,22 @@ def setup_scheduler(bot: "Bot", ai_manager: "AIManager") -> AsyncIOScheduler:
         misfire_grace_time=15,
     )
 
+    # 6. Uptime Saytlar Monitoringi (har UPTIME_CHECK_INTERVAL daqiqada)
+    scheduler.add_job(
+        check_uptime_monitors_job,
+        trigger=IntervalTrigger(
+            minutes=UPTIME_CHECK_INTERVAL,
+            timezone="Asia/Tashkent",
+        ),
+        args=[bot],
+        id="uptime_check",
+        name="Uptime Saytlar Monitoringi",
+        replace_existing=True,
+        misfire_grace_time=60,
+    )
+
     logger.info(
-        "Scheduler sozlandi: Hisobot %02d:%02d da, Email har %d daqiqada, SMM postlar 60s da, Eslatmalar 20s da",
-        REPORT_HOUR, REPORT_MINUTE, EMAIL_CHECK_INTERVAL,
+        "Scheduler sozlandi: Hisobot %02d:%02d da, Email har %d daqiqada, Uptime har %d daqiqada, SMM postlar 60s da, Eslatmalar 20s da",
+        REPORT_HOUR, REPORT_MINUTE, EMAIL_CHECK_INTERVAL, UPTIME_CHECK_INTERVAL,
     )
     return scheduler

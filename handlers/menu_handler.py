@@ -60,31 +60,38 @@ def build_reply_keyboard_menu() -> ReplyKeyboardMarkup:
             KeyboardButton(text="⚡ Hermes Agent"),
         ],
         [
+            KeyboardButton(text="📝 Vazifalar (Notion)"),
+            KeyboardButton(text="🌐 Saytlar (Uptime)"),
+        ],
+        [
+            KeyboardButton(text="⚽ Real Madrid & Xabarlar"),
             KeyboardButton(text="👤 Shaxsiy Profil (Mem0)"),
+        ],
+        [
             KeyboardButton(text="🎙 Ovozli Agent (TTS)"),
-        ],
-        [
             KeyboardButton(text="🤖 AI Modellar"),
+        ],
+        [
             KeyboardButton(text="🎭 Tizim Rollari"),
-        ],
-        [
             KeyboardButton(text="⏰ Eslatmalar"),
+        ],
+        [
             KeyboardButton(text="⏰ Rejalashtirilgan Postlar"),
-        ],
-        [
             KeyboardButton(text="🧠 Doimiy Xotira"),
+        ],
+        [
             KeyboardButton(text="🔄 Tarixni Sinxronlash"),
-        ],
-        [
             KeyboardButton(text="📊 Holat & Statistika"),
+        ],
+        [
             KeyboardButton(text="📧 Email Pochta"),
-        ],
-        [
             KeyboardButton(text="📡 Telegram Xulosasi"),
-            KeyboardButton(text="🔍 Raqobatchilar Tahlili"),
         ],
         [
+            KeyboardButton(text="🔍 Raqobatchilar Tahlili"),
             KeyboardButton(text="🧹 Xotirani Tozalash"),
+        ],
+        [
             KeyboardButton(text="❓ Yordam"),
         ],
     ]
@@ -117,24 +124,28 @@ def build_main_menu() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="⚡ Hermes 3 Agent", callback_data="menu:hermes"),
     )
     builder.row(
+        InlineKeyboardButton(text="📝 TodoList (Notion)", callback_data="menu:todo"),
+        InlineKeyboardButton(text="🌐 Saytlar Uptime", callback_data="menu:uptime"),
+    )
+    builder.row(
+        InlineKeyboardButton(text="⚽ Real Madrid & Xabarlar", callback_data="menu:news"),
         InlineKeyboardButton(text="👤 Profilim (Mem0)", callback_data="menu:mem0_profile"),
+    )
+    builder.row(
         InlineKeyboardButton(text="🎙 Ovozli Audio (TTS)", callback_data="menu:tts_info"),
-    )
-    builder.row(
         InlineKeyboardButton(text="🤖 Model Tanlash", callback_data="menu:models"),
+    )
+    builder.row(
         InlineKeyboardButton(text="🎭 Rol Tanlash", callback_data="menu:roles"),
-    )
-    builder.row(
         InlineKeyboardButton(text="⏰ Eslatmalar", callback_data="menu:reminders"),
+    )
+    builder.row(
         InlineKeyboardButton(text="⏰ Reja Postlar", callback_data="menu:scheduled_posts"),
-    )
-    builder.row(
         InlineKeyboardButton(text="🧠 Doimiy Xotira (RAG)", callback_data="menu:memory"),
-        InlineKeyboardButton(text="📊 Holat & Statistika", callback_data="menu:status"),
     )
     builder.row(
+        InlineKeyboardButton(text="📊 Holat & Statistika", callback_data="menu:status"),
         InlineKeyboardButton(text="🧹 Xotirani Tozala", callback_data="menu:clear"),
-        InlineKeyboardButton(text="👤 Userbot Info", callback_data="menu:userbot"),
     )
     builder.row(
         InlineKeyboardButton(text="📧 Email Agent", callback_data="email:menu"),
@@ -277,6 +288,27 @@ async def rk_hermes(message: Message, ai_manager: AIManager) -> None:
         "• Har qanday matematik yoki mantiqiy masalani bevosita yozishingiz mumkin!"
     )
     await message.answer(text, parse_mode="Markdown")
+
+
+@router.message(ADMIN_FILTER, F.text.in_({"📝 Vazifalar (Notion)", "Vazifalar (Notion)", "vazifalar", "vazifalarim", "/todo", "todolist"}))
+async def rk_todo(message: Message) -> None:
+    from core.todo_notion_agent import format_tasks_list_report
+    text, markup = await format_tasks_list_report()
+    await message.answer(text, reply_markup=markup, parse_mode="Markdown")
+
+
+@router.message(ADMIN_FILTER, F.text.in_({"🌐 Saytlar (Uptime)", "Saytlar (Uptime)", "saytlar", "uptime", "/uptime"}))
+async def rk_uptime(message: Message) -> None:
+    from core.uptime_agent import format_uptime_dashboard_report
+    text, markup = await format_uptime_dashboard_report()
+    await message.answer(text, reply_markup=markup, parse_mode="Markdown")
+
+
+@router.message(ADMIN_FILTER, F.text.in_({"⚽ Real Madrid & Xabarlar", "Real Madrid & Xabarlar", "real madrid", "halamadrid", "/realmadrid", "/news"}))
+async def rk_news(message: Message, ai_manager: AIManager) -> None:
+    from core.news_football_agent import get_topic_news
+    text, markup = await get_topic_news("realmadrid", ai_manager)
+    await message.answer(text, reply_markup=markup, parse_mode="Markdown")
 
 
 @router.message(ADMIN_FILTER, F.text.in_({"👤 Shaxsiy Profil (Mem0)", "Shaxsiy Profil (Mem0)", "profilim", "Profilim", "/profile", "profil memo", "memo", "mem0"}))
@@ -514,6 +546,11 @@ async def cmd_help(message: Message) -> None:
         "• `/hermes [topshiriq]` — Nous Hermes 3 avtonom rejalashtiruvchi va chuqur fikrlovchi agent\n"
         "• `/voice [matn]` — Microsoft Edge TTS orqali tabiiy ovozli xabar (o'zbek/rus/ingliz)\n"
         "• `/profile` — Mem0 shaxsiy adaptiv xotira va profilingiz tahlili\n"
+        "• `/todo` — Aqlli TodoList va Notion vazifalar menejeri\n"
+        "• `/uptime` — Veb-saytlar va serverlar monitoringi (har 10 daqiqada tekshiruv)\n"
+        "• `/realmadrid` — Real Madrid natijalari, to'purarlar va o'yinlar taqvimi\n"
+        "• `/news` — Dasturlash, O'zbekiston, kitoblar va sport yangiliklari\n"
+        "• `/disk` & `/clean_server` — Server disk monitoringi va xavfsiz tozalash\n"
         "• `/crawl [url]` — Crawl4AI orqali saytni LLM uchun toza Markdown formatida o'qish\n"
         "• `/screenshot [url]` — Browser-use orqali real-time veb-sayt skrinshotini olish\n"
         "• `/status` — AI modeli va tizim holati\n"
@@ -522,8 +559,8 @@ async def cmd_help(message: Message) -> None:
         "• `/userbot` — Userbot holati\n\n"
         "**📁 Hujjatlar (Microsoft MarkItDown):**\n"
         "Istalgan PDF, Word (DOCX), Excel (XLSX), PowerPoint (PPTX) yoki CSV faylni yuboring — agent uni bir lahzada tahlil qilib, xulosa yoki savollaringizga javob beradi.\n\n"
-        "**🎙 Ovozli Muloqot:**\n"
-        "Botga ovozli xabar (voice note) yuboring — agent ovozingizni tushunib, o'zi ham tabiiy inson ovozida javob qaytaradi!\n\n"
+        "**🎙 Ovozli Muloqot & Vazifalar:**\n"
+        "Botga ovozli xabar yuboring — agent ovozingizni tushunib, o'zi ham tabiiy inson ovozida javob qaytaradi! 'Vazifa qo'sh: ...' desangiz avtomat TodoList'ga saqlaydi.\n\n"
         "**📧 Email Agent:**\n"
         "• `pochta` yoki `email tekshir` → O'qilmagan xatlar va AI xulosasi\n"
         "• `email ai: user@example.com | vazifa` → AI xat tayyorlash\n"
@@ -606,6 +643,30 @@ async def cb_hermes(cb: CallbackQuery, ai_manager: AIManager) -> None:
         "• `hermes: O'zbekiston IT bozoridagi eng istiqbolli 5 ta sohani hisob-kitoblar bilan tahlil qil`"
     )
     await safe_edit_text(cb, text, reply_markup=builder.as_markup(), parse_mode="Markdown")
+
+
+@router.callback_query(ADMIN_FILTER, F.data == "menu:todo")
+async def cb_menu_todo(cb: CallbackQuery) -> None:
+    await cb.answer()
+    from core.todo_notion_agent import format_tasks_list_report
+    text, markup = await format_tasks_list_report()
+    await safe_edit_text(cb, text, reply_markup=markup, parse_mode="Markdown")
+
+
+@router.callback_query(ADMIN_FILTER, F.data == "menu:uptime")
+async def cb_menu_uptime(cb: CallbackQuery) -> None:
+    await cb.answer()
+    from core.uptime_agent import format_uptime_dashboard_report
+    text, markup = await format_uptime_dashboard_report()
+    await safe_edit_text(cb, text, reply_markup=markup, parse_mode="Markdown")
+
+
+@router.callback_query(ADMIN_FILTER, F.data == "menu:news")
+async def cb_menu_news(cb: CallbackQuery, ai_manager: AIManager) -> None:
+    await cb.answer()
+    from core.news_football_agent import get_topic_news
+    text, markup = await get_topic_news("realmadrid", ai_manager)
+    await safe_edit_text(cb, text, reply_markup=markup, parse_mode="Markdown")
 
 
 @router.callback_query(ADMIN_FILTER, F.data == "menu:mem0_profile")

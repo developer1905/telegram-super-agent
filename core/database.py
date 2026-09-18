@@ -141,6 +141,35 @@ class DatabaseManager:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+
+            # 8. Tasks (TodoList & Notion sinxronizatsiyasi)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS tasks (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    description TEXT DEFAULT '',
+                    due_date TEXT DEFAULT '',
+                    status TEXT DEFAULT 'pending',
+                    notion_page_id TEXT DEFAULT '',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            # 9. Uptime Monitors (Veb-saytlar monitoringi)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS uptime_monitors (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    url TEXT UNIQUE NOT NULL,
+                    name TEXT DEFAULT '',
+                    is_active INTEGER DEFAULT 1,
+                    last_status INTEGER DEFAULT 0,
+                    last_checked TEXT DEFAULT '',
+                    response_ms REAL DEFAULT 0.0,
+                    alert_sent INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
             conn.commit()
 
     # ─── 1. SHAXSIY MA'LUMOTLAR BAZASI (KNOWLEDGE BASE / RAG) ──────
@@ -743,6 +772,123 @@ class DatabaseManager:
                 conn.execute("DELETE FROM chat_history")
                 conn.commit()
         await loop.run_in_executor(None, _clear)
+
+    # ─── 8. TODOLIST VA VAZIFALAR (TASKS) ──────────────────────────
+
+    async def add_task(self, title: str, description: str = "", due_date: str = "", notion_page_id: str = "") -> int:
+        """Yangi vazifa qo'shish."""
+        loop = asyncio.get_running_loop()
+        def _insert():
+            with self._get_sqlite_conn() as conn:
+                cur = conn.cursor()
+                cur.execute("""
+                    INSERT INTO tasks (title, description, due_date, status, notion_page_id)
+                    VALUES (?, ?, ?, 'pending', ?)
+                """, (title.strip(), description.strip(), due_date.strip(), notion_page_id.strip()))
+                conn.commit()
+                return cur.lastrowid or 0
+        return await loop.run_in_executor(None, _insert)
+
+    async def get_tasks(self, status: str = "pending", limit: int = 50) -> list[dict]:
+        """Vazifalar ro'yxatini olish."""
+        loop = asyncio.get_running_loop()
+        def _get():
+            with self._get_sqlite_conn() as conn:
+                conn.row_factory = sqlite3.Row
+                cur = conn.cursor()
+                if status == "all":
+                    cur.execute("SELECT * FROM tasks ORDER BY id DESC LIMIT ?", (limit,))
+                else:
+                    cur.execute("SELECT * FROM tasks WHERE status = ? ORDER BY id DESC LIMIT ?", (status, limit))
+                return [dict(r) for r in cur.fetchall()]
+        return await loop.run_in_executor(None, _get)
+
+    async def complete_task(self, task_id: int) -> bool:
+        """Vazifani bajarilgan (completed) deb belgilash."""
+        loop = asyncio.get_running_loop()
+        def _update():
+            with self._get_sqlite_conn() as conn:
+                cur = conn.cursor()
+                cur.execute("UPDATE tasks SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = ?", (task_id,))
+                conn.commit()
+                return cur.rowcount > 0
+        return await loop.run_in_executor(None, _update)
+
+    async def delete_task(self, task_id: int) -> bool:
+        """Vazifani butunlay o'chirish."""
+        loop = asyncio.get_running_loop()
+        def _del():
+            with self._get_sqlite_conn() as conn:
+                cur = conn.cursor()
+                cur.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+                conn.commit()
+                return cur.rowcount > 0
+        return await loop.run_in_executor(None, _del)
+
+    # ─── 9. UPTIME MONITORINGI ─────────────────────────────────────
+
+    async def add_uptime_monitor(self, url: str, name: str = "") -> int:
+        """Kuzatuvga yangi veb-sayt yoki API URL qo'shish."""
+        loop = asyncio.get_running_loop()
+        clean_url = url.strip()
+        if not clean_url.startswith(("http://", "https://")):
+            clean_url = f"https://{clean_url}"
+        clean_name = name.strip() or clean_url.replace("https://", "").replace("http://", "").split("/")[0]
+
+        def _add():
+            with self._get_sqlite_conn() as conn:
+                cur = conn.cursor()
+                cur.execute("""
+                    INSERT INTO uptime_monitors (url, name, is_active, last_status, last_checked)
+                    VALUES (?, ?, 1, 0, '')
+                    ON CONFLICT(url) DO UPDATE SET
+                        name = excluded.name,
+                        is_active = 1
+                """, (clean_url, clean_name))
+                conn.commit()
+                return cur.lastrowid or 0
+        return await loop.run_in_executor(None, _add)
+
+    async def get_uptime_monitors(self, active_only: bool = True) -> list[dict]:
+        """Kuzatilayotgan barcha saytlarni olish."""
+        loop = asyncio.get_running_loop()
+        def _get():
+            with self._get_sqlite_conn() as conn:
+                conn.row_factory = sqlite3.Row
+                cur = conn.cursor()
+                if active_only:
+                    cur.execute("SELECT * FROM uptime_monitors WHERE is_active = 1 ORDER BY id ASC")
+                else:
+                    cur.execute("SELECT * FROM uptime_monitors ORDER BY id ASC")
+                return [dict(r) for r in cur.fetchall()]
+        return await loop.run_in_executor(None, _get)
+
+    async def update_uptime_status(self, monitor_id: int, status_code: int, response_ms: float, alert_sent: int = 0) -> bool:
+        """Sayt tekshiruv natijasini yangilash."""
+        loop = asyncio.get_running_loop()
+        def _upd():
+            with self._get_sqlite_conn() as conn:
+                cur = conn.cursor()
+                now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                cur.execute("""
+                    UPDATE uptime_monitors
+                    SET last_status = ?, response_ms = ?, last_checked = ?, alert_sent = ?
+                    WHERE id = ?
+                """, (status_code, response_ms, now_str, alert_sent, monitor_id))
+                conn.commit()
+                return cur.rowcount > 0
+        return await loop.run_in_executor(None, _upd)
+
+    async def delete_uptime_monitor(self, monitor_id: int) -> bool:
+        """Saytni kuzatuvdan o'chirish."""
+        loop = asyncio.get_running_loop()
+        def _del():
+            with self._get_sqlite_conn() as conn:
+                cur = conn.cursor()
+                cur.execute("DELETE FROM uptime_monitors WHERE id = ?", (monitor_id,))
+                conn.commit()
+                return cur.rowcount > 0
+        return await loop.run_in_executor(None, _del)
 
 
 # Global database singleton

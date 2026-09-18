@@ -169,6 +169,17 @@ EMAIL_SMTP_SERVER: str = os.getenv("EMAIL_SMTP_SERVER", "smtp.gmail.com")
 EMAIL_SMTP_PORT: int = int(os.getenv("EMAIL_SMTP_PORT", "465"))
 EMAIL_CHECK_INTERVAL: int = int(os.getenv("EMAIL_CHECK_INTERVAL", "15"))  # daqiqa
 
+# ─── Notion & TodoList ──────────────────────────────────────
+NOTION_API_KEY: str = os.getenv("NOTION_API_KEY", "")
+NOTION_DATABASE_ID: str = os.getenv("NOTION_DATABASE_ID", "")
+
+# ─── Uptime & Sayt Monitoringi ──────────────────────────────
+UPTIME_CHECK_INTERVAL: int = int(os.getenv("UPTIME_CHECK_INTERVAL", "10"))  # daqiqa
+UPTIME_TIMEOUT: int = int(os.getenv("UPTIME_TIMEOUT", "10"))  # soniya
+
+# ─── RSS & Yangiliklar ──────────────────────────────────────
+NEWS_MAX_ITEMS: int = int(os.getenv("NEWS_MAX_ITEMS", "5"))
+
 # ─── Xatoliklarni tekshirish ─────────────────────────────────
 def validate_config() -> list[str]:
     """Majburiy o'zgaruvchilarni tekshirib, yetishmaydiganlarini qaytaradi."""

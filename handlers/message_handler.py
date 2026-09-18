@@ -432,6 +432,89 @@ async def cb_disk_status(cb: CallbackQuery) -> None:
     await safe_edit_text(cb, report, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
+# ─── TodoList & Notion Callbacks ──────────────────────────────
+
+@router.callback_query(ADMIN_FILTER, F.data.startswith("todo:done:"))
+async def cb_todo_done(cb: CallbackQuery) -> None:
+    task_id = int(cb.data.replace("todo:done:", ""))
+    await db.complete_task(task_id)
+    await cb.answer(f"✅ #{task_id} vazifa bajarildi deb belgilandi!")
+    from core.todo_notion_agent import format_tasks_list_report
+    text, markup = await format_tasks_list_report()
+    await safe_edit_text(cb, text, reply_markup=markup, parse_mode="Markdown")
+
+
+@router.callback_query(ADMIN_FILTER, F.data.startswith("todo:del:"))
+async def cb_todo_del(cb: CallbackQuery) -> None:
+    task_id = int(cb.data.replace("todo:del:", ""))
+    await db.delete_task(task_id)
+    await cb.answer("❌ Vazifa o'chirildi")
+    from core.todo_notion_agent import format_tasks_list_report
+    text, markup = await format_tasks_list_report()
+    await safe_edit_text(cb, text, reply_markup=markup, parse_mode="Markdown")
+
+
+@router.callback_query(ADMIN_FILTER, F.data == "todo:refresh")
+async def cb_todo_refresh(cb: CallbackQuery) -> None:
+    await cb.answer("🔄 Yangilanmoqda...")
+    from core.todo_notion_agent import format_tasks_list_report
+    text, markup = await format_tasks_list_report()
+    await safe_edit_text(cb, text, reply_markup=markup, parse_mode="Markdown")
+
+
+@router.callback_query(ADMIN_FILTER, F.data == "todo:add_hint")
+async def cb_todo_add_hint(cb: CallbackQuery) -> None:
+    await cb.answer()
+    hint_text = (
+        "➕ **Yangi Vazifa Qo'shish:**\n\n"
+        "Botga xohlagan vaqtda quyidagi formatlarda yozishingiz mumkin:\n"
+        "• `vazifa: Ertaga soat 10 da hisobot topshirish`\n"
+        "• `todo: Do'kondan olma sotib olish 2026-09-20`\n"
+        "• `reja: Yangi loyiha dizaynini ko'rib chiqish`\n\n"
+        "🎙 Yoki ovozli xabar bilan *'Vazifa qo'sh: Uyga non olib kelish'* deb ayting!"
+    )
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="◀️ Vazifalar Ro'yxatiga Qaytish", callback_data="todo:refresh"))
+    await safe_edit_text(cb, hint_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
+
+
+# ─── Uptime Monitoring Callbacks ──────────────────────────────
+
+@router.callback_query(ADMIN_FILTER, F.data == "uptime:check_now")
+async def cb_uptime_check_now(cb: CallbackQuery) -> None:
+    await cb.answer("⏳ Saytlar tekshirilmoqda...")
+    from core.uptime_agent import run_uptime_batch_check, format_uptime_dashboard_report
+    await run_uptime_batch_check()
+    text, markup = await format_uptime_dashboard_report()
+    await safe_edit_text(cb, text, reply_markup=markup, parse_mode="Markdown")
+
+
+@router.callback_query(ADMIN_FILTER, F.data == "uptime:add_hint")
+async def cb_uptime_add_hint(cb: CallbackQuery) -> None:
+    await cb.answer()
+    text = (
+        "➕ **Monitoringga Yangi Sayt Qo'shish:**\n\n"
+        "Botga quyidagicha yozing:\n"
+        "• `/add_site https://mysite.uz Mening Saytim`\n"
+        "• `sayt qo'sh: https://api.mysite.uz | Asosiy API`\n\n"
+        "O'chirish uchun: `/del_site [id]` deb yozing."
+    )
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="◀️ Uptime Ro'yxatiga Qaytish", callback_data="uptime:check_now"))
+    await safe_edit_text(cb, text, reply_markup=builder.as_markup(), parse_mode="Markdown")
+
+
+# ─── RSS & Real Madrid Callbacks ──────────────────────────────
+
+@router.callback_query(ADMIN_FILTER, F.data.startswith("news:"))
+async def cb_news_topic(cb: CallbackQuery, ai_manager: AIManager) -> None:
+    topic = cb.data.replace("news:", "")
+    await cb.answer("⏳ Yangiliklar yuklanmoqda...")
+    from core.news_football_agent import get_topic_news
+    text, markup = await get_topic_news(topic, ai_manager)
+    await safe_edit_text(cb, text, reply_markup=markup, parse_mode="Markdown")
+
+
 # ─── Eslatmalar Callbacks ──────────────────────────────────────
 
 @router.callback_query(ADMIN_FILTER, F.data.startswith("done_rem:"))
@@ -881,6 +964,76 @@ async def handle_ai_chat(message: Message, ai_manager: AIManager) -> None:
             f"🔒 _Barcha shaxsiy xabarlar, SQLite bazasi va sozlamalar 100% xavfsiz saqlanib qoldi._"
         )
         await safe_edit_text(wait_msg, text, parse_mode="Markdown")
+        return
+
+    # 4.9 TodoList & Notion Vazifalar (/todo, vazifalar, reja, todoist)
+    if lower_u in ("/todo", "todo", "vazifalar", "vazifalarim", "reja", "rejalarim", "todolist"):
+        from core.todo_notion_agent import format_tasks_list_report
+        text, markup = await format_tasks_list_report()
+        await message.answer(text, reply_markup=markup, parse_mode="Markdown")
+        return
+
+    # Yangi vazifa qo'shish (vazifa: ..., todo: ..., reja: ..., /todo add ...)
+    if re.match(r"^(?:/todo\s+(?:add|qo'sh)?|vazifa\s*qo'sh:|vazifa:|reja:|todo:)\s+", user_text, re.IGNORECASE):
+        from core.todo_notion_agent import create_new_task
+        task_info = await create_new_task(user_text)
+        notion_txt = " (🌐 Notion'ga ham sinxronlandi)" if task_info["notion_synced"] else ""
+        due_txt = f"\n📅 Muddat: `{task_info['due_date']}`" if task_info["due_date"] else ""
+        await message.answer(
+            f"✅ **Yangi vazifa saqlandi (#{task_info['id']})**{notion_txt}!\n"
+            f"📌 **Vazifa:** {task_info['title']}{due_txt}\n\n"
+            f"Barcha vazifalar: /todo",
+            parse_mode="Markdown"
+        )
+        return
+
+    # 4.10 Uptime Monitoring (/uptime, saytlar holati, /add_site)
+    if lower_u in ("/uptime", "uptime", "saytlar", "saytlarim", "saytlar holati", "serverlarim"):
+        from core.uptime_agent import format_uptime_dashboard_report
+        text, markup = await format_uptime_dashboard_report()
+        await message.answer(text, reply_markup=markup, parse_mode="Markdown")
+        return
+
+    if lower_u.startswith(("/add_site ", "sayt qo'sh:", "sayt qosh:")):
+        site_cmd = re.sub(r"^(?:/add_site\s+|sayt\s*qo'sh:\s*|sayt\s*qosh:\s*)", "", user_text, flags=re.IGNORECASE).strip()
+        site_url = site_cmd
+        site_name = ""
+        if "|" in site_cmd:
+            site_url, site_name = site_cmd.split("|", 1)
+        elif " " in site_cmd:
+            parts = site_cmd.split(" ", 1)
+            site_url, site_name = parts[0], parts[1]
+        site_id = await db.add_uptime_monitor(site_url, site_name)
+        await message.answer(
+            f"✅ **Sayt monitoringga qo'shildi (#{site_id}):**\n"
+            f"🔗 Manzil: `{site_url.strip()}`\n"
+            f"💡 Bot har 10 daqiqada tekshirib, xatolik bo'lsa xabar beradi.\n\n"
+            f"Ko'rish: /uptime",
+            parse_mode="Markdown"
+        )
+        return
+
+    if lower_u.startswith(("/del_site ", "sayt o'chir:", "sayt ochir:")):
+        site_id_str = re.sub(r"^(?:/del_site\s+|sayt\s*o'chir:\s*|sayt\s*ochir:\s*)", "", user_text, flags=re.IGNORECASE).strip()
+        try:
+            m_id = int(site_id_str)
+            await db.delete_uptime_monitor(m_id)
+            await message.answer(f"✅ #{m_id} sayt monitoringdan o'chirildi.", parse_mode="Markdown")
+        except ValueError:
+            await message.answer("❌ Noto'g'ri ID. Masalan: `/del_site 1`")
+        return
+
+    # 4.11 Real Madrid & RSS Yangiliklar (/realmadrid, /news, yangiliklar)
+    if lower_u in ("/realmadrid", "realmadrid", "real madrid", "halamadrid", "hala madrid", "real natijalari", "real o'yini"):
+        from core.news_football_agent import get_real_madrid_report, build_news_keyboard
+        report_text = await get_real_madrid_report(ai_manager)
+        await message.answer(report_text, reply_markup=build_news_keyboard("realmadrid"), parse_mode="Markdown")
+        return
+
+    if lower_u in ("/news", "news", "yangiliklar", "xabarlar"):
+        from core.news_football_agent import get_topic_news
+        report_text, markup = await get_topic_news("realmadrid", ai_manager)
+        await message.answer(report_text, reply_markup=markup, parse_mode="Markdown")
         return
 
     # 5. Rasm qidirish va yuborish ("rasmini top: Toshkent", "rasm: Lamborghini", "Eiffel rasmini tashla")
