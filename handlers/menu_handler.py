@@ -68,12 +68,12 @@ def build_reply_keyboard_menu() -> ReplyKeyboardMarkup:
             KeyboardButton(text="👤 Shaxsiy Profil (Mem0)"),
         ],
         [
-            KeyboardButton(text="🎙 Ovozli Agent (TTS)"),
-            KeyboardButton(text="🤖 AI Modellar"),
+            KeyboardButton(text="🎙 Ovozli Agent (STT & TTS)"),
+            KeyboardButton(text="🎬 Video Yuklovchi"),
         ],
         [
+            KeyboardButton(text="🤖 AI Modellar"),
             KeyboardButton(text="🎭 Tizim Rollari"),
-            KeyboardButton(text="⏰ Eslatmalar"),
         ],
         [
             KeyboardButton(text="⏰ Rejalashtirilgan Postlar"),
@@ -319,19 +319,34 @@ async def rk_profile(message: Message) -> None:
     await wait_msg.edit_text(profile_text, reply_markup=build_profile_keyboard(), parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"🎙 Ovozli Agent (TTS)", "Ovozli Agent (TTS)", "ovozli xabar", "Ovozli xabar", "/voice"}))
+@router.message(ADMIN_FILTER, F.text.in_({"🎙 Ovozli Agent (STT & TTS)", "🎙 Ovozli Agent (TTS)", "Ovozli Agent (TTS)", "ovozli xabar", "Ovozli xabar", "/voice"}))
 async def rk_tts(message: Message) -> None:
     text = (
-        "🎙 **Microsoft Edge TTS — Jonli Ovozli Xabarlar**\n\n"
-        "AI javoblarini tabiiy inson ovozida (o'zbek, rus, ingliz) audio qilib eshitishingiz mumkin!\n\n"
+        "🎙 **Ovozli AI Agent (Speech-to-Text & Text-to-Speech)**\n\n"
+        "AI bilan to'liq ovozli rejimda suhbatlashishingiz mumkin!\n\n"
         "**Imkoniyatlar:**\n"
-        "1. **Ixtiyoriy matnni ovozga aylantirish:**\n"
-        "   `/voice Salom, bugun qanday yangiliklar bor?`\n"
-        "   deb yozing, bot darhol Telegram Voice formatida audio qilib yuboradi!\n\n"
-        "2. **Har bir AI javobi ostida '🔊 Ovozda eshitish' tugmasi:**\n"
-        "   Tugmani bir marta bosish orqali matnni ovozli xabar sifatida qabul qilasiz.\n\n"
-        "3. **Ovozli xabar yuborsangiz:**\n"
-        "   Bot sizning ovozingizni tinglaydi va avtomatik ravishda ovoz bilan javob qaytaradi!"
+        "1. **Ovozli xabar yuborish (STT):**\n"
+        "   Telegramda ovozli xabar yozib yuboring (o'zbek, rus, ingliz) — bot uni so'zma-so'z tinglab, buyrug'ingizni bajaradi!\n\n"
+        "2. **Ovozli javob olish (TTS):**\n"
+        "   Bot javobni insondek tabiiy o'zbek ovozida (Madina / Sardor) ovozli xabar ko'rinishida yuboradi.\n\n"
+        "3. **Matnni ovozga aylantirish:**\n"
+        "   `/voice Salom, bugun qanday yangiliklar bor?`\n\n"
+        "4. **Ovozli vazifalar:**\n"
+        "   *\"Vazifa qo'sh: Ertaga soat 10 da hisobot topshirish\"* deb ovoz yozsangiz, u avtomatik Notion rejalarga tushadi!"
+    )
+    await message.answer(text, parse_mode="Markdown")
+
+
+@router.message(ADMIN_FILTER, F.text.in_({"🎬 Video Yuklovchi", "Video Yuklovchi", "video yukla", "/video", "/dl"}))
+async def rk_video_downloader(message: Message) -> None:
+    text = (
+        "🎬 **Instagram, TikTok, YouTube Video Yuklovchi Agenti**\n\n"
+        "Menga ijtimoiy tarmoqdagi video havolasini yuboring:\n"
+        "• 📸 **Instagram Reels / Post:** `https://www.instagram.com/reel/...`\n"
+        "• 🎵 **TikTok (100% Suvsiz HD):** `https://vt.tiktok.com/...`\n"
+        "• ▶️ **YouTube Shorts / Video:** `https://youtube.com/shorts/...`\n"
+        "• 🐦 **X (Twitter):** `https://x.com/.../status/...`\n\n"
+        "Bot videoni darhol Telegram orqali MP4 formatda sizga jo'natadi!"
     )
     await message.answer(text, parse_mode="Markdown")
 

@@ -1096,6 +1096,9 @@
         <div class="subtab-pill active" data-tool="midjourney" onclick="switchToolSubTab('midjourney', this)">
           <i class="bi bi-palette-fill me-1"></i> Midjourney v6
         </div>
+        <div class="subtab-pill" data-tool="video" onclick="switchToolSubTab('video', this)">
+          <i class="bi bi-film me-1"></i> Video Yuklovchi
+        </div>
         <div class="subtab-pill" data-tool="uptime" onclick="switchToolSubTab('uptime', this)">
           <i class="bi bi-activity me-1"></i> Uptime Monitor
         </div>
@@ -1167,7 +1170,39 @@
         </div>
       </div>
 
-      <!-- 2. Uptime Monitor Subtab -->
+      <!-- 2. Video Yuklovchi Subtab (Instagram, TikTok, YouTube) -->
+      <div class="tool-content-pane" id="tool-pane-video" style="display: none;">
+        <div class="neon-card p-3 mb-3">
+          <div class="neon-card-header">
+            <span><i class="bi bi-camera-reels-fill me-2 text-danger"></i>Video Yuklovchi (Suvsiz HD)</span>
+            <span class="badge bg-danger text-white">Instagram • TikTok • YouTube</span>
+          </div>
+          <p class="text-muted small mb-2">Instagram Reels, TikTok (suvsiz), YouTube Shorts yoki X havolasini kiriting:</p>
+          <div class="input-group mb-2">
+            <input type="url" class="form-control" id="video-dl-input" placeholder="https://www.instagram.com/reel/... yoki TikTok linki" />
+            <button class="btn btn-neon-primary px-3" id="btn-dl-video" onclick="handleDownloadVideoWeb()">
+              <i class="bi bi-download"></i>
+            </button>
+          </div>
+          <div class="d-flex gap-1 overflow-x-auto text-nowrap mb-2">
+            <span class="quick-chip" onclick="setQuickVideo('https://www.instagram.com/reel/')">📸 Instagram Reels</span>
+            <span class="quick-chip" onclick="setQuickVideo('https://vt.tiktok.com/')">🎵 TikTok (Suvsiz)</span>
+            <span class="quick-chip" onclick="setQuickVideo('https://youtube.com/shorts/')">▶️ YouTube Shorts</span>
+          </div>
+          <div id="video-dl-result" style="display: none;" class="p-3 bg-light rounded-3 mt-2">
+            <div class="d-flex align-items-center gap-2 mb-1">
+              <span class="badge bg-success text-white" id="video-dl-platform">TikTok</span>
+              <span class="small fw-bold text-dark" id="video-dl-title">Video</span>
+            </div>
+            <div class="small text-muted mb-2">Hajmi: <b id="video-dl-size">0 MB</b></div>
+            <div class="alert alert-success py-2 px-3 small mb-0">
+              <i class="bi bi-check-circle-fill me-1"></i> Video tayyor! Telegram botingizda ham video avtomatik yuboriladi.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Uptime Monitor Subtab -->
       <div class="tool-content-pane" id="tool-pane-uptime" style="display: none;">
         <div class="neon-card p-3 mb-3">
           <div class="neon-card-header">
@@ -2326,6 +2361,58 @@
         navigator.clipboard.writeText(lastGeneratedPrompt);
         showToast('Prompt nusxalandi!');
         haptic('light');
+      }
+    }
+
+    // Video Downloader In-App
+    function setQuickVideo(prefix) {
+      const input = document.getElementById('video-dl-input');
+      if (input) {
+        input.value = prefix;
+        input.focus();
+      }
+    }
+
+    async function handleDownloadVideoWeb() {
+      const input = document.getElementById('video-dl-input');
+      const url = input.value.trim();
+      const btn = document.getElementById('btn-dl-video');
+      const resBox = document.getElementById('video-dl-result');
+      const platformBadge = document.getElementById('video-dl-platform');
+      const titleEl = document.getElementById('video-dl-title');
+      const sizeEl = document.getElementById('video-dl-size');
+
+      if (!url) {
+        showToast('Video havolasini kiriting', true);
+        return;
+      }
+
+      haptic('medium');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+      try {
+        const res = await fetch('/api/download_video', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ url: url })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          platformBadge.innerText = data.platform || 'Video';
+          titleEl.innerText = data.title || 'Muvaffaqiyatli yuklandi';
+          sizeEl.innerText = `${data.size_mb || 0} MB`;
+          resBox.style.display = 'block';
+          showToast('Video yuklandi va tayyorlandi!');
+          haptic('success');
+        } else {
+          showToast('Videoni yuklab bo\'lmadi yoki 50MB dan katta', true);
+        }
+      } catch (err) {
+        showToast('Tarmoq xatosi', true);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-download"></i>';
       }
     }
 

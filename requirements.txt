@@ -51,3 +51,7 @@ edge-tts>=6.1.0
 
 # Universal Hujjatlar Tahlilchisi (Microsoft MarkItDown)
 markitdown>=0.0.1
+
+# Ijtimoiy Tarmoqlar Video Yuklovchisi (Instagram, TikTok, YouTube)
+yt-dlp>=2024.0.0
+

@@ -554,6 +554,52 @@ async def api_generate_image_handler(request: web.Request) -> web.Response:
         return web.json_response({"status": "error", "message": str(exc)}, status=500)
 
 
+async def api_download_video_handler(request: web.Request) -> web.Response:
+    """Mini App: Ijtimoiy tarmoqlardan video yuklab olish."""
+    try:
+        data = await request.json()
+        url = data.get("url", "").strip()
+        if not url:
+            return web.json_response({"status": "error", "message": "URL kiritilmadi"}, status=400)
+        from core.media_downloader import download_social_video
+        info = await download_social_video(url)
+        if info:
+            return web.json_response({
+                "status": "ok",
+                "title": info.get("title"),
+                "platform": info.get("platform"),
+                "size_mb": info.get("size_mb"),
+                "message": f"✅ {info.get('platform')} videosi muvaffaqiyatli tayyorlandi!"
+            })
+        return web.json_response({"status": "error", "message": "Video yuklab bo'lmadi yoki hajm 50MB dan katta"}, status=400)
+    except Exception as exc:
+        logger.error("api_download_video xatosi: %s", exc)
+        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+
+
+async def api_tts_voice_handler(request: web.Request) -> web.Response:
+    """Mini App: Matnni ovozga aylantirish (TTS)."""
+    try:
+        data = await request.json()
+        text = data.get("text", "").strip()
+        voice = data.get("voice")
+        if not text:
+            return web.json_response({"status": "error", "message": "Matn kiritilmadi"}, status=400)
+        from core.tts_agent import generate_speech_audio
+        import base64
+        audio_bytes = await generate_speech_audio(text, voice=voice)
+        if audio_bytes:
+            b64 = base64.b64encode(audio_bytes).decode("utf-8")
+            return web.json_response({
+                "status": "ok",
+                "audio_base64": f"data:audio/mp3;base64,{b64}"
+            })
+        return web.json_response({"status": "error", "message": "Ovoz sintezida xatolik"}, status=500)
+    except Exception as exc:
+        logger.error("api_tts_voice xatosi: %s", exc)
+        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+
+
 async def start_web_server(ai_manager: AIManager, bot: Optional[Bot] = None) -> web.AppRunner:
     """aiohttp web server va Mini App endpointlarini ishga tushiradi."""
     app = web.Application()
@@ -594,6 +640,8 @@ async def start_web_server(ai_manager: AIManager, bot: Optional[Bot] = None) -> 
     app.router.add_post("/api/clean_server", api_clean_server_handler)
     app.router.add_get("/api/profile", api_profile_handler)
     app.router.add_post("/api/generate_image", api_generate_image_handler)
+    app.router.add_post("/api/download_video", api_download_video_handler)
+    app.router.add_post("/api/tts_voice", api_tts_voice_handler)
 
     port = int(os.getenv("PORT", "8080"))
     runner = web.AppRunner(app)

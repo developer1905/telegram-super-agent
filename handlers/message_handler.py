@@ -860,6 +860,45 @@ async def handle_ai_chat(message: Message, ai_manager: AIManager) -> None:
             )
             return
 
+    # 4.2.1 Ijtimoiy tarmoqlardan video yuklash (Instagram, TikTok, YouTube, X)
+    from core.media_downloader import extract_media_url, download_social_video, detect_platform
+    media_url = extract_media_url(user_text)
+    if media_url and (
+        any(k in user_text.lower() for k in ["yukla", "download", "video", "/dl", "/video"])
+        or user_text.strip() == media_url
+        or len(user_text.split()) <= 3
+    ):
+        platform_name = detect_platform(media_url)
+        wait_msg = await message.answer(f"⏳ **{platform_name} videosi yuklab olinmoqda...**\n`{media_url}`\n\n_Iltimos, kuting (HD, suvsiz)..._")
+        await message.bot.send_chat_action(message.chat.id, "upload_video")
+        video_info = await download_social_video(media_url)
+        if video_info and os.path.exists(video_info["file_path"]):
+            try:
+                from aiogram.types import FSInputFile
+                v_file = FSInputFile(video_info["file_path"])
+                caption = (
+                    f"🎬 **{video_info.get('platform', 'Video')} yuklandi!**\n\n"
+                    f"📝 **Nomi:** {video_info.get('title', '')[:100]}\n"
+                    f"📦 **Hajmi:** `{video_info.get('size_mb', 0)} MB`\n\n"
+                    f"🤖 Super-Agent"
+                )
+                await message.reply_video(video=v_file, caption=caption, parse_mode="Markdown")
+                await wait_msg.delete()
+                LogCollector().add(action_type="media_download", description=f"Video: {platform_name}")
+            except Exception as v_err:
+                logger.error("Video yuborishda xato: %s", v_err)
+                await safe_edit_text(wait_msg, f"❌ Videoni yuborishda xatolik: {v_err}")
+            finally:
+                if os.path.exists(video_info["file_path"]):
+                    try:
+                        os.remove(video_info["file_path"])
+                    except Exception:
+                        pass
+            return
+        else:
+            await safe_edit_text(wait_msg, f"❌ Kechirasiz, {platform_name} videosini yuklab bo'lmadi yoki video hajmi 50MB dan katta.")
+            return
+
     # 4.3 Ovoz Sintezi — Text-to-Speech (/voice, ovoz:, gapir:)
     voice_match = re.match(r"^(?:/voice|ovoz|gapir|ovozga\s+aylantir)[:\s]+(.+)$", user_text, re.IGNORECASE | re.DOTALL)
     if voice_match:

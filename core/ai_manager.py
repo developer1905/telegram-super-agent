@@ -190,6 +190,52 @@ class AIManager:
 
         return "⚠️ Sun'iy intellekt xizmati vaqtincha band. Iltimos, bir ozdan so'ng qayta urinib ko'ring."
 
+    async def generate_with_audio(
+        self,
+        audio_bytes: bytes,
+        mime_type: str = "audio/ogg",
+        custom_instruction: Optional[str] = None,
+    ) -> str:
+        """
+        Ovozli xabarni Gemini Multimodal orqali to'g'ridan-to'g'ri tahlil qilish va javob berish.
+        """
+        instruction = custom_instruction or (
+            "Foydalanuvchining ushbu ovozli xabarini diqqat bilan eshiting va tushuning.\n"
+            "Format:\n"
+            "🎙 **Transkripsiya (Aytilgan gaplar):**\n"
+            "<aniq eshitilgan matn>\n\n"
+            "💡 **AI Javobi:**\n"
+            "<foydalanuvchi so'roviga to'liq, aniq va foydali javob>"
+        )
+
+        if GEMINI_API_KEY and self._gemini_client:
+            models_to_try = [GEMINI_MODEL] + list(GEMINI_FALLBACK_MODELS)
+            for m in models_to_try:
+                try:
+                    part = genai_types.Part.from_bytes(data=audio_bytes, mime_type=mime_type)
+                    resp = await asyncio.to_thread(
+                        self._gemini_client.models.generate_content,
+                        model=m,
+                        contents=[part, instruction],
+                    )
+                    if resp and resp.text:
+                        return resp.text.strip()
+                except Exception as exc:
+                    logger.warning("Gemini audio tahlil xatosi (%s): %s", m, exc)
+                    continue
+
+        # Zaxira: matn transkripsiyasi orqali generatsiya
+        try:
+            from core.speech_agent import transcribe_audio_bytes
+            transcription = await transcribe_audio_bytes(audio_bytes, mime_type, ai_manager=self)
+            if transcription:
+                ans = await self.generate(transcription)
+                return f"🎙 **Transkripsiya:** _{transcription}_\n\n💡 **AI Javobi:**\n{ans}"
+        except Exception as stt_err:
+            logger.error("Zaxira STT xatosi: %s", stt_err)
+
+        return "❌ Ovozli xabarni tahlil qilishda xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring yoki matn ko'rinishida yozing."
+
     # ─── Gemini ──────────────────────────────────────────────
 
     async def _generate_gemini(
