@@ -1,30 +1,53 @@
 """
-handlers/group_handler.py — Guruhlar va Kanallarda Avtomatik Salomlashish va AI Yordamchi
+handlers/group_handler.py — Guruhlar va Kanallarda To'liq Avtopilot va AI Yordamchi
 
 Imkoniyatlar:
-1. my_chat_member / new_chat_members orqali kanal yoki guruhga qo'shilganda avtomatik salomlashish (bulletproof safe_send).
-2. Kanallarni va guruhlarni avtomatik bazaga (managed_chats) ro'yxatga olish.
-3. Guruhda admin yozsa yoki buyruq bersa zudlik bilan javob berish.
-4. Guruh a'zolari botga savol bersa (bot ..., @mention, reply, yoki savol belgisi ?) aqlli AI javob qaytarish.
-5. Kanallarda post chiqarilganda yoki savol berilganda (savol?, bot..., #xulosa, /ai) kanalga avtomatik AI tahlil va javob yo'llash.
-6. Adminga yangi guruh/kanal qo'shilganida to'liq hisobot berish.
+1. my_chat_member / new_chat_members orqali kanal yoki guruhga qo'shilganda avtomatik salomlashish.
+2. Kanallarni va guruhlarni bazaga (managed_chats) avtomatik ro'yxatga olish.
+3. Rasm chizish (Midjourney/FLUX.1): Guruhda yoki kanalda /draw, /imagine, 'bot rasm chiz:' buyrug'i berilsa fotorealistik rasm generatsiya qilish.
+4. Video yuklash: Guruhda Instagram, TikTok, YouTube havolalari yuborilganda videoni to'g'ridan-to'g'ri yuklab guruhga jo'natish.
+5. Expert AI Agentlar:
+   - 🔬 Deep Research: /research, /tadqiqot
+   - 💻 Code Reviewer: /code, /audit, /kod
+   - 📄 Document & Contract Analyzer: /doc, /shartnoma
+   - 🎯 Viral SMM Creator: /smm, /post
+6. Multimodal Vision & Hujjat tahlili: Guruhda rasm yoki fayl yuborib botdan so'ralsa darhol tahlil qilish.
+7. Guruh Moderatsiyasi (Adminlar uchun):
+   - /mute [minut], /unmute, /ban, /unban, /pin, /unpin, /rules, /setrules, /warn
+8. Kanallar bilan ishlash (Channel Autopilot):
+   - Postlarda savol bo'lsa yoki #xulosa, #tahlil, #fakt bo'lsa professional sharh berish
+   - /post_channel orqali kanalga post chiqarish
 """
 
 from __future__ import annotations
 
+import datetime
+import io
 import logging
+import os
 import re
+import uuid
 from typing import Optional
 
-from aiogram import Router, F
+from aiogram import Router, F, Bot
 from aiogram.types import (
     Message,
     ChatMemberUpdated,
+    BufferedInputFile,
+    ChatPermissions,
 )
 
 from config import ADMIN_ID
 from core.ai_manager import AIManager
 from core.database import db
+from core.expert_agents import (
+    DeepResearchAgent,
+    CodeReviewerAgent,
+    DocumentContractAgent,
+    ViralSMMAgent,
+)
+from core.media_downloader import extract_media_url, download_social_video
+from core.midjourney_agent import draw_midjourney_image
 from core.reminder_manager import parse_reminder_smart
 from core.safe_send import safe_send_message, safe_message_reply, safe_message_answer
 from services.scheduler import LogCollector
@@ -32,158 +55,92 @@ from services.scheduler import LogCollector
 logger = logging.getLogger(__name__)
 router = Router(name="group")
 
+# Guruh qoidalari uchun xotira kesh
+_GROUP_RULES: dict[int, str] = {}
+# Foydalanuvchilar ogohlantirishlari (user_id -> count)
+_USER_WARNS: dict[str, int] = {}
 
-# ─── 1. KANAL YOKI GURUHGA QO'SHILGANDA AVTOMATIK SALOMLASHISH ───
+
+async def _is_user_group_admin(message: Message) -> bool:
+    """Foydalanuvchi ushbu guruhda admin yoki tizim administratori ekanligini tekshiradi."""
+    if not message.from_user:
+        return False
+    if message.from_user.id == ADMIN_ID:
+        return True
+    try:
+        member = await message.chat.get_member(message.from_user.id)
+        return member.status in ("creator", "administrator")
+    except Exception:
+        return False
+
+
+# ─── 1. KANAL YOKI GURUHGA QO'SHILGANDA SALOMLASHISH ─────────
 
 @router.my_chat_member()
 async def on_my_chat_member_updated(event: ChatMemberUpdated) -> None:
-    """
-    Bot kanal yoki guruhga qo'shilganda, admin qilinganda yoki chiqarilganda ishlaydi.
-    """
+    """Bot kanal yoki guruhga qo'shilganda yoki chiqarilganda ishlaydi."""
     old_status = event.old_chat_member.status
     new_status = event.new_chat_member.status
     chat = event.chat
 
-    logger.info(
-        "ChatMemberUpdated: chat_id=%s, title='%s', type=%s, %s -> %s",
-        chat.id,
-        chat.title,
-        chat.type,
-        old_status,
-        new_status,
-    )
+    logger.info("ChatMemberUpdated: chat_id=%s, title='%s', type=%s, %s -> %s",
+                chat.id, chat.title, chat.type, old_status, new_status)
 
     # 1. KANALGA QO'SHILGANDA
     if chat.type == "channel":
         if new_status == "administrator":
-            # Bazaga saqlash
             await db.add_or_update_managed_chat(
                 chat_id=chat.id,
                 title=chat.title or "Nomsiz Kanal",
                 chat_type="channel",
                 username=chat.username or "",
             )
-
-            # Kanalga avtomatik salomlashish posti
             welcome_post = (
                 "🎉 **Assalomu alaykum!**\n\n"
                 "Ushbu kanalga **Super-Agent AI** tizimi muvaffaqiyatli ulandi! 🤖✨\n\n"
                 "📌 **Imkoniyatlar:**\n"
-                "• Kanalga berilgan savollarga avtomatik AI tahlil va javoblar\n"
-                "• Postlarni avtomatik rejalashtirish va chiqarish\n"
-                "• Gemini AI yordamida tezislar, xulosalar va hashtaglar tayyorlash\n\n"
-                "Kanalda botga murojaat qilish uchun postda `bot [savol]` yoki `/ai [savol]` deb yozishingiz mumkin."
+                "• Kanal postlariga avtomatik AI tahlil, tezislar va xulosalar (#xulosa, #savol, #fakt)\n"
+                "• Savollarga aqlli va professional javoblar\n"
+                "• Rasm chizish va kontent yaratish imkoniyati"
             )
             try:
-                await safe_send_message(
-                    bot=event.bot,
-                    chat_id=chat.id,
-                    text=welcome_post,
-                    parse_mode="Markdown",
-                )
-                logger.info("✅ '%s' kanaliga salomlashish posti chiqarildi", chat.title)
+                await safe_send_message(bot=event.bot, chat_id=chat.id, text=welcome_post, parse_mode="Markdown")
             except Exception as exc:
-                logger.warning("Kanalga salomlashish posti yuborilmadi (%s): %s", chat.id, exc)
-
-            # Adminga xabarnoma
-            try:
-                admin_notice = (
-                    f"📢 **Bot yangi kanalga Admin bo'lib ulandi!**\n\n"
-                    f"📌 Kanal: **{chat.title}**\n"
-                    f"🆔 ID: `{chat.id}`\n"
-                    f"🔗 Username: @{chat.username or 'yo‘q'}\n\n"
-                    f"✅ Kanalga salomlashish posti chiqarildi va bazaga saqlandi!"
-                )
-                await safe_send_message(
-                    bot=event.bot,
-                    chat_id=ADMIN_ID,
-                    text=admin_notice,
-                    parse_mode="Markdown",
-                )
-            except Exception as exc:
-                logger.warning("Adminga kanal xabari yuborilmadi: %s", exc)
-
+                logger.warning("Kanalga salomlashish posti yuborilmadi: %s", exc)
         elif new_status in ("kicked", "left"):
             await db.remove_managed_chat(chat.id)
-            try:
-                await safe_send_message(
-                    bot=event.bot,
-                    chat_id=ADMIN_ID,
-                    text=f"⚠️ **Diqqat:** Bot `{chat.title}` kanalidan chiqarildi.",
-                    parse_mode="Markdown",
-                )
-            except Exception:
-                pass
         return
 
-    # 2. GURUH YOKI SUPERGURUHGA QO'SHILGANDA
+    # 2. GURUHGA QO'SHILGANDA
     if chat.type in ("group", "supergroup"):
         if new_status in ("member", "administrator"):
-            # Bazaga saqlash
             await db.add_or_update_managed_chat(
                 chat_id=chat.id,
                 title=chat.title or "Nomsiz Guruh",
                 chat_type="group",
                 username=chat.username or "",
             )
-
             bot_user = await event.bot.get_me()
-            bot_username = bot_user.username or "bot"
-
-            # Guruhga avtomatik salomlashish xabari
             welcome_group = (
-                f"👋 **Assalomu alaykum, aziz \"{chat.title}\" a'zolari!**\n\n"
-                f"Men **Super-Agent AI** — aqlli guruh yordamchisiman! 🤖✨\n\n"
-                f"💡 **Menga murojaat qilish oson:**\n"
-                f"1. `bot [savolingiz]` yoki `@{bot_username} [savol]` deb yozing\n"
-                f"2. Mening xabarimga **Reply** (javob) qiling\n"
-                f"3. Biror xabarni tushunmasangiz, unga reply qilib `bot tushuntir` deng\n\n"
-                f"Barcha savollaringizga mamnuniyat bilan javob beraman! 🚀"
+                f"👋 **Assalomu alaykum, \"{chat.title}\" a'zolari!**\n\n"
+                f"Men **Super-Agent AI** — universal guruh yordamchisiman! 🤖✨\n\n"
+                f"🚀 **Men guruhda nimalar qila olaman?**\n"
+                f"• 🎨 **Rasm chizish:** `/draw [prompt]` yoki `bot rasm chiz: [so'rov]`\n"
+                f"• 🎬 **Video yuklash:** Instagram/TikTok/YouTube ssilkasini yuboring\n"
+                f"• 🔬 **Deep Research:** `/research [mavzu]`\n"
+                f"• 💻 **Kodni tekshirish:** `/code [kod]`\n"
+                f"• 📄 **Shartnoma tahlili:** `/doc [matn]`\n"
+                f"• 🎯 **SMM Post:** `/smm [mavzu]`\n"
+                f"• 🛡️ **Guruh moderatsiyasi:** `/mute`, `/ban`, `/pin`, `/rules` (adminlar uchun)\n"
+                f"• 💬 Menga savol berish uchun `bot [savol]` deng yoki xabarimga **Reply** qiling!"
             )
             try:
-                await safe_send_message(
-                    bot=event.bot,
-                    chat_id=chat.id,
-                    text=welcome_group,
-                    parse_mode="Markdown",
-                )
-                logger.info("✅ '%s' guruhiga salomlashish xabari yuborildi", chat.title)
+                await safe_send_message(bot=event.bot, chat_id=chat.id, text=welcome_group, parse_mode="Markdown")
             except Exception as exc:
-                logger.warning("Guruhga salomlashish xabari yuborilmadi (%s): %s", chat.id, exc)
-
-            # Adminga xabarnoma
-            try:
-                admin_notice = (
-                    f"👥 **Bot yangi guruhga ulandi!**\n\n"
-                    f"📌 Guruh: **{chat.title}**\n"
-                    f"🆔 ID: `{chat.id}`\n"
-                    f"🔗 Username: @{chat.username or 'yo‘q'}\n"
-                    f"👑 Status: {new_status}\n\n"
-                    f"Guruh a'zolari botga savol bersa yoki siz buyruq bersangiz, zudlik bilan javob beradi."
-                )
-                await safe_send_message(
-                    bot=event.bot,
-                    chat_id=ADMIN_ID,
-                    text=admin_notice,
-                    parse_mode="Markdown",
-                )
-            except Exception as exc:
-                logger.warning("Adminga guruh xabari yuborilmadi: %s", exc)
-
+                logger.warning("Guruhga salomlashish xabari yuborilmadi: %s", exc)
         elif new_status in ("kicked", "left"):
             await db.remove_managed_chat(chat.id)
-            try:
-                await safe_send_message(
-                    bot=event.bot,
-                    chat_id=ADMIN_ID,
-                    text=f"⚠️ **Diqqat:** Bot `{chat.title}` guruhidan chiqarildi.",
-                    parse_mode="Markdown",
-                )
-            except Exception:
-                pass
 
-
-# ─── 2. NEW_CHAT_MEMBERS (Foydalanuvchi botni guruhga qo'shganda) ─
 
 @router.message(F.chat.type.in_({"group", "supergroup"}), F.new_chat_members)
 async def on_new_chat_members(message: Message) -> None:
@@ -198,199 +155,463 @@ async def on_new_chat_members(message: Message) -> None:
                 username=message.chat.username or "",
             )
             welcome_group = (
-                f"👋 **Assalomu alaykum, aziz \"{message.chat.title}\" a'zolari!**\n\n"
-                f"Men **Super-Agent AI** — aqlli guruh yordamchisiman! 🤖✨\n\n"
-                f"💡 **Menga murojaat qilish uchun:**\n"
-                f"• Xabaringiz boshida `bot [savolingiz]` deb yozing yoki `@{bot_user.username}` deb belgilang!\n"
-                f"• Yoki mening xabarimga **Reply** qiling.\n\n"
-                f"Savol va topshiriqlaringizni bajonidil bajaraman!"
+                f"👋 **Assalomu alaykum!** Men **Super-Agent AI**man.\n\n"
+                f"Menga topshiriq berish uchun xabaringizda `bot ...` deb yozing yoki buyruqlardan foydalaning (`/draw`, `/research`, `/code`, `/smm`)."
             )
-            try:
-                await safe_message_answer(message, welcome_group, parse_mode="Markdown")
-            except Exception as exc:
-                logger.warning("Guruh new_chat_members xatosi: %s", exc)
+            await safe_message_answer(message, welcome_group, parse_mode="Markdown")
             break
 
 
-# ─── 3. GURUHDA BUYRUQ VA SAVOLLARGA JAVOB BERISH ────────────
+# ─── 2. GURUHDA MATN VA TOPSHIRIQLARNI BAJARISH ──────────────
 
 @router.message(F.chat.type.in_({"group", "supergroup"}), F.text)
-async def handle_group_message(message: Message, ai_manager: AIManager) -> None:
+async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot) -> None:
     """
-    Guruhdagi barcha xabarlarni aqlli tahlil qilish:
-    1. Admin yozsa: Har qanday savol yoki buyruqqa darhol javob beradi.
-    2. Har qanday a'zo uchun:
-       - Botga reply qilinganda
-       - @mention qilinganda
-       - Xabarda 'bot', 'ai', 'agent' so'zlari bilan boshlansa yoki murojaat bo'lsa
-       - Biror xabarga reply qilib 'bot javob ber', 'tushuntir', 'tarjima qil' deyilsa
-       - Savol berilganda (? belgisi bilan va botga tegishli bo'lsa)
+    Guruhdagi har qanday topshiriq va buyruqlarni aqlli tarzda bajarish.
     """
     raw_text = (message.text or "").strip()
     if not raw_text:
         return
 
-    is_admin = (message.from_user and message.from_user.id == ADMIN_ID)
-    bot_user = await message.bot.get_me()
+    text_lower = raw_text.lower()
+    bot_user = await bot.get_me()
     bot_username = (bot_user.username or "").lower()
     bot_mention = f"@{bot_username}" if bot_username else ""
 
-    text_lower = raw_text.lower()
-
-    # 1. Reply tekshiruvi: botning xabariga reply qilinganmi?
+    # Botga murojaat tekshiruvi
     is_reply_to_bot = (
         message.reply_to_message is not None
         and message.reply_to_message.from_user is not None
         and message.reply_to_message.from_user.id == bot_user.id
     )
-
-    # 2. Mention tekshiruvi: @bot_username yozilganmi?
     is_bot_mentioned = bool(bot_mention and bot_mention in text_lower)
+    starts_with_bot = bool(re.match(r"^(?:bot|botjon|ai|/ai|agent|superagent|qani bot|ey bot)[\s,:!-]+", text_lower))
+    starts_with_slash = raw_text.startswith("/")
+    has_media_link = bool(extract_media_url(raw_text))
 
-    # 3. Bot prefikslari (bot, botjon, ai, /ai, /bot, /ask, superagent, agent, ey bot, salom bot)
-    prefix_pattern = r"^(?:bot|botjon|ai|/ai|/bot|/ask|agent|superagent|ey bot|salom bot|qani bot)[\s,:!-]+"
-    starts_with_bot = bool(re.search(prefix_pattern, text_lower))
-
-    # 4. Matn ichida botga murojaat bor-yo'qligi
-    contains_bot_call = bool(re.search(r"\b(?:bot|botjon|superagent)\b", text_lower))
-
-    # 5. Boshqa odamning xabariga reply qilib botdan yordam so'rash
-    is_reply_to_other = message.reply_to_message is not None and not is_reply_to_bot
-    is_asking_on_reply = is_reply_to_other and (
-        contains_bot_call
-        or any(w in text_lower for w in ["tushuntir", "javob ber", "tarjima qil", "bunga nima", "fikring", "tahlil"])
-    )
-
-    # 6. Admin uchun kengaytirilgan ruxsat
-    is_admin_direct = is_admin and (
-        raw_text.startswith("/")
-        or starts_with_bot
-        or contains_bot_call
-        or raw_text.endswith("?")
-        or any(w in text_lower for w in ["eslat", "remind", "post", "tahlil", "statistika", "xabar"])
-    )
-
-    # Bot javob berishi kerakmi?
-    should_reply = (
+    # Triggerlar
+    should_process = (
         is_reply_to_bot
         or is_bot_mentioned
         or starts_with_bot
-        or is_asking_on_reply
-        or (contains_bot_call and raw_text.endswith("?"))
-        or is_admin_direct
+        or starts_with_slash
+        or has_media_link
+        or (message.reply_to_message and any(w in text_lower for w in ["bot", "tekshir", "tushuntir", "tarjima qil"]))
     )
 
-    if not should_reply:
+    if not should_process:
         return
 
-    # Prefikslarni tozalash (AI ga toza so'rov yuborish uchun)
-    clean_query = raw_text
+    # Prefikslardan tozalangan matn
+    clean_text = raw_text
     if starts_with_bot:
-        clean_query = re.sub(prefix_pattern, "", clean_query, flags=re.IGNORECASE).strip()
+        clean_text = re.sub(r"^(?:bot|botjon|ai|/ai|agent|superagent|qani bot|ey bot)[\s,:!-]+", "", clean_text, flags=re.IGNORECASE).strip()
     if bot_mention:
-        clean_query = re.sub(re.escape(bot_mention), "", clean_query, flags=re.IGNORECASE).strip()
-    clean_query = clean_query.strip()
+        clean_text = re.sub(re.escape(bot_mention), "", clean_text, flags=re.IGNORECASE).strip()
+    clean_text = clean_text.strip()
+    clean_lower = clean_text.lower()
 
-    # Reply qilingan xabar bo'lsa, uning matnini kontekst sifatida qo'shamiz
-    replied_context = ""
-    if message.reply_to_message:
-        replied_text = message.reply_to_message.text or message.reply_to_message.caption or ""
-        sender_name = message.reply_to_message.from_user.full_name if message.reply_to_message.from_user else "A'zo"
-        if replied_text:
-            replied_context = f"[Mavzu xabari ({sender_name}): '{replied_text[:500]}']\n"
+    # ── A. GURUH MODERATSIYASI (Adminlar uchun) ──
+    is_admin = await _is_user_group_admin(message)
 
-    # Agar xabar faqat "bot" bo'lib boshqa matn bo'lmasa
-    if not clean_query and not replied_context:
-        user_name = message.from_user.first_name if message.from_user else "do'stim"
-        await safe_message_reply(
-            message,
-            f"Assalomu alaykum, {user_name}! Savolingiz yoki topshirig'ingizni yozing, bajonidil yordam beraman! Masalan: `bot O'zbekistonning diqqatga sazovor joylari haqida aytib ber`",
-            parse_mode="Markdown",
-        )
+    # 1. /mute yoki /sukut (faqat replyga)
+    if is_admin and (clean_lower.startswith("/mute") or clean_lower.startswith("/sukut") or clean_lower.startswith("bot mute")):
+        if not message.reply_to_message or not message.reply_to_message.from_user:
+            await safe_message_reply(message, "⚠️ Mute qilish uchun biror a'zoning xabariga reply qiling: `/mute 10` (daqiqa).", parse_mode="Markdown")
+            return
+        target_user = message.reply_to_message.from_user
+        minutes = 10
+        m = re.search(r"\d+", clean_text)
+        if m:
+            minutes = int(m.group(0))
+        until_date = datetime.datetime.now() + datetime.timedelta(minutes=minutes)
+        try:
+            await bot.restrict_chat_member(
+                chat_id=message.chat.id,
+                user_id=target_user.id,
+                permissions=ChatPermissions(can_send_messages=False),
+                until_date=until_date,
+            )
+            await safe_message_reply(message, f"🔇 **{target_user.full_name}** {minutes} daqiqaga guruhda yozishdan cheklandi.", parse_mode="Markdown")
+        except Exception as exc:
+            await safe_message_reply(message, f"❌ Mute qilishda xatolik: {exc}", parse_mode=None)
         return
 
-    # ── ADMIN XOS BUYRUQLARI ──
-    if is_admin:
-        # 1. Eslatma o'rnatish
-        if any(w in clean_query.lower() for w in ["eslat", "remind", "eslatma"]):
-            rem_res = await parse_reminder_smart(clean_query, ai_manager)
-            if rem_res:
-                rem_time, rem_task = rem_res
-                await db.add_reminder(message.chat.id, rem_task, rem_time)
-                await safe_message_reply(
-                    message,
-                    f"⏰ **Eslatma qabul qilindi, hurmatli Admin!**\n\n"
-                    f"📝 Vazifa: {rem_task}\n"
-                    f"🕒 Vaqt: `{rem_time}`\n"
-                    f"Vaqti kelganda ushbu guruhga signal yuboraman.",
-                    parse_mode="Markdown",
+    # 2. /unmute
+    if is_admin and (clean_lower.startswith("/unmute") or clean_lower.startswith("bot unmute")):
+        if not message.reply_to_message or not message.reply_to_message.from_user:
+            await safe_message_reply(message, "⚠️ Unmute qilish uchun a'zoning xabariga reply qiling.", parse_mode=None)
+            return
+        target_user = message.reply_to_message.from_user
+        try:
+            await bot.restrict_chat_member(
+                chat_id=message.chat.id,
+                user_id=target_user.id,
+                permissions=ChatPermissions(
+                    can_send_messages=True,
+                    can_send_audios=True,
+                    can_send_documents=True,
+                    can_send_photos=True,
+                    can_send_videos=True,
+                    can_send_other_messages=True,
+                    can_add_web_page_previews=True,
+                ),
+            )
+            await safe_message_reply(message, f"🔊 **{target_user.full_name}** uchun cheklov bekor qilindi.", parse_mode="Markdown")
+        except Exception as exc:
+            await safe_message_reply(message, f"❌ Unmute xatosi: {exc}", parse_mode=None)
+        return
+
+    # 3. /ban yoki /hayda
+    if is_admin and (clean_lower.startswith("/ban") or clean_lower.startswith("/hayda") or clean_lower.startswith("bot ban")):
+        if not message.reply_to_message or not message.reply_to_message.from_user:
+            await safe_message_reply(message, "⚠️ Bandan o'tkazish uchun a'zoning xabariga reply qiling.", parse_mode=None)
+            return
+        target_user = message.reply_to_message.from_user
+        try:
+            await bot.ban_chat_member(chat_id=message.chat.id, user_id=target_user.id)
+            await safe_message_reply(message, f"⛔ **{target_user.full_name}** guruhdan chiqarildi va bloklandi.", parse_mode="Markdown")
+        except Exception as exc:
+            await safe_message_reply(message, f"❌ Ban xatosi: {exc}", parse_mode=None)
+        return
+
+    # 4. /unban
+    if is_admin and (clean_lower.startswith("/unban") or clean_lower.startswith("bot unban")):
+        user_id_to_unban = None
+        if message.reply_to_message and message.reply_to_message.from_user:
+            user_id_to_unban = message.reply_to_message.from_user.id
+        else:
+            m = re.search(r"\d{6,}", clean_text)
+            if m:
+                user_id_to_unban = int(m.group(0))
+        if user_id_to_unban:
+            try:
+                await bot.unban_chat_member(chat_id=message.chat.id, user_id=user_id_to_unban)
+                await safe_message_reply(message, f"✅ Foydalanuvchi ({user_id_to_unban}) bandan chiqarildi.", parse_mode=None)
+            except Exception as exc:
+                await safe_message_reply(message, f"❌ Unban xatosi: {exc}", parse_mode=None)
+        return
+
+    # 5. /pin va /unpin
+    if is_admin and (clean_lower.startswith("/pin") or clean_lower.startswith("/qada")):
+        if message.reply_to_message:
+            try:
+                await bot.pin_chat_message(chat_id=message.chat.id, message_id=message.reply_to_message.message_id)
+                await safe_message_reply(message, "📌 Xabar muvaffaqiyatli qadaldi!", parse_mode=None)
+            except Exception as exc:
+                await safe_message_reply(message, f"❌ Xabarni qadashda xatolik: {exc}", parse_mode=None)
+        return
+
+    if is_admin and (clean_lower.startswith("/unpin")):
+        try:
+            await bot.unpin_chat_message(chat_id=message.chat.id)
+            await safe_message_reply(message, "📌 Qadalgan xabar yechildi.", parse_mode=None)
+        except Exception as exc:
+            await safe_message_reply(message, f"❌ Unpin xatosi: {exc}", parse_mode=None)
+        return
+
+    # 6. /rules va /setrules
+    if clean_lower.startswith("/rules") or clean_lower == "qoidalar" or clean_lower == "guruh qoidalari":
+        rules = _GROUP_RULES.get(message.chat.id, "📜 **Guruh Qoidalari:**\n1. O'zaro hurmat saqlansin.\n2. Reklama va spam taqiqlanadi.\n3. Haqoratli so'zlar ishlatilmasin.")
+        await safe_message_reply(message, rules, parse_mode="Markdown")
+        return
+
+    if is_admin and clean_lower.startswith("/setrules"):
+        new_rules = clean_text[9:].strip()
+        if new_rules:
+            _GROUP_RULES[message.chat.id] = f"📜 **Guruh Qoidalari:**\n\n{new_rules}"
+            await safe_message_reply(message, "✅ Guruh qoidalari muvaffaqiyatli saqlandi!", parse_mode=None)
+        return
+
+    # 7. /warn (ogohlantirish)
+    if is_admin and (clean_lower.startswith("/warn") or clean_lower.startswith("ogohlantir")):
+        if message.reply_to_message and message.reply_to_message.from_user:
+            t_user = message.reply_to_message.from_user
+            u_key = f"{message.chat.id}:{t_user.id}"
+            count = _USER_WARNS.get(u_key, 0) + 1
+            _USER_WARNS[u_key] = count
+            if count >= 3:
+                _USER_WARNS[u_key] = 0
+                until_date = datetime.datetime.now() + datetime.timedelta(hours=24)
+                await bot.restrict_chat_member(chat_id=message.chat.id, user_id=t_user.id, permissions=ChatPermissions(can_send_messages=False), until_date=until_date)
+                await safe_message_reply(message, f"⚠️ **{t_user.full_name}** 3 marta ogohlantirildi va 24 soatga mute qilindi!", parse_mode="Markdown")
+            else:
+                await safe_message_reply(message, f"⚠️ **{t_user.full_name}** ogohlantirildi! ({count}/3 ta)", parse_mode="Markdown")
+            return
+
+    # ── B. RASM CHIZISH (FLUX.1 / Midjourney) ──
+    img_match = re.match(r"^(?:/draw|/imagine|/midjourney|rasm\s+chiz|rasm|chiz|chizib\s+ber)[:\s]+(.+)$", clean_text, re.IGNORECASE | re.DOTALL)
+    if img_match:
+        prompt_query = img_match.group(1).strip()
+        wait_m = await message.reply("🎨 **FLUX.1 rasm chizmoqda...** Bir necha soniya kuting...")
+        try:
+            await bot.send_chat_action(message.chat.id, "upload_photo")
+            img_bytes, enhanced_p, ar, seed = await draw_midjourney_image(
+                raw_prompt=prompt_query,
+                ai_manager=ai_manager,
+                enhance=True,
+            )
+            if img_bytes:
+                photo_file = BufferedInputFile(file=img_bytes, filename=f"flux_{uuid.uuid4().hex[:6]}.jpg")
+                caption = (
+                    f"🎨 **FLUX.1 Badiiy Asari:**\n"
+                    f"📝 *{prompt_query}*\n"
+                    f"📐 O'lcham: `{ar}` | 🎲 Seed: `{seed}`"
                 )
+                await wait_m.delete()
+                await message.reply_photo(photo=photo_file, caption=caption, parse_mode="Markdown")
+                return
+            else:
+                await wait_m.edit_text("❌ Rasm chizishda xatolik yuz berdi. Iltimos, qayta urinib ko'ring.")
+        except Exception as exc:
+            logger.error("Guruhda rasm chizish xatosi: %s", exc)
+            await wait_m.edit_text(f"❌ Rasm generatsiyasida xatolik: {exc}")
+        return
+
+    # ── C. VIDEO YUKLASH (Instagram, TikTok, YouTube) ──
+    media_url = extract_media_url(raw_text)
+    if media_url:
+        wait_m = await message.reply("⏳ **Video yuklanmoqda...** Iltimos, kuting...")
+        try:
+            await bot.send_chat_action(message.chat.id, "upload_video")
+            info = await download_social_video(media_url)
+            if info and info.get("file_path") and os.path.exists(info["file_path"]):
+                f_path = info["file_path"]
+                caption = f"🎬 **Video yuklandi!**\n📌 Manba: {info.get('platform', 'Ijtimoiy tarmoq')}"
+                try:
+                    from aiogram.types import FSInputFile
+                    v_file = FSInputFile(f_path)
+                    await message.reply_video(video=v_file, caption=caption, parse_mode="Markdown")
+                except Exception:
+                    # Fallback to document
+                    d_file = FSInputFile(f_path)
+                    await message.reply_document(document=d_file, caption=caption, parse_mode="Markdown")
+                await wait_m.delete()
+                return
+            else:
+                await wait_m.edit_text("⚠️ Ushbu videoni yuklab bo'lmadi yoki havola yopiq hisobga tegishli.")
+                return
+        except Exception as exc:
+            logger.error("Guruhda video yuklash xatosi: %s", exc)
+            await wait_m.edit_text("⚠️ Video yuklashda xatolik yuz berdi.")
+            return
+
+    # ── D. 🔬 DEEP RESEARCH AGENT ──
+    if clean_lower.startswith("/research") or clean_lower.startswith("/tadqiqot") or clean_lower.startswith("tadqiqot:"):
+        query = re.sub(r"^(?:/research|/tadqiqot|tadqiqot:)[\s:]*", "", clean_text, flags=re.IGNORECASE).strip()
+        if not query and message.reply_to_message:
+            query = message.reply_to_message.text or message.reply_to_message.caption or ""
+        if query:
+            wait_m = await message.reply(f"🔬 **'{query[:40]}' mavzusi bo'yicha Deep Research boshlandi...**\nInternet faktlari qidirilmoqda...")
+            try:
+                report = await DeepResearchAgent.conduct_research(query, ai_manager)
+                await wait_m.delete()
+                for chunk in [report[i:i+4000] for i in range(0, len(report), 4000)]:
+                    await message.reply(chunk, parse_mode="Markdown")
+                return
+            except Exception as exc:
+                await wait_m.edit_text(f"❌ Tadqiqotda xatolik: {exc}")
                 return
 
-        # 2. /status
-        if clean_query.lower() in ("/status", "holat", "status"):
-            status_text = ai_manager.status()
-            await safe_message_reply(message, f"📊 **Bot Holati:**\n{status_text}", parse_mode="Markdown")
-            return
+    # ── E. 💻 CODE REVIEWER AGENT ──
+    if clean_lower.startswith("/code") or clean_lower.startswith("/audit") or clean_lower.startswith("/kod") or clean_lower.startswith("kod:"):
+        code_body = re.sub(r"^(?:/code|/audit|/kod|kod:)[\s:]*", "", clean_text, flags=re.IGNORECASE).strip()
+        if not code_body and message.reply_to_message:
+            code_body = message.reply_to_message.text or ""
+        if code_body:
+            wait_m = await message.reply("💻 **Kod auditi o'tkazilmoqda...** Xatolar va xavfsizlik tekshirilmoqda...")
+            try:
+                audit_res = await CodeReviewerAgent.review_code(code_body, ai_manager)
+                await wait_m.delete()
+                for chunk in [audit_res[i:i+4000] for i in range(0, len(audit_res), 4000)]:
+                    await message.reply(chunk, parse_mode="Markdown")
+                return
+            except Exception as exc:
+                await wait_m.edit_text(f"❌ Kod auditida xatolik: {exc}")
+                return
 
-        # 3. /clear
-        if clean_query.lower() in ("/clear", "tozala"):
-            res = ai_manager.clear_history()
-            await safe_message_reply(message, res, parse_mode="Markdown")
-            return
+    # ── F. 📄 DOCUMENT & CONTRACT ANALYZER ──
+    if clean_lower.startswith("/doc") or clean_lower.startswith("/shartnoma") or clean_lower.startswith("shartnoma:"):
+        doc_text = re.sub(r"^(?:/doc|/shartnoma|shartnoma:)[\s:]*", "", clean_text, flags=re.IGNORECASE).strip()
+        if not doc_text and message.reply_to_message:
+            doc_text = message.reply_to_message.text or message.reply_to_message.caption or ""
+        if doc_text:
+            wait_m = await message.reply("📄 **Hujjat va shartnoma xatarlari tahlil qilinmoqda...**")
+            try:
+                analysis = await DocumentContractAgent.analyze_contract(doc_text, ai_manager)
+                await wait_m.delete()
+                for chunk in [analysis[i:i+4000] for i in range(0, len(analysis), 4000)]:
+                    await message.reply(chunk, parse_mode="Markdown")
+                return
+            except Exception as exc:
+                await wait_m.edit_text(f"❌ Shartnoma tahlilida xatolik: {exc}")
+                return
 
-    # ── AI JAVOBI YARATISH ──
+    # ── G. 🎯 VIRAL SMM AGENT ──
+    if clean_lower.startswith("/smm") or clean_lower.startswith("/post") or clean_lower.startswith("smm:") or clean_lower.startswith("post:"):
+        topic = re.sub(r"^(?:/smm|/post|smm:|post:)[\s:]*", "", clean_text, flags=re.IGNORECASE).strip()
+        if not topic and message.reply_to_message:
+            topic = message.reply_to_message.text or ""
+        if topic:
+            wait_m = await message.reply("🎯 **Viral SMM post yaratilmoqda...** Ilgaklar va hashtaglar tanlanmoqda...")
+            try:
+                smm_post = await ViralSMMAgent.generate_campaign(topic, "Telegram", ai_manager)
+                await wait_m.delete()
+                for chunk in [smm_post[i:i+4000] for i in range(0, len(smm_post), 4000)]:
+                    await message.reply(chunk, parse_mode="Markdown")
+                return
+            except Exception as exc:
+                await wait_m.edit_text(f"❌ SMM yaratishda xatolik: {exc}")
+                return
+
+    # ── H. UMUMIY AQLLI AI JAVOBI ──
+    replied_context = ""
+    if message.reply_to_message:
+        r_text = message.reply_to_message.text or message.reply_to_message.caption or ""
+        sender_n = message.reply_to_message.from_user.full_name if message.reply_to_message.from_user else "A'zo"
+        if r_text:
+            replied_context = f"[Mavzu xabari ({sender_n}): '{r_text[:600]}']\n"
+
     try:
-        await message.bot.send_chat_action(message.chat.id, "typing")
+        await bot.send_chat_action(message.chat.id, "typing")
     except Exception:
         pass
 
-    user_full = message.from_user.full_name if message.from_user else "Foydalanuvchi"
     group_title = message.chat.title or "Guruh"
+    user_full = message.from_user.full_name if message.from_user else "Foydalanuvchi"
 
     full_prompt = (
-        f"Guruh: '{group_title}'. Foydalanuvchi: {user_full}.\n"
+        f"Siz '{group_title}' guruhida eng aqlli va professional Super-Agent AI yordamchisiz.\n"
+        f"Murojaat qiluvchi a'zo: {user_full}.\n"
         f"{replied_context}"
-        f"Savol / Murojaat: {clean_query or 'Ushbu mavzuni tushuntirib ber.'}\n\n"
-        f"Talab: Guruh a'zosiga do'stona, aniq, foydali va chiroyli formatda o'zbek tilida javob ber."
+        f"Savol / Vazifa: {clean_text or 'Ushbu mavzuni tushuntirib ber.'}\n\n"
+        f"Talab: Guruh a'zolariga o'ta aniq, foydali, do'stona va chiroyli Markdown formatda javob bering."
     )
 
     try:
-        response = await ai_manager.generate(full_prompt, save_history=False)
-        await safe_message_reply(message, response, parse_mode="Markdown")
+        reply = await ai_manager.generate(full_prompt, save_history=False)
+        await safe_message_reply(message, reply, parse_mode="Markdown")
         LogCollector().add(
             action_type="group_ai",
-            description=f"Guruh ({group_title}): {clean_query[:35]}",
+            description=f"Guruh ({group_title}): {clean_text[:35]}",
             model_used="gemini_assistant",
         )
     except Exception as exc:
-        logger.error("Guruhda AI javobida xatolik: %s", exc)
-        await safe_message_reply(
-            message,
-            "⚠️ Kechirasiz, so'rovingizga javob tayyorlashda xatolik yuz berdi. Iltimos, qayta urinib ko'ring.",
-            parse_mode=None,
+        logger.error("Guruhda AI javob xatosi: %s", exc)
+        await safe_message_reply(message, "⚠️ Savolingizga javob tayyorlashda xatolik yuz berdi. Iltimos, qayta so'rang.", parse_mode=None)
+
+
+# ─── 3. GURUHDA RASM (MULTIMODAL VISION) BILAN ISHLASH ────────
+
+@router.message(F.chat.type.in_({"group", "supergroup"}), F.photo)
+async def handle_group_photo(message: Message, ai_manager: AIManager, bot: Bot) -> None:
+    """Guruhda rasm yuborilganda yoki rasmga bot orqali savol berilganda."""
+    caption = (message.caption or "").strip()
+    bot_user = await bot.get_me()
+    bot_mention = f"@{bot_user.username}".lower() if bot_user.username else ""
+
+    # Tekshiruv: rasm tagida bot chaqirilganmi?
+    has_bot_call = bool(
+        "bot" in caption.lower()
+        or (bot_mention and bot_mention in caption.lower())
+        or caption.startswith("/")
+    )
+
+    if not has_bot_call:
+        return
+
+    wait_m = await message.reply("🔍 **Rasm tahlil qilinmoqda (Gemini Vision)...**")
+    try:
+        photo = message.photo[-1]
+        file_obj = await bot.get_file(photo.file_id)
+        buf = io.BytesIO()
+        await bot.download_file(file_obj.file_path, destination=buf)
+        img_bytes = buf.getvalue()
+
+        clean_caption = re.sub(r"\b(?:bot|botjon)\b", "", caption, flags=re.IGNORECASE).strip()
+        user_prompt = clean_caption or "Ushbu rasmni batafsil tahlil qiling va unda nimalar aks etganini tushuntiring."
+
+        analysis = await ai_manager.generate_with_image(
+            prompt=user_prompt,
+            image_bytes=img_bytes,
+            mime_type="image/jpeg",
         )
+        await wait_m.delete()
+        await message.reply(analysis, parse_mode="Markdown")
+    except Exception as exc:
+        logger.error("Guruhda rasm tahlili xatosi: %s", exc)
+        await wait_m.edit_text(f"❌ Rasmni tahlil qilishda xatolik: {exc}")
 
 
-# ─── 4. KANALDA POSTLAR VA SAVOLLARGA JAVOB BERISH (CHANNEL_POST) ─
+# ─── 4. GURUHDA HUJJAT BILAN ISHLASH ──────────────────────────
+
+@router.message(F.chat.type.in_({"group", "supergroup"}), F.document)
+async def handle_group_document(message: Message, ai_manager: AIManager, bot: Bot) -> None:
+    """Guruhda shartnoma yoki hujjat (.pdf, .docx, .txt) yuborilganda audit qilish."""
+    caption = (message.caption or "").strip().lower()
+    doc = message.document
+    if not doc:
+        return
+
+    # Agar captionda bot yoki shartnoma / tekshir bo'lsa
+    if not any(k in caption for k in ["bot", "tekshir", "shartnoma", "doc", "audit", "tahlil"]):
+        return
+
+    file_name = doc.file_name or "hujjat"
+    wait_m = await message.reply(f"📄 **'{file_name}' hujjati tahlil qilinmoqda...**")
+    try:
+        file_obj = await bot.get_file(doc.file_id)
+        buf = io.BytesIO()
+        await bot.download_file(file_obj.file_path, destination=buf)
+        content_bytes = buf.getvalue()
+
+        # Matn ajratib olish
+        extracted_text = ""
+        if file_name.endswith(".txt") or file_name.endswith(".md"):
+            extracted_text = content_bytes.decode("utf-8", errors="ignore")
+        elif file_name.endswith(".pdf"):
+            try:
+                import pypdf
+                pdf_reader = pypdf.PdfReader(io.BytesIO(content_bytes))
+                pages_text = [p.extract_text() or "" for p in pdf_reader.pages[:15]]
+                extracted_text = "\n".join(pages_text)
+            except Exception:
+                extracted_text = content_bytes[:4000].decode("utf-8", errors="ignore")
+        elif file_name.endswith(".docx"):
+            try:
+                import docx
+                doc_obj = docx.Document(io.BytesIO(content_bytes))
+                extracted_text = "\n".join([p.text for p in doc_obj.paragraphs])
+            except Exception:
+                extracted_text = content_bytes[:4000].decode("utf-8", errors="ignore")
+        else:
+            extracted_text = content_bytes[:4000].decode("utf-8", errors="ignore")
+
+        if not extracted_text.strip():
+            await wait_m.edit_text("⚠️ Hujjatdan matn ajratib bo'lmadi.")
+            return
+
+        analysis = await DocumentContractAgent.analyze_contract(extracted_text[:12000], ai_manager)
+        await wait_m.delete()
+        for chunk in [analysis[i:i+4000] for i in range(0, len(analysis), 4000)]:
+            await message.reply(chunk, parse_mode="Markdown")
+    except Exception as exc:
+        logger.error("Guruhda hujjat tahlili xatosi: %s", exc)
+        await wait_m.edit_text(f"❌ Hujjat tahlilida xatolik: {exc}")
+
+
+# ─── 5. KANALDA POSTLARGA AVTOMATIK JAVOB (CHANNEL AUTOPILOT) ─
 
 @router.channel_post(F.text)
-async def handle_channel_post(message: Message, ai_manager: AIManager) -> None:
+async def handle_channel_post(message: Message, ai_manager: AIManager, bot: Bot) -> None:
     """
-    Kanalga yangi post chiqarilganda yoki savol berilganda ishlaydi.
-    1. Kanalni doimiy bazaga (managed_chats) avtomatik kiritadi.
-    2. Agar postda savol berilsa (oxirida '?' bo'lsa), yoki 'bot', '/ai', '@bot', 'savol:' bo'lsa:
-       Bot kanalga darhol aqlli javob yoki sharh xabarini chiqaradi.
-    3. Agar postda #ai_xulosa, #bot_tahlil yoki 'xulosa:' bo'lsa:
-       Postning qisqacha xulosasi va hashtaglarini kanalga sharh qilib chiqaradi.
+    Kanalga yangi post chiqarilganda avtomatik tahlil va javob yuborish.
     """
     raw_text = (message.text or "").strip()
     if not raw_text:
         return
 
-    logger.info("ChannelPost received in '%s': %s", message.chat.title, raw_text[:45])
-
-    # 1. Kanalni bazada yangilab qo'yamiz
+    # Kanalni bazada yangilash
     await db.add_or_update_managed_chat(
         chat_id=message.chat.id,
         title=message.chat.title or "Kanal",
@@ -398,12 +619,11 @@ async def handle_channel_post(message: Message, ai_manager: AIManager) -> None:
         username=message.chat.username or "",
     )
 
-    bot_user = await message.bot.get_me()
-    bot_username = (bot_user.username or "").lower()
-    bot_mention = f"@{bot_username}" if bot_username else ""
+    bot_user = await bot.get_me()
+    bot_mention = f"@{bot_user.username}".lower() if bot_user.username else ""
     text_lower = raw_text.lower()
 
-    # Triggerlarni tekshiramiz
+    # Triggerlar
     has_bot_call = bool(
         bot_mention in text_lower
         or re.search(r"^(?:bot|/ai|/bot|/ask|ai:)[\s,:!-]+", text_lower)
@@ -411,47 +631,36 @@ async def handle_channel_post(message: Message, ai_manager: AIManager) -> None:
         or "#bot" in text_lower
     )
     is_question = raw_text.endswith("?") or text_lower.startswith("savol:")
-    is_summary_request = "#ai_xulosa" in text_lower or text_lower.startswith("xulosa:") or text_lower.startswith("tahlil:")
+    is_summary = "#xulosa" in text_lower or text_lower.startswith("xulosa:") or "#tahlil" in text_lower
+    is_fact_check = "#fakt" in text_lower or text_lower.startswith("fakt:")
 
-    # Agar post botga qaratilgan bo'lsa yoki savol bo'lsa yoki xulosa so'ralsa
-    if has_bot_call or is_question or is_summary_request:
-        try:
-            await message.bot.send_chat_action(message.chat.id, "typing")
-        except Exception:
-            pass
+    if not (has_bot_call or is_question or is_summary or is_fact_check):
+        return
 
-        # Matnni tozalash
-        clean_text = raw_text
-        if bot_mention:
-            clean_text = re.sub(re.escape(bot_mention), "", clean_text, flags=re.IGNORECASE).strip()
-        clean_text = re.sub(r"^(?:bot|/ai|/bot|/ask|ai:|#ai_xulosa|#bot_tahlil|xulosa:|tahlil:|savol:)[\s,:!-]+", "", clean_text, flags=re.IGNORECASE).strip()
+    try:
+        await bot.send_chat_action(message.chat.id, "typing")
+    except Exception:
+        pass
 
-        if is_summary_request:
-            prompt = (
-                f"Kanal posti: '{clean_text or raw_text}'.\n\n"
-                f"Ushbu post uchun qisqacha 3 ta asosiy xulosa va 4 ta eng sara hashtag tuzib ber (o'zbek tilida)."
-            )
-        else:
-            prompt = (
-                f"Telegram kanalida post / savol berildi: '{clean_text or raw_text}'.\n\n"
-                f"Ushbu kanal obunachilari uchun professional, aniq, qiziqarli va chiroyli formatda javob / izoh tayyorlab ber (o'zbek tilida)."
-            )
+    clean_text = re.sub(r"^(?:bot|/ai|/bot|/ask|ai:|#ai|#bot|#xulosa|#tahlil|#fakt|xulosa:|fakt:|savol:)[\s,:!-]+", "", raw_text, flags=re.IGNORECASE).strip()
 
-        try:
-            ai_reply = await ai_manager.generate(prompt, save_history=False)
-            header = "💡 **AI Xulosasi:**\n\n" if is_summary_request else "🤖 **Super-Agent Javobi:**\n\n"
-            
-            # Kanalga javob xabarini yo'llash (reply qilib)
-            await safe_message_reply(
-                message=message,
-                text=f"{header}{ai_reply}",
-                parse_mode="Markdown",
-            )
-            LogCollector().add(
-                action_type="channel_ai",
-                description=f"Kanal ({message.chat.title}): {raw_text[:35]}",
-                model_used="gemini_assistant",
-            )
-            logger.info("✅ Kanalga AI javobi muvaffaqiyatli yuborildi: %s", message.chat.title)
-        except Exception as exc:
-            logger.error("Kanal postida AI javob tayyorlash xatosi: %s", exc)
+    if is_summary:
+        prompt = f"Kanal posti: '{clean_text or raw_text}'.\n\nUshbu post bo'yicha 3 ta eng muhim tezis-xulosa va 4 ta ommabop hashtag tuzib ber (o'zbek tilida)."
+        header = "💡 **AI Xulosasi va Tezislar:**\n\n"
+    elif is_fact_check:
+        prompt = f"Kanal posti: '{clean_text or raw_text}'.\n\nUshbu faktni tahlil qiling va obunachilar uchun qisqa izoh bering (o'zbek tilida)."
+        header = "🔍 **AI Fakt Tahlili:**\n\n"
+    else:
+        prompt = f"Telegram kanalida savol/post berildi: '{clean_text or raw_text}'.\n\nObunachilar uchun professional, aniq va qiziqarli sharh yozib ber (o'zbek tilida)."
+        header = "🤖 **Super-Agent Tahlili:**\n\n"
+
+    try:
+        ai_reply = await ai_manager.generate(prompt, save_history=False)
+        await safe_message_reply(message=message, text=f"{header}{ai_reply}", parse_mode="Markdown")
+        LogCollector().add(
+            action_type="channel_ai",
+            description=f"Kanal ({message.chat.title}): {raw_text[:35]}",
+            model_used="gemini_assistant",
+        )
+    except Exception as exc:
+        logger.error("Kanal postida AI javob xatosi: %s", exc)
