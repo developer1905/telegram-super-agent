@@ -143,6 +143,125 @@ def build_mj_keyboard(
     return builder.as_markup()
 
 
+# ─────────────────────────────────────────────────────────────
+#  TELEGRAM STUDIO: USER SETTINGS & STUDIO INTERACTION PANEL
+# ─────────────────────────────────────────────────────────────
+USER_IMAGE_SETTINGS: dict[int, dict] = {}
+
+AVAILABLE_STYLES = {
+    "photo": "📸 Fotorealistik",
+    "anime": "🎌 Anime",
+    "3d": "✨ 3D Disney",
+    "cyberpunk": "👾 Kiberpank",
+    "art": "🎨 Moybo'yoq",
+    "vector": "📐 Vektor",
+}
+
+QUICK_IDEAS = [
+    ("tashkent", "🏙️ Toshkent 2050", "Futuristik Toshkent 2050, uchuvchi elektromobillar, neon minoralar"),
+    ("library", "🏛️ Kiber Kutubxona", "Alisher Navoiy kutubxonasi futuristik kiberpank uslubida, 8k ultra-detailed"),
+    ("samurai", "⚔️ Kiber Samuray", "Cyberpunk samuray yomg'ir ostida kiber shahar ko'chasida"),
+    ("space", "🚀 Kosmik Kema", "Kosmik tadqiqot kemasi qora tuynuk yaqinida, 8k cinematic"),
+]
+
+
+def get_user_image_settings(user_id: int) -> dict:
+    """Foydalanuvchining rasm chizish bo'yicha tanlangan sozlamalari (Model, Proporsiya, Uslub)."""
+    if user_id not in USER_IMAGE_SETTINGS:
+        USER_IMAGE_SETTINGS[user_id] = {
+            "model": "flux",
+            "ar": "1:1",
+            "style": "photo",
+        }
+    return USER_IMAGE_SETTINGS[user_id]
+
+
+def build_image_studio_panel(user_id: int) -> tuple[str, InlineKeyboardMarkup]:
+    """
+    Web App'dagi barcha imkoniyatlarni o'zida jamlagan Telegram Studio paneli:
+    - 4 ta AI Modellar (FLUX.1, GPT-Image-2, Z-Image Turbo, FLUX.2 Klein)
+    - 5 ta Proporsiyalar (1:1, 16:9, 9:16, 4:3, 3:4)
+    - 6 ta Badiiy Uslublar (Fotorealistik, Anime, 3D, Cyberpunk, Moybo'yoq, Vektor)
+    - 4 ta Bir zumda ishga tushuvchi Tayyor G'oyalar
+    """
+    cfg = get_user_image_settings(user_id)
+    cur_model = cfg.get("model", "flux")
+    cur_ar = cfg.get("ar", "1:1")
+    cur_style = cfg.get("style", "photo")
+
+    model_name = AVAILABLE_MODELS.get(cur_model, cur_model).split("(")[0].strip()
+    style_name = AVAILABLE_STYLES.get(cur_style, cur_style)
+
+    ar_desc = {
+        "1:1": "Kvadrat (1024x1024)",
+        "16:9": "Keng format (1280x720)",
+        "9:16": "Story / Reels (720x1280)",
+        "4:3": "Klassik (1024x768)",
+        "3:4": "Portret (768x1024)",
+    }.get(cur_ar, cur_ar)
+
+    text = (
+        "🎨 <b>Super-Agent AI Rasm Chizish Studiyasi</b>\n\n"
+        "Web App'dagi barcha zamonaviy AI modellar va sozlamalar endi botning o'zida to'liq ishlaydi!\n\n"
+        "⚙️ <b>Hozirgi Tanlangan Sozlamalar:</b>\n"
+        f"• 🤖 <b>AI Model:</b> <code>{model_name}</code>\n"
+        f"• 📐 <b>Proporsiya:</b> <code>{cur_ar}</code> ({ar_desc})\n"
+        f"• 🎭 <b>Badiiy Uslub:</b> <code>{style_name}</code>\n\n"
+        "👇 <i>Tugmalar orqali model yoki o'lchamni tanlang, tayyor g'oyani bosing yoki istalgan promptni botga yozing:</i>"
+    )
+
+    builder = InlineKeyboardBuilder()
+
+    # 1. Modellar qatori
+    models = [
+        ("flux", "⚡ FLUX.1"),
+        ("gpt-image-2", "🤖 GPT-Img"),
+        ("z-image", "🎌 Z-Anime"),
+        ("flux-klein", "🔮 Klein"),
+    ]
+    m_btns = []
+    for m_code, m_title in models:
+        prefix = "✅ " if cur_model == m_code else ""
+        m_btns.append(InlineKeyboardButton(text=f"{prefix}{m_title}", callback_data=f"img_cfg:model:{m_code}"))
+    builder.row(*m_btns[:2])
+    builder.row(*m_btns[2:])
+
+    # 2. Proporsiyalar qatori
+    ratios = [
+        ("1:1", "📐 1:1"),
+        ("16:9", "🖥️ 16:9"),
+        ("9:16", "📱 9:16"),
+        ("4:3", "🖼️ 4:3"),
+        ("3:4", "📄 3:4"),
+    ]
+    r_btns = []
+    for r_code, r_title in ratios:
+        prefix = "✅ " if cur_ar == r_code else ""
+        r_btns.append(InlineKeyboardButton(text=f"{prefix}{r_title}", callback_data=f"img_cfg:ar:{r_code}"))
+    builder.row(*r_btns[:3])
+    builder.row(*r_btns[3:])
+
+    # 3. Uslublar qatori
+    s_btns = []
+    for s_code, s_title in AVAILABLE_STYLES.items():
+        prefix = "✅ " if cur_style == s_code else ""
+        s_btns.append(InlineKeyboardButton(text=f"{prefix}{s_title}", callback_data=f"img_cfg:style:{s_code}"))
+    builder.row(*s_btns[:3])
+    builder.row(*s_btns[3:])
+
+    # 4. Tezkor Tayyor G'oyalar
+    i_btns = []
+    for idea_key, idea_label, _ in QUICK_IDEAS:
+        i_btns.append(InlineKeyboardButton(text=idea_label, callback_data=f"img_idea:{idea_key}"))
+    builder.row(*i_btns[:2])
+    builder.row(*i_btns[2:])
+
+    # 5. Asosiy Menyu
+    builder.row(InlineKeyboardButton(text="◀️ Asosiy Menyu", callback_data="menu:main"))
+
+    return text, builder.as_markup()
+
+
 def parse_prompt_params(prompt: str) -> tuple[str, str, str, Optional[str]]:
     """
     Prompt ichidan --ar, --style va --model parametrlarini ajratib oladi.

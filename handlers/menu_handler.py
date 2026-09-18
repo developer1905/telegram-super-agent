@@ -11,7 +11,9 @@ handlers/menu_handler.py — Asosiy Menyu va Inline Tugmalar
 
 from __future__ import annotations
 
+import html
 import logging
+import uuid
 
 from aiogram import Router, F
 from aiogram.filters import Command
@@ -23,6 +25,7 @@ from aiogram.types import (
     WebAppInfo,
     ReplyKeyboardMarkup,
     KeyboardButton,
+    BufferedInputFile,
 )
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
@@ -37,6 +40,15 @@ from config import (
 from core.ai_manager import AIManager
 from core.database import db
 from core.userbot import get_userbot_info, summarize_telegram_activity
+from core.midjourney_agent import (
+    build_image_studio_panel,
+    get_user_image_settings,
+    QUICK_IDEAS,
+    draw_midjourney_image,
+    build_mj_keyboard,
+    AVAILABLE_MODELS,
+    MJ_TASKS,
+)
 from services.roles import ROLES, get_role_keyboard_data
 from services.scheduler import LogCollector
 
@@ -56,7 +68,7 @@ def build_reply_keyboard_menu() -> ReplyKeyboardMarkup:
             KeyboardButton(text="📱 Mini App Paneli"),
         ],
         [
-            KeyboardButton(text="🎨 Midjourney Rasm"),
+            KeyboardButton(text="🎨 Rasm Chizish"),
             KeyboardButton(text="⚡ Hermes Agent"),
         ],
         [
@@ -125,7 +137,7 @@ def build_main_menu() -> InlineKeyboardMarkup:
         )
 
     builder.row(
-        InlineKeyboardButton(text="🎨 Midjourney AI Rasm", callback_data="menu:midjourney"),
+        InlineKeyboardButton(text="🎨 Rasm Chizish Studio", callback_data="menu:image_studio"),
         InlineKeyboardButton(text="⚡ Hermes 3 Agent", callback_data="menu:hermes"),
     )
     builder.row(
@@ -676,20 +688,91 @@ async def cb_main_menu(cb: CallbackQuery, ai_manager: AIManager) -> None:
     )
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "menu:midjourney")
-async def cb_midjourney(cb: CallbackQuery) -> None:
+@router.callback_query(ADMIN_FILTER, F.data.in_({"menu:image_studio", "menu:midjourney"}))
+async def cb_image_studio(cb: CallbackQuery) -> None:
     await cb.answer()
-    builder = InlineKeyboardBuilder()
-    builder.row(InlineKeyboardButton(text="◀️ Asosiy Menyu", callback_data="menu:main"))
-    text = (
-        "🎨 **Midjourney v6 AI Rasm Chizish Xizmati**\n\n"
-        "Qanday rasm chizishni xohlaysiz? Quyidagi formatlarda botga yozing:\n\n"
-        "• `/imagine futuristik Toshkent shahri kechasi --ar 16:9`\n"
-        "• `chiz: qora mushuk kosmosda oltin skafandrda`\n"
-        "• `rasm chiz: neonli kiberpank qiz portreti`\n\n"
-        "💡 Barcha o'lchamlar (--ar 16:9, 1:1, 9:16) qo'llab-quvvatlanadi va 100% bepul ishlaydi!"
+    text, markup = build_image_studio_panel(cb.from_user.id)
+    await safe_edit_text(cb, text, reply_markup=markup, parse_mode="HTML")
+
+
+@router.callback_query(ADMIN_FILTER, F.data.startswith("img_cfg:"))
+async def cb_img_config(cb: CallbackQuery) -> None:
+    parts = cb.data.split(":")
+    cfg_type = parts[1] if len(parts) > 1 else ""
+    cfg_val = parts[2] if len(parts) > 2 else ""
+
+    cfg = get_user_image_settings(cb.from_user.id)
+    if cfg_type in ("model", "ar", "style") and cfg_val:
+        cfg[cfg_type] = cfg_val
+        await cb.answer(f"✅ {cfg_val.upper()} tanlandi!")
+    else:
+        await cb.answer()
+
+    text, markup = build_image_studio_panel(cb.from_user.id)
+    await safe_edit_text(cb, text, reply_markup=markup, parse_mode="HTML")
+
+
+@router.callback_query(ADMIN_FILTER, F.data.startswith("img_idea:"))
+async def cb_img_idea(cb: CallbackQuery, ai_manager: AIManager) -> None:
+    idea_key = cb.data.replace("img_idea:", "").strip()
+    idea_dict = {k: p for k, _, p in QUICK_IDEAS}
+    prompt = idea_dict.get(idea_key)
+    if not prompt:
+        await cb.answer("G'oya topilmadi", show_alert=True)
+        return
+
+    cfg = get_user_image_settings(cb.from_user.id)
+    model = cfg.get("model", "flux")
+    ar = cfg.get("ar", "1:1")
+    style = cfg.get("style", "photo")
+
+    model_title = AVAILABLE_MODELS.get(model, model).split("(")[0].strip()
+    await cb.answer(f"🎨 {model_title} ({ar}) ishlamoqda...")
+    wait_msg = await cb.message.answer(
+        f"🎨 <b>Super-Agent Studio rasm chizmoqda...</b>\n\n"
+        f"🤖 Model: <code>{model_title}</code> | 📐 O'lcham: <code>{ar}</code>\n"
+        f"📝 <i>{html.escape(prompt)}</i>",
+        parse_mode="HTML",
     )
-    await safe_edit_text(cb, text, reply_markup=builder.as_markup(), parse_mode="Markdown")
+    try:
+        await cb.bot.send_chat_action(cb.message.chat.id, "upload_photo")
+        full_prompt = f"{prompt} --style {style}"
+        img_bytes, enhanced_p, used_ar, seed, used_model, *_ = await draw_midjourney_image(
+            raw_prompt=full_prompt,
+            ai_manager=ai_manager,
+            aspect_ratio=ar,
+            model=model,
+            enhance=True,
+        )
+        if img_bytes:
+            task_id = uuid.uuid4().hex[:8]
+            MJ_TASKS[task_id] = {
+                "prompt": prompt,
+                "enhanced": enhanced_p,
+                "ar": used_ar,
+                "seed": seed,
+                "model": used_model,
+                "style": style,
+            }
+            reply_markup = build_mj_keyboard(task_id, current_model=used_model, current_ar=used_ar, current_style=style)
+            photo_file = BufferedInputFile(file=img_bytes, filename=f"idea_{task_id}.jpg")
+            m_title = AVAILABLE_MODELS.get(used_model, used_model).split("(")[0].strip()
+            caption = (
+                f"🎨 <b>Super-Agent Studio: {html.escape(m_title)}</b>\n\n"
+                f"📝 <b>G'oya:</b> <i>{html.escape(prompt)}</i>\n"
+                f"📐 O'lcham: <code>{used_ar}</code> | 🎲 Seed: <code>{seed}</code>\n\n"
+                f"<i>Quyidagi tugmalar orqali model yoki proporsiyani almashtirishingiz mumkin:</i>"
+            )
+            try:
+                await wait_msg.delete()
+            except Exception:
+                pass
+            await cb.message.answer_photo(photo=photo_file, caption=caption, reply_markup=reply_markup, parse_mode="HTML")
+        else:
+            await wait_msg.edit_text("❌ Rasm chizishda xatolik yuz berdi. Iltimos qayta urinib ko'ring.")
+    except Exception as exc:
+        logger.error("Tezkor g'oya rasm xatosi: %s", exc)
+        await wait_msg.edit_text(f"❌ Xatolik: {exc}")
 
 
 @router.callback_query(ADMIN_FILTER, F.data == "menu:hermes")

@@ -49,6 +49,8 @@ from core.midjourney_agent import (
     generate_free_midjourney_image,
     MJ_TASKS,
     build_mj_keyboard,
+    build_image_studio_panel,
+    get_user_image_settings,
     AVAILABLE_MODELS,
     ASPECT_RATIOS,
 )
@@ -930,31 +932,28 @@ async def handle_ai_chat(message: Message, ai_manager: AIManager) -> None:
     if mj_match:
         raw_prompt = (mj_match.group(1) or "").strip()
         if not raw_prompt:
-            helper_text = (
-                "🎨 <b>Super-Agent Studio — AI Rasm Markazi</b>\n\n"
-                "Qanday rasm chizmoqchisiz? Buyruqdan so'ng xohlagan tasavvuringizni yozing:\n\n"
-                "💡 <i>Masalan:</i>\n"
-                "<code>/draw Samarqand Registon maydoni kechasi, kiberpank uslubida</code>\n"
-                "<code>/flux Kosmik kema qora tuynuk yaqinida --ar 16:9 --model flux</code>\n\n"
-                "⚙️ <b>Qo'shimcha parametrlar:</b>\n"
-                "• <b>O'lchamlar:</b> <code>--ar 1:1</code>, <code>--ar 16:9</code>, <code>--ar 9:16</code>, <code>--ar 4:3</code>, <code>--ar 3:4</code>\n"
-                "• <b>Modellar:</b> <code>--model flux</code>, <code>--model gpt-image-2</code>, <code>--model z-image</code>, <code>--model flux-klein</code>\n"
-                "• <b>Uslublar:</b> <code>--style photo</code>, <code>--style anime</code>, <code>--style 3d</code>, <code>--style cyberpunk</code>, <code>--style art</code>\n\n"
-                "<i>Rasm chizilgach, ostidagi tugmalar orqali model va o'lchamni bir zumda almashtira olasiz!</i>"
-            )
-            await message.answer(helper_text, parse_mode="HTML")
+            text, markup = build_image_studio_panel(message.from_user.id)
+            await message.answer(text, reply_markup=markup, parse_mode="HTML")
             return
 
+        user_cfg = get_user_image_settings(message.from_user.id)
+        default_ar = user_cfg.get("ar", "1:1")
+        default_model = user_cfg.get("model", "flux")
+        default_style = user_cfg.get("style", "photo")
+
         wait_msg = await message.answer(
-            "🎨 <b>Super-Agent Studio rasm chizmoqda...</b>\n\n"
+            f"🎨 <b>Super-Agent Studio rasm chizmoqda ({default_model.upper()})...</b>\n\n"
             "✨ <i>Prompt AI tomonidan kinoxit darajasiga boyitilmoqda va fotorealistik ishlanmoqda...</i>",
             parse_mode="HTML",
         )
         await message.bot.send_chat_action(message.chat.id, "upload_photo")
         try:
+            full_user_prompt = raw_prompt if "--style" in raw_prompt else f"{raw_prompt} --style {default_style}"
             img_bytes, enhanced_prompt, ar, seed, used_model, *_ = await draw_midjourney_image(
-                raw_prompt=raw_prompt,
+                raw_prompt=full_user_prompt,
                 ai_manager=ai_manager,
+                aspect_ratio=default_ar,
+                model=default_model,
                 enhance=True,
             )
         except Exception as draw_err:
