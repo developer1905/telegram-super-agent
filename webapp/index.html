@@ -2195,6 +2195,7 @@
     // ─── 3. VOSITALAR (TOOLS) MULTI-SUBTAB CONTROLLER ───────────
     let currentActiveTool = 'midjourney';
     let currentMjAr = '1:1';
+    let currentMjStyle = 'photo';
 
     function initToolsTab() {
       if (currentActiveTool === 'midjourney') {
@@ -2231,9 +2232,6 @@
     }
 
     // Midjourney / FLUX.1 Studio In-App Generator
-    let currentMjAr = '1:1';
-    let currentMjStyle = 'photo';
-
     function setMjAr(ar, el) {
       haptic('light');
       currentMjAr = ar;
