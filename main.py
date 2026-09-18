@@ -588,6 +588,29 @@ async def api_video_stream_handler(request: web.Request) -> web.StreamResponse:
     return response
 
 
+async def api_video_audio_handler(request: web.Request) -> web.StreamResponse:
+    """Yuklangan videodan MP3 audio ajratib Web App ga uzatish."""
+    filename = request.match_info.get("filename", "")
+    filename = os.path.basename(filename)
+    base_name = os.path.splitext(filename)[0]
+    mp3_filename = f"{base_name}.mp3"
+    mp3_path = os.path.join(os.path.dirname(__file__), "data", "temp", mp3_filename)
+
+    if not os.path.exists(mp3_path):
+        video_path = os.path.join(os.path.dirname(__file__), "data", "temp", f"{base_name}.mp4")
+        if not os.path.exists(video_path):
+            return web.Response(text="Video fayl topilmadi", status=404)
+        from core.media_downloader import extract_audio_from_video
+        ok = await extract_audio_from_video(video_path, mp3_path)
+        if not ok or not os.path.exists(mp3_path):
+            return web.Response(text="Audio ajratib bo'lmadi", status=500)
+
+    response = web.FileResponse(mp3_path)
+    response.headers["Content-Disposition"] = f'attachment; filename="{mp3_filename}"'
+    response.headers["Content-Type"] = "audio/mpeg"
+    return response
+
+
 async def api_agent_research_handler(request: web.Request) -> web.Response:
     """Mini App: Deep Research Agent API."""
     try:
@@ -722,6 +745,7 @@ async def start_web_server(ai_manager: AIManager, bot: Optional[Bot] = None) -> 
     app.router.add_post("/api/generate_image", api_generate_image_handler)
     app.router.add_post("/api/download_video", api_download_video_handler)
     app.router.add_get("/api/video/stream/{filename}", api_video_stream_handler)
+    app.router.add_get("/api/video/audio/{filename}", api_video_audio_handler)
     app.router.add_post("/api/tts_voice", api_tts_voice_handler)
     app.router.add_post("/api/agent/research", api_agent_research_handler)
     app.router.add_post("/api/agent/code_review", api_agent_code_review_handler)

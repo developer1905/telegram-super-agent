@@ -368,24 +368,48 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
             await wait_m.edit_text(f"❌ Rasm generatsiyasida xatolik: {exc}")
         return
 
-    # ── C. VIDEO YUKLASH (Instagram, TikTok, YouTube) ──
+    # ── C. VIDEO YUKLASH (Instagram, TikTok, YouTube, X, Pinterest) ──
     media_url = extract_media_url(raw_text)
     if media_url:
-        wait_m = await message.reply("⏳ **Video yuklanmoqda...** Iltimos, kuting...")
+        wait_m = await message.reply("⏳ <b>Video yuklanmoqda...</b> Iltimos, kuting...", parse_mode="HTML")
         try:
+            from core.media_downloader import get_or_create_mp3
             await bot.send_chat_action(message.chat.id, "upload_video")
             info = await download_social_video(media_url)
             if info and info.get("file_path") and os.path.exists(info["file_path"]):
                 f_path = info["file_path"]
-                caption = f"🎬 **Video yuklandi!**\n📌 Manba: {info.get('platform', 'Ijtimoiy tarmoq')}"
+                p_safe = html.escape(info.get("platform", "Video"))
+                t_safe = html.escape(info.get("title", "")[:80])
+                m_info = ""
+                if info.get("music_title"):
+                    m_info = f"\n🎵 <b>Musiqa:</b> {html.escape(info['music_title'][:60])}"
+
+                caption = (
+                    f"🎬 <b>{p_safe} yuklandi!</b>\n"
+                    f"📝 <b>Nomi:</b> {t_safe}"
+                    f"{m_info}\n\n"
+                    f"🤖 <b>Super-Agent</b>"
+                )
+                from aiogram.types import FSInputFile
+                v_file = FSInputFile(f_path)
                 try:
-                    from aiogram.types import FSInputFile
-                    v_file = FSInputFile(f_path)
-                    await message.reply_video(video=v_file, caption=caption, parse_mode="Markdown")
+                    await message.reply_video(video=v_file, caption=caption, parse_mode="HTML")
                 except Exception:
-                    # Fallback to document
-                    d_file = FSInputFile(f_path)
-                    await message.reply_document(document=d_file, caption=caption, parse_mode="Markdown")
+                    await message.reply_document(document=v_file, caption=caption, parse_mode="HTML")
+
+                # Agar so'rovda mp3 yoki musiqa bo'lsa
+                if any(w in raw_text.lower() for w in ["mp3", "musiqa", "audio", "qo'shiq"]):
+                    mp3_info = await get_or_create_mp3(info)
+                    if mp3_info and os.path.exists(mp3_info["audio_path"]):
+                        a_file = FSInputFile(mp3_info["audio_path"])
+                        await message.reply_audio(
+                            audio=a_file,
+                            title=mp3_info.get("title", "Audio")[:80],
+                            performer=mp3_info.get("artist", "Super-Agent")[:80],
+                            caption=f"🎵 <b>{html.escape(mp3_info.get('title', 'Musiqa')[:80])}</b>",
+                            parse_mode="HTML",
+                        )
+
                 await wait_m.delete()
                 return
             else:

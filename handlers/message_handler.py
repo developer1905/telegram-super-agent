@@ -67,6 +67,7 @@ NOT_ADMIN_FILTER = F.from_user.id != ADMIN_ID
 _pending_posts: dict[int, tuple[str, str]] = {}
 _pending_smart_sends: dict[str, str] = {}  # draft_id -> message_text
 _mj_tasks: dict[str, dict] = {}  # task_id -> {"prompt": str, "enhanced": str, "ar": str, "seed": int}
+_media_cache: dict[str, dict] = {}  # task_id -> video_info
 
 
 # ─── Boshqalar uchun Rad Etish ────────────────────────────────
@@ -384,7 +385,70 @@ async def cb_midjourney_action(cb: CallbackQuery, ai_manager: AIManager) -> None
         await cb.message.answer_photo(photo=input_file, caption=caption, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# ─── Ovozda O'qish (TTS Callback) ────────────────────────────
+# ─── Video Musiqa va MP3 Callbacklari ────────────────────────
+
+@router.callback_query(ADMIN_FILTER, F.data.startswith("media:mp3:"))
+async def cb_media_mp3(cb: CallbackQuery) -> None:
+    task_id = cb.data.split(":")[-1]
+    v_info = _media_cache.get(task_id)
+    if not v_info or not os.path.exists(v_info.get("file_path", "")):
+        await cb.answer("⚠️ Video fayl xotiradan o'chirilgan, havolani qayta yuboring.", show_alert=True)
+        return
+
+    await cb.answer("⏳ MP3 audio ajratilmoqda...")
+    from core.media_downloader import get_or_create_mp3
+    mp3_info = await get_or_create_mp3(v_info)
+    if mp3_info and os.path.exists(mp3_info["audio_path"]):
+        from aiogram.types import FSInputFile
+        a_file = FSInputFile(mp3_info["audio_path"])
+        track_title = html.escape(mp3_info.get("title", "Audio Track")[:80])
+        artist_name = html.escape(mp3_info.get("artist", "Super-Agent")[:80])
+        caption = (
+            f"🎵 <b>{track_title}</b>\n"
+            f"👤 <b>Ijrochi:</b> {artist_name}\n\n"
+            f"🤖 <b>Super-Agent Audio</b>"
+        )
+        try:
+            await cb.message.reply_audio(
+                audio=a_file,
+                title=mp3_info.get("title", "Audio Track")[:80],
+                performer=mp3_info.get("artist", "Super-Agent")[:80],
+                caption=caption,
+                parse_mode="HTML",
+            )
+            LogCollector().add(action_type="media_mp3", description=f"MP3: {track_title[:30]}")
+        except Exception as err:
+            logger.error("MP3 yuborishda xato: %s", err)
+            await cb.message.reply(f"❌ Musiqani yuborishda xatolik: {err}")
+    else:
+        await cb.message.reply("❌ Videodan MP3 musiqani ajratib bo'lmadi.")
+
+
+@router.callback_query(ADMIN_FILTER, F.data.startswith("media:shazam:"))
+async def cb_media_shazam(cb: CallbackQuery, ai_manager: AIManager) -> None:
+    task_id = cb.data.split(":")[-1]
+    v_info = _media_cache.get(task_id)
+    if not v_info:
+        await cb.answer("⚠️ Ma'lumot topilmadi, havolani qayta yuboring.", show_alert=True)
+        return
+
+    await cb.answer("🔍 Qo'shiq tahlil qilinmoqda...")
+    title = v_info.get("music_title") or v_info.get("title") or ""
+    author = v_info.get("music_author") or ""
+    platform = v_info.get("platform", "Video")
+
+    prompt = (
+        f"Videodan olingan ma'lumotlar:\n"
+        f"Platforma: {platform}\n"
+        f"Video sarlavhasi / matni: {v_info.get('title', '')}\n"
+        f"Musiqa treki: {title}\n"
+        f"Ijrochi / Muallif: {author}\n\n"
+        f"Topshiriq: Ushbu videoda yangragan asl qo'shiq nomi, ijrochisi, janri va qanday topish mumkinligini "
+        f"aniqlab, foydalanuvchiga juda chiroyli, qisqa va aniq ma'lumot ber (o'zbek tilida)."
+    )
+    res = await ai_manager.generate(prompt, save_history=False)
+    await cb.message.reply(f"🔍 <b>Videodagi Qo'shiq Tahlili (Shazam AI):</b>\n\n{res}", parse_mode="HTML")
+
 
 @router.callback_query(ADMIN_FILTER, F.data == "read_voice_msg")
 async def cb_read_voice_msg(cb: CallbackQuery) -> None:
@@ -928,43 +992,78 @@ async def handle_ai_chat(message: Message, ai_manager: AIManager) -> None:
             LogCollector().add(action_type="viral_smm", description=f"SMM: {smm_input[:30]}")
             return
 
-    # 4.2.E Ijtimoiy tarmoqlardan video yuklash (Instagram, TikTok, YouTube, X)
-    from core.media_downloader import extract_media_url, download_social_video, detect_platform
+    # 4.2.E Ijtimoiy tarmoqlardan video yuklash (Instagram, TikTok, YouTube, X, Pinterest)
+    from core.media_downloader import extract_media_url, download_social_video, detect_platform, get_or_create_mp3
     media_url = extract_media_url(user_text)
     if media_url:
         platform_name = detect_platform(media_url)
-        wait_msg = await message.answer(f"⏳ **{platform_name} videosi yuklab olinmoqda...**\n`{media_url}`\n\n_Iltimos, kuting (HD, suvsiz formatda)..._")
+        wait_msg = await message.answer(f"⏳ <b>{platform_name} videosi yuklab olinmoqda...</b>\n<code>{html.escape(media_url[:80])}</code>\n\n<i>Iltimos, kuting (HD, suvsiz formatda)...</i>", parse_mode="HTML")
         await message.bot.send_chat_action(message.chat.id, "upload_video")
         video_info = await download_social_video(media_url)
-        if video_info and os.path.exists(video_info["file_path"]):
+        if video_info and os.path.exists(video_info.get("file_path", "")):
             try:
                 from aiogram.types import FSInputFile
+                task_id = uuid.uuid4().hex[:8]
+                _media_cache[task_id] = video_info
+
                 v_file = FSInputFile(video_info["file_path"])
+                p_safe = html.escape(video_info.get("platform", "Video"))
+                t_safe = html.escape(video_info.get("title", "")[:80])
+                sz = video_info.get("size_mb", 0)
+
+                music_line = ""
+                if video_info.get("music_title"):
+                    music_line = f"\n🎵 <b>Musiqa:</b> {html.escape(video_info['music_title'][:60])}"
+                    if video_info.get("music_author"):
+                        music_line += f" — <i>{html.escape(video_info['music_author'][:40])}</i>"
+
                 caption = (
-                    f"🎬 **{video_info.get('platform', 'Video')} yuklandi!**\n\n"
-                    f"📝 **Nomi:** {video_info.get('title', '')[:100]}\n"
-                    f"📦 **Hajmi:** `{video_info.get('size_mb', 0)} MB`\n\n"
-                    f"🤖 Super-Agent"
+                    f"🎬 <b>{p_safe} yuklandi!</b>\n\n"
+                    f"📝 <b>Nomi:</b> {t_safe}\n"
+                    f"📦 <b>Hajmi:</b> <code>{sz} MB</code>"
+                    f"{music_line}\n\n"
+                    f"🤖 <b>Super-Agent</b>"
                 )
+
+                # Tugmalar: MP3 yuklash va Qo'shiqni aniqlash
+                builder = InlineKeyboardBuilder()
+                builder.row(
+                    InlineKeyboardButton(text="🎵 Musiqasini olish (MP3)", callback_data=f"media:mp3:{task_id}"),
+                    InlineKeyboardButton(text="🔍 Qo'shiqni aniqlash", callback_data=f"media:shazam:{task_id}"),
+                )
+
                 try:
-                    await message.reply_video(video=v_file, caption=caption, parse_mode="Markdown")
+                    await message.reply_video(video=v_file, caption=caption, parse_mode="HTML", reply_markup=builder.as_markup())
                 except Exception as vid_err:
                     logger.warning("reply_video muvaffaqiyatsiz (%s), reply_document orqali yuborilmoqda", vid_err)
-                    await message.reply_document(document=v_file, caption=caption, parse_mode="Markdown")
+                    await message.reply_document(document=v_file, caption=caption, parse_mode="HTML", reply_markup=builder.as_markup())
+
                 await wait_msg.delete()
                 LogCollector().add(action_type="media_download", description=f"Video: {platform_name}")
+
+                # Agar foydalanuvchi so'rovida "mp3" yoki "musiqa" yozilgan bo'lsa, MP3 ni ham darhol jo'natish
+                if any(w in user_text.lower() for w in ["mp3", "musiqa", "audio", "qo'shiq"]):
+                    mp3_info = await get_or_create_mp3(video_info)
+                    if mp3_info and os.path.exists(mp3_info["audio_path"]):
+                        a_file = FSInputFile(mp3_info["audio_path"])
+                        m_caption = (
+                            f"🎵 <b>{html.escape(mp3_info.get('title', 'Musiqa')[:80])}</b>\n"
+                            f"👤 <b>Ijrochi:</b> {html.escape(mp3_info.get('artist', 'Super-Agent')[:80])}\n\n"
+                            f"🤖 <b>Super-Agent Audio</b>"
+                        )
+                        await message.reply_audio(
+                            audio=a_file,
+                            title=mp3_info.get("title", "Audio Track")[:80],
+                            performer=mp3_info.get("artist", "Super-Agent")[:80],
+                            caption=m_caption,
+                            parse_mode="HTML",
+                        )
             except Exception as v_err:
                 logger.error("Video yuborishda xato: %s", v_err)
-                await safe_edit_text(wait_msg, f"❌ Videoni yuborishda xatolik: {v_err}")
-            finally:
-                if os.path.exists(video_info["file_path"]):
-                    try:
-                        os.remove(video_info["file_path"])
-                    except Exception:
-                        pass
+                await safe_edit_text(wait_msg, f"❌ Videoni yuborishda xatolik: {v_err}", parse_mode=None)
             return
         else:
-            await safe_edit_text(wait_msg, f"❌ Kechirasiz, {platform_name} videosini yuklab bo'lmadi yoki video hajmi 50MB dan katta.")
+            await safe_edit_text(wait_msg, f"❌ Kechirasiz, {platform_name} videosini yuklab bo'lmadi yoki video hajmi 50MB dan katta.", parse_mode=None)
             return
 
     # 4.3 Ovoz Sintezi — Text-to-Speech (/voice, ovoz:, gapir:)
