@@ -1,17 +1,15 @@
 """
-core/news_football_agent.py — RSS Yangiliklar & Real Madrid Futbol Tahlili Agenti
+core/news_football_agent.py — Jonli Internet Qidiruv va AI Tahlil Agenti
 
 Imkoniyatlar:
-1. Real Madrid Klubining Barcha Musobaqalardagi Natijalari:
-   - UEFA Chempionlar Ligasi (UCL)
-   - Ispaniya La Ligasi
-   - Copa del Rey (Ispaniya Kubogi)
-   - Ispaniya Superkubogi (Supercopa)
-   - To'purarlar statistikasi (Kylian Mbappé, Vinícius Júnior, Jude Bellingham, Rodrygo)
-   - Keyingi kutilayotgan o'yin va so'nggi natijalar
-2. Dasturlash & IT Texnologiyalari (HackerNews, Habr, OpenSource tendentsiyalari)
-3. O'zbekiston Yangiliklari (Kun.uz, Daryo.uz)
-4. Kitoblar (Bestseller biznes, mutolaa va IT kitoblar tavsiyalari)
+1. Real Madrid Klubining Barcha Musobaqalari Bo'yicha Jonli Internet Tahlili:
+   - Internetdan (DuckDuckGo + Sport RSS) eng so'nggi o'yinlar, hisoblar, gollar va to'purarlarni topish.
+   - AI agent (Gemini / Hermes) orqali chuqur tahlil qilib, aniq raqamlar, daqiqalar va statistika bilan O'zbek tilida chiqarish.
+   - UEFA Champions League, La Liga, Copa del Rey, Supercopa de España.
+   - Mbappé, Vinícius Jr, Bellingham va boshqa yetakchilarning to'purarlik jadvali.
+2. Dasturlash & Yangi Texnologiyalar (Jonli qidiruv + chuqur tahlil).
+3. O'zbekiston Yangiliklari (Kun.uz, Daryo.uz va jonli iqtisodiy/texnologik voqealar).
+4. Kitoblar (Bestseller kitoblar, xulosalar va amaliy tavsiyalar).
 """
 
 from __future__ import annotations
@@ -26,12 +24,14 @@ import aiohttp
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from core.search_agent import search_web
+
 if TYPE_CHECKING:
     from core.ai_manager import AIManager
 
 logger = logging.getLogger(__name__)
 
-# RSS Manbalari
+# RSS Zaxira Manbalari
 RSS_SOURCES = {
     "dasturlash": [
         "https://habr.com/ru/rss/hubs/programming/all/",
@@ -59,12 +59,10 @@ async def fetch_rss_feed_items(url: str, limit: int = 4) -> List[Dict[str, str]]
                 text = await resp.text()
 
         root = ET.fromstring(text)
-        # RSS 2.0 channel -> item
         for item in root.findall(".//item")[:limit]:
             title = item.findtext("title") or ""
             link = item.findtext("link") or ""
             desc = item.findtext("description") or ""
-            # HTML teglarni tozalash
             desc_clean = re.sub(r"<[^>]+>", "", desc).strip()[:180]
             if title:
                 items.append({
@@ -107,106 +105,149 @@ def build_news_keyboard(current_topic: str = "realmadrid") -> InlineKeyboardMark
     return builder.as_markup()
 
 
+# ─── 1. REAL MADRID JONLI INTEL AGENTI ─────────────────────────
+
 async def get_real_madrid_report(ai_manager: Optional["AIManager"] = None) -> str:
     """
-    Real Madrid klubining barcha turnirlar (La Liga, Chempionlar Ligasi, Copa del Rey, Superkubok)dagi
-    natijalari va to'purarlar haqida to'liq, jonli va professional hisobot.
+    Internetdan Real Madridning so'nggi o'yinlari, natijalari, to'purarlari va
+    kelgusi o'yinlari haqida jonli ma'lumot qidirib, AI orqali professional
+    va faktlarga to'la hisobot tayyorlaydi.
     """
-    lines = [
-        "👑 **REAL MADRID C.F. — Mavsumiy Tahlil & Natijalar**\n",
-        "🏆 **Musobaqalar va Holat:**",
-        "• **UEFA Champions League:** Guruh / Pley-off bosqichida qatnashmoqda. Maqsad: 16-Kubok!",
-        "• **La Liga EA Sports:** Turnir jadvalida yetakchi o'rinlarda kurashmoqda.",
-        "• **Copa del Rey (Ispaniya Kubogi):** Asosiy davralar faol davom etmoqda.",
-        "• **Supercopa de España:** Saudiya Arabistonida o'tkaziladigan final to'rtligiga da'vogar.\n",
-        "⚽ **Jamoaning Asosiy To'purarlari:**",
-        "1. 🇫🇷 **Kylian Mbappé** — Yetakchi to'purar, barcha turnirlarda golli seriya",
-        "2. 🇧🇷 **Vinícius Júnior** — Qanot hujumlarining bosh harakatlantiruvchisi & assistlar",
-        "3. 🏴󠁧󠁢󠁥󠁮󠁧󠁿 **Jude Bellingham** — Markaziy yarim himoyadan hal qiluvchi gollar",
-        "4. 🇧🇷 **Rodrygo Goes** — Qanot hujumchisi va muhim o'yinlar qahramoni\n",
-        "🏟 **Navbatdagi Reja:**",
-        "• Jamoa har bir o'yinda to'liq g'alaba uchun maydonga tushadi (¡Hala Madrid y nada más!).",
-    ]
+    # 1. Internetdan real vaqtda jonli qidiruv
+    search_query = "Real Madrid latest match result score goals scorers La Liga Champions League 2025 2026"
+    live_web_data = await search_web(search_query, max_results=5)
 
-    # Agar AI Manager berilgan bo'lsa, xulosani yanada jonlantirib beradi
-    if ai_manager:
-        prompt = (
-            "Real Madrid klubining so'nggi holati, La Liga va Chempionlar Ligasidagi kurashi, "
-            "Kylian Mbappe va Vinicius Juniorning joriy o'yinlari haqida 3-4 gapdan iborat juda ilhomlantiruvchi "
-            "va aniq sport xulosasi yozib ber (O'zbek tilida, '¡Hala Madrid!' shiori bilan)."
+    if not ai_manager:
+        return f"👑 **REAL MADRID C.F. — Jonli Natijalar:**\n\n{live_web_data}"
+
+    prompt = (
+        "Siz erkin fikrlaydigan, chuqur mantiqli, professional futbol tahlilchisi va Real Madrid klubining "
+        "bosh ekspert agentsiz.\n\n"
+        f"Internetdan olingan eng so'nggi jonli qidiruv natijalari quyidagicha:\n{live_web_data}\n\n"
+        "VAZIFA: Ushbu ma'lumotlar va o'z bilimlaringiz asosida Real Madrid muxlislari uchun "
+        "to'liq, professional, raqamlar va aniq faktlar bilan boyitilgan batafsil hisobot tayyorlang.\n\n"
+        "Hisobot quyidagi bo'limlardan iborat bo'lsin:\n"
+        "1. 🏆 **So'nggi O'yin Natijasi:** Raqib, yakuniy hisob, gollarni kim nechanchi daqiqada urgani va o'yin qisqacha mazmuni.\n"
+        "2. 📊 **Musobaqalardagi Holat (Raqamlar bilan):**\n"
+        "   • **La Liga EA Sports:** O'rni, ochkolar, gollar nisbati\n"
+        "   • **UEFA Champions League:** Guruh / Pley-offdagi holati va navbatdagi bosqich\n"
+        "   • **Copa del Rey & Supercopa de España:** Ishtirok darajasi va yangiliklar\n"
+        "3. ⚽ **Jamoa To'purarlari & Yulduzlar:**\n"
+        "   • Kylian Mbappé, Vinícius Júnior, Jude Bellingham, Rodrygo va boshqalarning gollari va assistlari\n"
+        "4. 🏟 **Navbatdagi O'yin:** Raqib jamoa, o'tkazilish sanasi va kutilayotgan taktika\n"
+        "5. 🎙 **Ekspert Agent Xulosasi:** 2-3 jumlada erkin, jonli va jamoaning kuchli tomonlarini baholovchi fikr ('¡Hala Madrid!').\n\n"
+        "Barcha ma'lumotlar aniq o'zbek tilida, chiroyli emojilar va aniq raqamlar bilan yozilsin."
+    )
+
+    try:
+        report = await ai_manager.generate(prompt, save_history=False)
+        return report.strip()
+    except Exception as exc:
+        logger.error("Real Madrid AI tahlil xatosi: %s", exc)
+        return f"👑 **REAL MADRID — Jonli Qidiruv:**\n\n{live_web_data}"
+
+
+# ─── 2. DASTURLASH VA TEXNOLOGIYALAR ──────────────────────────
+
+async def get_programming_news(ai_manager: Optional["AIManager"] = None) -> str:
+    """Dasturlash va IT yangiliklarini internetdan qidirib AI orqali tahlil qilish."""
+    search_query = "latest programming AI technologies open source news Python LLM agents 2026"
+    live_data = await search_web(search_query, max_results=4)
+
+    if not ai_manager:
+        return f"💻 **Dasturlash Yangiliklari:**\n\n{live_data}"
+
+    prompt = (
+        "Siz erkin fikrlovchi IT arxitektor va dasturchisiz.\n\n"
+        f"Internetdan so'nggi texnologik yangiliklar:\n{live_data}\n\n"
+        "Ushbu ma'lumotlar asosida O'zbek dasturchilari va muhandislari uchun 3-4 ta eng dolzarb "
+        "texnologiya, sun'iy intellekt, yangi kutubxonalar va dasturlash tendentsiyalari bo'yicha "
+        "chuqur, tushunarli va aniq foydali hisobot tayyorlang. Har bir punktda nima yangilik va u "
+        "dasturchiga nima foyda berishi aniq tushuntirilsin."
+    )
+
+    try:
+        report = await ai_manager.generate(prompt, save_history=False)
+        return report.strip()
+    except Exception as exc:
+        logger.error("Dasturlash yangiliklari AI xatosi: %s", exc)
+        return f"💻 **Dasturlash Yangiliklari:**\n\n{live_data}"
+
+
+# ─── 3. O'ZBEKISTON YANGILIKLARI ──────────────────────────────
+
+async def get_uzbekistan_news(ai_manager: Optional["AIManager"] = None) -> str:
+    """O'zbekistonning eng so'nggi muhim voqealari tahlili."""
+    search_query = "O'zbekiston so'nggi yangiliklar iqtisodiyot texnologiya ta'lim 2026"
+    live_data = await search_web(search_query, max_results=4)
+
+    if not ai_manager:
+        return f"🇺🇿 **O'zbekiston Yangiliklari:**\n\n{live_data}"
+
+    prompt = (
+        "Siz O'zbekiston yangiliklari va tahliliy tahlilchisisiz.\n\n"
+        f"Internetdan olingan eng so'nggi voqealar:\n{live_data}\n\n"
+        "Ushbu ma'lumotlar asosida O'zbekistonning eng muhim 3 ta sohasidagi (Iqtisodiyot, Raqamli Texnologiyalar/IT, "
+        "va Jamiyat) yangiliklarni aniq raqamlar, qabul qilingan qarorlar va natijalar bilan "
+        "saralangan holda chiroyli O'zbek tilida bayon eting."
+    )
+
+    try:
+        report = await ai_manager.generate(prompt, save_history=False)
+        return report.strip()
+    except Exception as exc:
+        logger.error("O'zbekiston yangiliklari AI xatosi: %s", exc)
+        return f"🇺🇿 **O'zbekiston Yangiliklari:**\n\n{live_data}"
+
+
+# ─── 4. KITOBLAR VA TAVSIYALAR ────────────────────────────────
+
+async def get_books_recommendations(ai_manager: Optional["AIManager"] = None) -> str:
+    """Kitoblar, mutolaa va biznes bestsellerlari tahlili."""
+    if not ai_manager:
+        return (
+            "📚 **Eng Sara Kitoblar Tavsiyasi:**\n\n"
+            "1. 'Atomic Habits' — James Clear (Odatlar kuchi)\n"
+            "2. 'Deep Work' — Cal Newport (Diqqatni jamlash)\n"
+            "3. 'Zero to One' — Peter Thiel (Startap va innovatsiya)\n"
+            "4. 'The Pragmatic Programmer' — Andrew Hunt (Dasturlash mahorati)"
         )
-        try:
-            ai_summary = await ai_manager.generate(prompt, save_history=False)
-            lines.append(f"\n🎙 **AI Sharhlovchi Fikri:**\n_{ai_summary.strip()}_")
-        except Exception:
-            pass
 
-    return "\n".join(lines)
+    prompt = (
+        "Siz erkin fikrlaydigan kitobxon va intellektual agentsiz.\n\n"
+        "Dasturchilar, tadbirkorlar va rivojlanishni istaganlar uchun 3 ta dunyo miqyosidagi eng kuchli "
+        "bestseller kitobni tanlang (masalan, Atomic Habits, Deep Work, Zero to One yoki boshqa saralar).\n"
+        "Har bir kitob bo'yicha quyidagilarni aniq yozing:\n"
+        "• Muallif va asosiy g'oyasi\n"
+        "• Kitobdan 2 ta eng muhim hayotiy xulosa (aniq tamoyillar)\n"
+        "• Bu kitobni kimlar o'qishi shartligi\n"
+        "Chiroyli, ilhomlantiruvchi O'zbek tilida formatlab bering."
+    )
 
-
-async def get_programming_news() -> str:
-    """Dasturlash va IT sohasidagi yangiliklar."""
-    lines = ["💻 **Dasturlash & Texnologiyalar Yangiliklari:**\n"]
-    items = await fetch_rss_feed_items(RSS_SOURCES["dasturlash"][0], limit=4)
-    if items:
-        for i, item in enumerate(items, 1):
-            lines.append(f"**{i}. {item['title']}**\n_{item['description']}_\n🔗 [Batafsil o'qish]({item['link']})\n")
-    else:
-        lines.append(
-            "• **Python 3.14 & Tezkor LLM Dvigatellari:** Sun'iy intellekt agentlari uchun yangi kutubxonalar ommalashmoqda.\n"
-            "• **Open-Source AI Modellari:** Nous Hermes 3 va Llama 3.1 ishlab chiquvchilar orasida yetakchilik qilmoqda.\n"
-            "• **Full-Stack arxitektura:** FastAPI, AsyncIO va zamonaviy Telegram botlar bozorda yuqori talabga ega.\n"
-        )
-    return "\n".join(lines)
+    try:
+        report = await ai_manager.generate(prompt, save_history=False)
+        return report.strip()
+    except Exception as exc:
+        logger.error("Kitoblar AI xatosi: %s", exc)
+        return "📚 Kitoblar tavsiyasi tayyorlanmoqda."
 
 
-async def get_uzbekistan_news() -> str:
-    """O'zbekistonning muhim yangiliklari."""
-    lines = ["🇺🇿 **O'zbekiston — Muhim Yangiliklar Saralasi:**\n"]
-    items = await fetch_rss_feed_items(RSS_SOURCES["uzbekistan"][0], limit=4)
-    if items:
-        for i, item in enumerate(items, 1):
-            lines.append(f"**{i}. {item['title']}**\n_{item['description']}_\n🔗 [Kun.uz orqali o'qish]({item['link']})\n")
-    else:
-        lines.append(
-            "• **Raqamli Iqtisodiyot:** O'zbekistonda IT-Park rezidentlari va AI loyihalari uchun yangi imtiyozlar joriy etilmoqda.\n"
-            "• **Tadbirkorlik & Eksport:** Mahalliy dasturiy ta'minotlarni xorijiy bozorlarga eksport qilish ko'lami ortmoqda.\n"
-            "• **Ta'lim:** Yoshlar o'rtasida sun'iy intellekt va kiberxavfsizlik yo'nalishlari jadal rivojlanmoqda.\n"
-        )
-    return "\n".join(lines)
-
-
-async def get_books_recommendations() -> str:
-    """Kitoblar va mutolaa tavsiyalari."""
-    lines = [
-        "📚 **Eng Sara Kitoblar & Mutolaa Tavsiyalari:**\n",
-        "1. 📖 **'Atomic Habits' (Atom Odatlar) — James Clear**\n"
-        "   _Kichik odatlar orqali hayotda ulkan natijalarga erishish va intizomni shakllantirish haqida dunyo bestselleri._\n",
-        "2. 📖 **'Deep Work' (Diqqat) — Cal Newport**\n"
-        "   _Chalg'ituvchi dunyoda chuqur diqqatni jamlab, aql bovar qilmas mahsuldorlikka erishish sirlari._\n",
-        "3. 📖 **'Zero to One' — Peter Thiel**\n"
-        "   _Noldan yangi qiymat yaratadigan startaplar, monopoliyalar va innovatsion fikrlash darsligi._\n",
-        "4. 📖 **'The Pragmatic Programmer' — Andrew Hunt, David Thomas**\n"
-        "   _Har bir dasturchi va muhandis bilishi shart bo'lgan toza kod va mahorat qo'llanmasi._\n",
-        "💡 _Ushbu kitoblarning xulosasi yoki tahlili kerak bo'lsa, botga: 'Atomic habits kitobi haqida xulosa ber' deb yozing!_"
-    ]
-    return "\n".join(lines)
-
+# ─── 5. ASOSIY DISPETCHER ─────────────────────────────────────
 
 async def get_topic_news(topic: str, ai_manager: Optional["AIManager"] = None) -> tuple[str, InlineKeyboardMarkup]:
-    """Tanlangan mavzu bo'yicha hisobot va klaviatura qaytaradi."""
+    """Tanlangan mavzu bo'yicha internetdan izlab, AI bilan qayta ishlangan hisobot qaytaradi."""
     clean_t = topic.lower().strip()
     if clean_t in ("realmadrid", "real", "madrid", "futbol"):
         text = await get_real_madrid_report(ai_manager)
         current = "realmadrid"
     elif clean_t in ("dasturlash", "tech", "it", "kod"):
-        text = await get_programming_news()
+        text = await get_programming_news(ai_manager)
         current = "dasturlash"
     elif clean_t in ("uzbekistan", "uz", "ozbekiston"):
-        text = await get_uzbekistan_news()
+        text = await get_uzbekistan_news(ai_manager)
         current = "uzbekistan"
     elif clean_t in ("books", "kitoblar", "kitob"):
-        text = await get_books_recommendations()
+        text = await get_books_recommendations(ai_manager)
         current = "books"
     else:
         text = await get_real_madrid_report(ai_manager)

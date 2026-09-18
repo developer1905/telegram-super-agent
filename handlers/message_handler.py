@@ -1025,15 +1025,17 @@ async def handle_ai_chat(message: Message, ai_manager: AIManager) -> None:
 
     # 4.11 Real Madrid & RSS Yangiliklar (/realmadrid, /news, yangiliklar)
     if lower_u in ("/realmadrid", "realmadrid", "real madrid", "halamadrid", "hala madrid", "real natijalari", "real o'yini"):
+        wait_msg = await message.answer("🔍 **Real Madrid bo'yicha jonli internet qidiruv va AI tahlili olib borilmoqda...**", parse_mode="Markdown")
         from core.news_football_agent import get_real_madrid_report, build_news_keyboard
         report_text = await get_real_madrid_report(ai_manager)
-        await message.answer(report_text, reply_markup=build_news_keyboard("realmadrid"), parse_mode="Markdown")
+        await safe_edit_text(wait_msg, report_text, reply_markup=build_news_keyboard("realmadrid"), parse_mode="Markdown")
         return
 
     if lower_u in ("/news", "news", "yangiliklar", "xabarlar"):
+        wait_msg = await message.answer("🔍 **Internetdan eng so'nggi yangiliklar yig'ilmoqda va tahlil qilinmoqda...**", parse_mode="Markdown")
         from core.news_football_agent import get_topic_news
         report_text, markup = await get_topic_news("realmadrid", ai_manager)
-        await message.answer(report_text, reply_markup=markup, parse_mode="Markdown")
+        await safe_edit_text(wait_msg, report_text, reply_markup=markup, parse_mode="Markdown")
         return
 
     # 5. Rasm qidirish va yuborish ("rasmini top: Toshkent", "rasm: Lamborghini", "Eiffel rasmini tashla")
@@ -1073,6 +1075,20 @@ async def handle_ai_chat(message: Message, ai_manager: AIManager) -> None:
                 description=f"Web search: {search_q[:40]}",
             )
             return
+
+    # 6.5 Avtomat Jonli Qidiruv (Agar so'rovda yangilik, oxirgi o'yin, natija, kurs yoki jonli faktlar so'ralsa)
+    live_triggers = [
+        "yangilik", "natija", "hisob", "o'yin", "o'yini", "kurs", "kursi", "narxi",
+        "oxirgi", "so'nggi", "kecha", "bugun nima", "kim yutdi", "kim gol urdi",
+        "jadval", "chempionat", "dollar", "valyuta", "qachon o'ynaydi", "necha necha bo'ldi"
+    ]
+    if any(trig in lower_u for trig in live_triggers) and len(user_text.split()) >= 2:
+        wait_msg = await message.answer("🌐 **Internetdan jonli faktlar qidirilmoqda va AI tahlil qilmoqda...**", parse_mode="Markdown")
+        ai_ans = await answer_with_web_search(user_text, ai_manager)
+        voice_btn = InlineKeyboardBuilder()
+        voice_btn.row(InlineKeyboardButton(text="🔊 Ovozda eshitish", callback_data="read_voice_msg"))
+        await safe_edit_text(wait_msg, ai_ans, reply_markup=voice_btn.as_markup(), parse_mode="Markdown")
+        return
 
     # 7. Oddiy so'rov → AI bilan to'g'ridan-to'g'ri va tezkor suhbat
     # Mem0 orqa fonda foydalanuvchining shaxsiy odatlarini o'rganadi

@@ -129,21 +129,25 @@ async def download_image_bytes(image_url: str) -> Optional[bytes]:
     return None
 
 
-# ─── AI Bilan Birlashtirilgan Jonli Qidiruv ───────────────────
+# ─── AI Bilan Birlashtirilgan Jonli Qidiruv & Avtonom Tahlil ──
 
 async def answer_with_web_search(user_query: str, ai_manager: "AIManager") -> str:
     """
     Internetdan eng so'nggi ma'lumotlarni qidiradi va AI yordamida
-    to'liq, chiroyli va manbalar bilan boyitilgan javob tayyorlaydi.
+    erkin fikrlaydigan agent uslubida chuqur, aniq raqamlar va faktlar bilan
+    boyitilgan professional javob tayyorlaydi.
     """
-    raw_search = await search_web(user_query, max_results=5)
+    raw_search = await search_web(user_query, max_results=6)
 
     prompt = (
         f"Foydalanuvchi quyidagi savolni berdi:\n\"{user_query}\"\n\n"
-        f"Internetdan olingan eng so'nggi ma'lumotlar:\n{raw_search}\n\n"
-        f"Ushbu ma'lumotlar asosida foydalanuvchiga O'zbek tilida aniq, tushunarli, "
-        f"eng so'nggi faktlarga asoslangan professional javob tayyorla. "
-        f"Javob oxirida muhim manba havolalarini ko'rsatib o't."
+        f"Internetdan real vaqtda olingan eng so'nggi qidiruv ma'lumotlari:\n{raw_search}\n\n"
+        "Siz erkin fikrlaydigan, mustaqil intellektual va chuqur tahlilchi AI agentsiz.\n"
+        "Ushbu ma'lumotlar va o'z mantiqingiz asosida foydalanuvchiga quyidagi talablarga rioya qilib javob bering:\n"
+        "1. Quruq va umumiy gaplar bo'lmasin. Aniq raqamlar, sanalar, hisoblar, ismlar va statistikani ko'rsating.\n"
+        "2. Masalani erkin va har tomonlama tahlil qiling, sabab va oqibatlarni tushuntiring.\n"
+        "3. Javobni chiroyli Markdown formatida, aniq va ravon O'zbek tilida bayon qiling.\n"
+        "4. Javob oxirida ma'lumot qayerdan olingani (manba havolalari)ni ko'rsatib o'ting."
     )
 
     try:
