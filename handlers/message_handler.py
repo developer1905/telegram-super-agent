@@ -1262,6 +1262,15 @@ async def handle_ai_chat(message: Message, ai_manager: AIManager) -> None:
         return
 
     # 5. Rasm qidirish va yuborish ("rasmini top: Toshkent", "rasm: Lamborghini", "Eiffel rasmini tashla")
+    # NOTE: Tugma matnlari ('Rasm Chizish' kabi) bu blokga kirib qolmasligi uchun himoya
+    _exact_btn_texts = {"\U0001f3a8 Rasm Chizish", "Rasm Chizish", "rasm chizish"}
+    if user_text.strip() in _exact_btn_texts:
+        from core.midjourney_agent import build_image_studio_panel as _bsp
+        uid = message.from_user.id if message.from_user else 0
+        _txt, _mkp = _bsp(uid)
+        await message.answer(_txt, reply_markup=_mkp, parse_mode="HTML")
+        return
+
     if re.search(r"(?:rasmini\s+(?:top|tashla|yukla|korsat|ko'rsat)|rasm[:\s]+)", user_text, re.IGNORECASE):
         query_clean = re.sub(r"^(?:rasmini\s+(?:top|tashla|yukla|korsat|ko'rsat)|rasm)[:\s]+", "", user_text, flags=re.IGNORECASE)
         query_clean = re.sub(r"\s+(?:rasmini|rasm)\s+(?:top|tashla|yukla|korsat|ko'rsat).*$", "", query_clean, flags=re.IGNORECASE).strip()

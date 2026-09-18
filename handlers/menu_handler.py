@@ -277,19 +277,12 @@ async def safe_edit_text(
 
 # ─── Doimiy Pastki Klaviatura Handleri (Reply Keyboard) ──────
 
-@router.message(ADMIN_FILTER, F.text.in_({"🎨 Midjourney Rasm", "Midjourney Rasm", "midjourney rasm", "/imagine", "/midjourney"}))
+@router.message(ADMIN_FILTER, F.text.in_({"🎨 Rasm Chizish", "Rasm Chizish", "rasm chizish", "🎨 Midjourney Rasm", "Midjourney Rasm", "midjourney rasm", "/imagine", "/midjourney"}))
 async def rk_midjourney(message: Message) -> None:
-    text = (
-        "🎨 **Midjourney v6 AI Rasm Chizish Xizmati**\n\n"
-        "O'zbek, rus yoki ingliz tilida xohlagan tasviringizni tasvirlang. "
-        "AI uni professional Midjourney v6 fotorealistik formatiga boyitib, bir necha soniyada chizib beradi!\n\n"
-        "**Foydalanish namunalari:**\n"
-        "• `/imagine futuristik Toshkent shahri kechasi --ar 16:9`\n"
-        "• `chiz: qora mushuk oltin skafandrda kosmosda suzmoqda`\n"
-        "• `rasm chiz: neonli kiberpank qiz portreti, 8k, photorealistic`\n\n"
-        "💡 Barcha o'lchamlar (--ar 16:9, 1:1, 9:16) qo'llab-quvvatlanadi va 100% bepul ishlaydi!"
-    )
-    await message.answer(text, parse_mode="Markdown")
+    """Reply keyboard '🎨 Rasm Chizish' tugmasi — interaktiv AI Studio paneli ochiladi."""
+    user_id = message.from_user.id if message.from_user else 0
+    text, markup = build_image_studio_panel(user_id)
+    await message.answer(text, reply_markup=markup, parse_mode="HTML")
 
 
 @router.message(ADMIN_FILTER, F.text.in_({"⚡ Hermes Agent", "Hermes Agent", "hermes agent", "/hermes"}))
