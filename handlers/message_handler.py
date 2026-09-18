@@ -48,7 +48,12 @@ from core.hermes_agent import run_hermes_agent
 from core.tts_agent import generate_speech_audio
 from core.crawl_agent import crawl_web_page
 from core.browser_agent import take_website_screenshot
-from core.mem0_agent import auto_extract_user_memories, get_user_profile_report
+from core.mem0_agent import (
+    auto_extract_user_memories,
+    get_user_profile_report,
+    build_profile_keyboard,
+    save_profile_fact,
+)
 from services.scheduler import LogCollector
 from handlers.email_handler import handle_email_text_command
 
@@ -804,11 +809,26 @@ async def handle_ai_chat(message: Message, ai_manager: AIManager) -> None:
             await safe_edit_text(wait_msg, "❌ Skrinshot olib bo'lmadi. Sayt manzilini tekshiring.")
             return
 
-    # 4.6 Mem0 — Adaptiv Shaxsiy Profil (/profile, mening profilim)
-    if user_text.lower() in ("/profile", "profil", "mening profilim", "men haqimda", "profilim"):
-        prof_text = await get_user_profile_report()
-        await message.answer(prof_text, parse_mode="Markdown")
+    # 4.6 Mem0 — Adaptiv Shaxsiy Profil (/profile, profil memo, memo, mem0, profilim)
+    lower_u = user_text.lower().strip()
+    if lower_u in ("/profile", "profil", "mening profilim", "men haqimda", "profilim", "profil memo", "memo", "mem0", "shaxsiy profil", "xotira memo"):
+        prof_text = await get_user_profile_report(message.from_user.id)
+        await message.answer(prof_text, reply_markup=build_profile_keyboard(), parse_mode="Markdown")
         return
+
+    # 4.7 Mem0 — Qo'lda fakt qo'shish ("profil: kasb: AI Engineer" yoki "/profile set ism Umid")
+    if lower_u.startswith(("/profile set ", "profil qo'sh:", "profil: ", "profilimga: ")):
+        cleaned_cmd = re.sub(r"^(?:/profile set\s+|profil qo'sh:\s*|profil:\s*|profilimga:\s*)", "", user_text, flags=re.IGNORECASE).strip()
+        if ":" in cleaned_cmd:
+            k, v = cleaned_cmd.split(":", 1)
+        elif " " in cleaned_cmd:
+            k, v = cleaned_cmd.split(" ", 1)
+        else:
+            k, v = "eslatma", cleaned_cmd
+        if k and v:
+            await save_profile_fact(k, v)
+            await message.answer(f"✅ **Mem0 Profilingizga saqlandi:**\n• **{k.strip().capitalize()}:** {v.strip()}", parse_mode="Markdown")
+            return
 
     # 5. Rasm qidirish va yuborish ("rasmini top: Toshkent", "rasm: Lamborghini", "Eiffel rasmini tashla")
     if re.search(r"(?:rasmini\s+(?:top|tashla|yukla|korsat|ko'rsat)|rasm[:\s]+)", user_text, re.IGNORECASE):

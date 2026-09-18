@@ -279,12 +279,12 @@ async def rk_hermes(message: Message, ai_manager: AIManager) -> None:
     await message.answer(text, parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"👤 Shaxsiy Profil (Mem0)", "Shaxsiy Profil (Mem0)", "profilim", "Profilim", "/profile"}))
+@router.message(ADMIN_FILTER, F.text.in_({"👤 Shaxsiy Profil (Mem0)", "Shaxsiy Profil (Mem0)", "profilim", "Profilim", "/profile", "profil memo", "memo", "mem0"}))
 async def rk_profile(message: Message) -> None:
-    from core.mem0_agent import get_user_profile_summary
+    from core.mem0_agent import get_user_profile_report, build_profile_keyboard
     wait_msg = await message.answer("⏳ Mem0 xotirasi tekshirilmoqda...")
-    profile_text = await get_user_profile_summary(message.from_user.id)
-    await wait_msg.edit_text(profile_text, parse_mode="Markdown")
+    profile_text = await get_user_profile_report(message.from_user.id)
+    await wait_msg.edit_text(profile_text, reply_markup=build_profile_keyboard(), parse_mode="Markdown")
 
 
 @router.message(ADMIN_FILTER, F.text.in_({"🎙 Ovozli Agent (TTS)", "Ovozli Agent (TTS)", "ovozli xabar", "Ovozli xabar", "/voice"}))
@@ -605,11 +605,45 @@ async def cb_hermes(cb: CallbackQuery, ai_manager: AIManager) -> None:
 @router.callback_query(ADMIN_FILTER, F.data == "menu:mem0_profile")
 async def cb_mem0_profile(cb: CallbackQuery) -> None:
     await cb.answer()
-    from core.mem0_agent import get_user_profile_summary
-    profile_text = await get_user_profile_summary(cb.from_user.id)
+    from core.mem0_agent import get_user_profile_report, build_profile_keyboard
+    profile_text = await get_user_profile_report(cb.from_user.id)
+    await safe_edit_text(cb, profile_text, reply_markup=build_profile_keyboard(show_back=True), parse_mode="Markdown")
+
+
+@router.callback_query(ADMIN_FILTER, F.data == "mem0:refresh")
+async def cb_mem0_refresh(cb: CallbackQuery) -> None:
+    await cb.answer("🔄 Yangilanmoqda...")
+    from core.mem0_agent import get_user_profile_report, build_profile_keyboard
+    profile_text = await get_user_profile_report(cb.from_user.id)
+    await safe_edit_text(cb, profile_text, reply_markup=build_profile_keyboard(show_back=True), parse_mode="Markdown")
+
+
+@router.callback_query(ADMIN_FILTER, F.data == "mem0:add_help")
+async def cb_mem0_add_help(cb: CallbackQuery) -> None:
+    await cb.answer()
     builder = InlineKeyboardBuilder()
-    builder.row(InlineKeyboardButton(text="◀️ Asosiy Menyu", callback_data="menu:main"))
-    await safe_edit_text(cb, profile_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
+    builder.row(InlineKeyboardButton(text="◀️ Profilga qaytish", callback_data="menu:mem0_profile"))
+    text = (
+        "➕ **Mem0 ga Shaxsiy Ma'lumot Kiritish:**\n\n"
+        "Shunchaki botga o'zingiz haqingizda xabar yozing. Masalan:\n\n"
+        "• `mening ismim Umid`\n"
+        "• `men Toshkentda yashayman`\n"
+        "• `kasbim: Senior AI dasturchi`\n"
+        "• `bizning kompaniya: MegaTech`\n"
+        "• `mening maqsadim: AI agentlar yaratish`\n"
+        "• `profil: sevimli kitobim: Atomic Habits`\n\n"
+        "Mem0 bularni bir zumda ajratib olib, doimiy profilingizga joylaydi!"
+    )
+    await safe_edit_text(cb, text, reply_markup=builder.as_markup(), parse_mode="Markdown")
+
+
+@router.callback_query(ADMIN_FILTER, F.data == "mem0:clear")
+async def cb_mem0_clear(cb: CallbackQuery) -> None:
+    await cb.answer("🗑 Profil tozalandi", show_alert=True)
+    from core.mem0_agent import clear_user_profile, get_user_profile_report, build_profile_keyboard
+    await clear_user_profile()
+    profile_text = await get_user_profile_report(cb.from_user.id)
+    await safe_edit_text(cb, profile_text, reply_markup=build_profile_keyboard(show_back=True), parse_mode="Markdown")
 
 
 @router.callback_query(ADMIN_FILTER, F.data == "menu:tts_info")
