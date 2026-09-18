@@ -22,7 +22,7 @@ import logging
 import re
 from typing import Dict, Any, List, Optional, Tuple
 
-from core.search_agent import search_web
+from core.search_agent import search_web, search_realtime_news
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +111,7 @@ async def check_morning_match_announcement() -> Optional[str]:
         return None
 
     try:
-        search_data = await search_web("Real Madrid next match today schedule fixture 2025 2026", max_results=4)
+        search_data = await search_realtime_news("Real Madrid next match schedule fixture La Liga Champions League", category="football", max_results=5)
         parsed = parse_match_data_from_search(search_data)
 
         if parsed["is_match_today"]:
@@ -145,7 +145,7 @@ async def poll_live_match_events() -> List[str]:
     alerts: List[str] = []
 
     try:
-        search_data = await search_web("Real Madrid live score match today goals events result", max_results=4)
+        search_data = await search_realtime_news("Real Madrid live score match today goals events", category="football", max_results=5)
         parsed = parse_match_data_from_search(search_data)
 
         opp = parsed["opponent"] or _MATCH_STATE["opponent"] or "Raqib"

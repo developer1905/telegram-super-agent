@@ -27,22 +27,118 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _sync_web_search(query: str, max_results: int = 5) -> list[dict]:
-    """DuckDuckGo orqali sinxron qidiruv."""
+import re
+import xml.etree.ElementTree as ET
+
+def _sync_google_news_rss(query: str, max_results: int = 5, lang: str = "en") -> list[dict]:
+    """Google News RSS orqali real-vaqtdagi (so'nggi soat va kunlardagi) xabarlarni olish."""
     try:
-        ddgs = DDGS()
-        results = list(ddgs.text(query, max_results=max_results))
-        return results
+        encoded = urllib.parse.quote(query)
+        if lang == "uz":
+            url = f"https://news.google.com/rss/search?q={encoded}&hl=uz&gl=UZ&ceid=UZ:uz"
+        elif lang == "ru":
+            url = f"https://news.google.com/rss/search?q={encoded}&hl=ru&gl=RU&ceid=RU:ru"
+        else:
+            url = f"https://news.google.com/rss/search?q={encoded}&hl=en-US&gl=US&ceid=US:en"
+
+        req = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                )
+            },
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            content = resp.read()
+            root = ET.fromstring(content)
+            items = []
+            for item in root.findall(".//item")[:max_results]:
+                title = item.find("title").text if item.find("title") is not None else ""
+                link = item.find("link").text if item.find("link") is not None else ""
+                pub_date = item.find("pubDate").text if item.find("pubDate") is not None else ""
+                desc = item.find("description").text if item.find("description") is not None else ""
+                clean_desc = re.sub(r"<[^>]+>", " ", desc).strip()
+                if title:
+                    items.append({
+                        "title": title,
+                        "body": f"🗓 [Sana: {pub_date}]\n{clean_desc[:250]}",
+                        "href": link,
+                        "date": pub_date,
+                    })
+            return items
     except Exception as exc:
-        logger.error("DDGS web search xatosi: %s", exc)
+        logger.debug("Google News RSS xatosi: %s", exc)
         return []
 
 
-async def search_web(query: str, max_results: int = 5) -> str:
+def _sync_kun_uz_rss(max_results: int = 5) -> list[dict]:
+    """Kun.uz RSS orqali O'zbekistonning bugungi so'nggi yangiliklarini olish."""
+    try:
+        url = "https://kun.uz/news/rss"
+        req = urllib.request.Request(
+            url,
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
+        )
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            root = ET.fromstring(resp.read())
+            items = []
+            for item in root.findall(".//item")[:max_results]:
+                title = item.find("title").text if item.find("title") is not None else ""
+                link = item.find("link").text if item.find("link") is not None else ""
+                pub_date = item.find("pubDate").text if item.find("pubDate") is not None else ""
+                desc = item.find("description").text if item.find("description") is not None else ""
+                clean_desc = re.sub(r"<[^>]+>", " ", desc).strip()
+                if title:
+                    items.append({
+                        "title": title,
+                        "body": f"🗓 [Bugun: {pub_date}]\n{clean_desc[:250]}",
+                        "href": link,
+                        "date": pub_date,
+                    })
+            return items
+    except Exception as exc:
+        logger.debug("Kun.uz RSS xatosi: %s", exc)
+        return []
+
+
+def _sync_web_search(query: str, max_results: int = 5, timelimit: Optional[str] = "m") -> list[dict]:
     """
-    Internetdan qidirib, natijalarni formatlangan matn ko'rinishida qaytaradi.
+    Gibrid real-vaqt qidiruvi:
+    1. Google News RSS (real-time yangiliklar va sport natijalari)
+    2. DuckDuckGo (timelimit='w' yoki 'm' orqali yangi sahifalar)
     """
-    results = await asyncio.to_thread(_sync_web_search, query, max_results)
+    results: list[dict] = []
+
+    # 1. Google News RSS orqali eng yangi sana bilan olingan xabarlar
+    google_news = _sync_google_news_rss(query, max_results=max_results)
+    if google_news:
+        results.extend(google_news)
+
+    # 2. Agar natijalar kam bo'lsa, DuckDuckGo orqali to'ldirish
+    if len(results) < max_results:
+        needed = max_results - len(results)
+        try:
+            ddgs = DDGS()
+            # Avval oxirgi oy ('m') yoki hafta ('w') chegarasi bilan
+            ddg_items = list(ddgs.text(query, max_results=needed, timelimit=timelimit or "m"))
+            results.extend(ddg_items)
+        except Exception:
+            try:
+                ddgs = DDGS()
+                results.extend(list(ddgs.text(query, max_results=needed)))
+            except Exception as exc:
+                logger.debug("DDGS fallback xatosi: %s", exc)
+
+    return results[:max_results]
+
+
+async def search_web(query: str, max_results: int = 5, timelimit: Optional[str] = "m") -> str:
+    """
+    Internetdan real-vaqtda qidirib, natijalarni formatlangan matn ko'rinishida qaytaradi.
+    """
+    results = await asyncio.to_thread(_sync_web_search, query, max_results, timelimit)
     if not results:
         return "Internetdan ma'lumot topilmadi."
 
@@ -54,6 +150,21 @@ async def search_web(query: str, max_results: int = 5) -> str:
         lines.append(f"{i}. **{title}**\n{body}\nManba: {href}\n")
 
     return "\n".join(lines)
+
+
+async def search_realtime_news(query: str, category: str = "general", max_results: int = 5) -> str:
+    """
+    Maxsus soha bo'yicha eng so'nggi (bugungi / kechagi) xabarlarni qaytaradi.
+    """
+    if category == "uzbekistan":
+        # Kun.uz RSS dan to'g'ridan-to'g'ri o'zbekcha yangiliklar
+        kun_items = await asyncio.to_thread(_sync_kun_uz_rss, max_results)
+        if kun_items:
+            lines = [f"{i}. **{r['title']}**\n{r['body']}\nManba: {r['href']}\n" for i, r in enumerate(kun_items, 1)]
+            return "\n".join(lines)
+
+    # Boshqa kategoriyalar uchun Google News RSS
+    return await search_web(query, max_results=max_results, timelimit="w")
 
 
 # ─── Rasm Qidirish (DuckDuckGo + Wikimedia Fallback) ─────────

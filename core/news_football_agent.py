@@ -113,27 +113,38 @@ async def get_real_madrid_report(ai_manager: Optional["AIManager"] = None) -> st
     kelgusi o'yinlari haqida jonli ma'lumot qidirib, AI orqali professional
     va faktlarga to'la hisobot tayyorlaydi.
     """
-    # 1. Internetdan real vaqtda jonli qidiruv
-    search_query = "Real Madrid latest match result score goals scorers La Liga Champions League 2025 2026"
-    live_web_data = await search_web(search_query, max_results=5)
+    from core.search_agent import search_realtime_news
+    import datetime
+
+    today_str = datetime.datetime.now().strftime("%Y-yil %d-%B")
+
+    # 1. Internetdan real vaqtda jonli qidiruv (Google News RSS + Fresh DDG)
+    search_query = "Real Madrid latest match result score goals scorers La Liga Champions League"
+    live_web_data = await search_realtime_news(search_query, category="football", max_results=6)
 
     if not ai_manager:
-        return f"👑 **REAL MADRID C.F. — Jonli Natijalar:**\n\n{live_web_data}"
+        return f"👑 **REAL MADRID C.F. — Jonli Natijalar ({today_str}):**\n\n{live_web_data}"
 
     prompt = (
+        f"Bugungi sana: {today_str}.\n"
         "Siz erkin fikrlaydigan, chuqur mantiqli, professional futbol tahlilchisi va Real Madrid klubining "
         "bosh ekspert agentsiz.\n\n"
-        f"Internetdan olingan eng so'nggi jonli qidiruv natijalari quyidagicha:\n{live_web_data}\n\n"
-        "VAZIFA: Ushbu ma'lumotlar va o'z bilimlaringiz asosida Real Madrid muxlislari uchun "
+        f"Internetdan olingan eng so'nggi jonli qidiruv va yangiliklar natijalari quyidagicha:\n{live_web_data}\n\n"
+        "VAZIFA: Ushbu yangi ma'lumotlar asosida Real Madrid muxlislari uchun "
         "to'liq, professional, raqamlar va aniq faktlar bilan boyitilgan batafsil hisobot tayyorlang.\n\n"
+        "QAT'IY QOIDALAR:\n"
+        f"1. Siz hozir {today_str} holatida tahlil qilyapsiz. Faqat eng so'nggi bo'lib o'tgan o'yin natijasini tahlil qiling.\n"
+        "2. Eski yillardagi (2022, 2023, 2024 yoki 2025 boshidagi) o'yinlarni yangi deb ko'rsatmang! "
+        "Manbalardagi [Sana: ...] ko'rsatkichiga qarang.\n"
+        "3. Raqib nomi, aniq hisob, gollar mualliflari va daqiqalari aniq yozilsin.\n\n"
         "Hisobot quyidagi bo'limlardan iborat bo'lsin:\n"
         "1. 🏆 **So'nggi O'yin Natijasi:** Raqib, yakuniy hisob, gollarni kim nechanchi daqiqada urgani va o'yin qisqacha mazmuni.\n"
         "2. 📊 **Musobaqalardagi Holat (Raqamlar bilan):**\n"
         "   • **La Liga EA Sports:** O'rni, ochkolar, gollar nisbati\n"
-        "   • **UEFA Champions League:** Guruh / Pley-offdagi holati va navbatdagi bosqich\n"
-        "   • **Copa del Rey & Supercopa de España:** Ishtirok darajasi va yangiliklar\n"
+        "   • **UEFA Champions League:** Holat va navbatdagi bosqich\n"
+        "   • **Copa del Rey & Supercopa de España:** Yangiliklar\n"
         "3. ⚽ **Jamoa To'purarlari & Yulduzlar:**\n"
-        "   • Kylian Mbappé, Vinícius Júnior, Jude Bellingham, Rodrygo va boshqalarning gollari va assistlari\n"
+        "   • Kylian Mbappé, Vinícius Júnior, Jude Bellingham, Rodrygo va boshqalarning natijalari\n"
         "4. 🏟 **Navbatdagi O'yin:** Raqib jamoa, o'tkazilish sanasi va kutilayotgan taktika\n"
         "5. 🎙 **Ekspert Agent Xulosasi:** 2-3 jumlada erkin, jonli va jamoaning kuchli tomonlarini baholovchi fikr ('¡Hala Madrid!').\n\n"
         "Barcha ma'lumotlar aniq o'zbek tilida, chiroyli emojilar va aniq raqamlar bilan yozilsin."
@@ -144,26 +155,31 @@ async def get_real_madrid_report(ai_manager: Optional["AIManager"] = None) -> st
         return report.strip()
     except Exception as exc:
         logger.error("Real Madrid AI tahlil xatosi: %s", exc)
-        return f"👑 **REAL MADRID — Jonli Qidiruv:**\n\n{live_web_data}"
+        return f"👑 **REAL MADRID — Jonli Qidiruv ({today_str}):**\n\n{live_web_data}"
 
 
 # ─── 2. DASTURLASH VA TEXNOLOGIYALAR ──────────────────────────
 
 async def get_programming_news(ai_manager: Optional["AIManager"] = None) -> str:
     """Dasturlash va IT yangiliklarini internetdan qidirib AI orqali tahlil qilish."""
-    search_query = "latest programming AI technologies open source news Python LLM agents 2026"
-    live_data = await search_web(search_query, max_results=4)
+    from core.search_agent import search_realtime_news
+    import datetime
+
+    today_str = datetime.datetime.now().strftime("%Y-yil %d-%B")
+    search_query = "AI LLM Python programming framework models tech news"
+    live_data = await search_realtime_news(search_query, category="tech", max_results=5)
 
     if not ai_manager:
-        return f"💻 **Dasturlash Yangiliklari:**\n\n{live_data}"
+        return f"💻 **Dasturlash Yangiliklari ({today_str}):**\n\n{live_data}"
 
     prompt = (
+        f"Bugungi sana: {today_str}.\n"
         "Siz erkin fikrlovchi IT arxitektor va dasturchisiz.\n\n"
-        f"Internetdan so'nggi texnologik yangiliklar:\n{live_data}\n\n"
+        f"Internetdan so'nggi real-vaqtdagi yangiliklar:\n{live_data}\n\n"
         "Ushbu ma'lumotlar asosida O'zbek dasturchilari va muhandislari uchun 3-4 ta eng dolzarb "
         "texnologiya, sun'iy intellekt, yangi kutubxonalar va dasturlash tendentsiyalari bo'yicha "
-        "chuqur, tushunarli va aniq foydali hisobot tayyorlang. Har bir punktda nima yangilik va u "
-        "dasturchiga nima foyda berishi aniq tushuntirilsin."
+        "chuqur, tushunarli va aniq foydali hisobot tayyorlang. Faqat eng so'nggi yangiliklar yoritilsin, "
+        "har bir punktda yangi vositaning amaliy foydasi ko'rsatilsin."
     )
 
     try:
@@ -171,25 +187,30 @@ async def get_programming_news(ai_manager: Optional["AIManager"] = None) -> str:
         return report.strip()
     except Exception as exc:
         logger.error("Dasturlash yangiliklari AI xatosi: %s", exc)
-        return f"💻 **Dasturlash Yangiliklari:**\n\n{live_data}"
+        return f"💻 **Dasturlash Yangiliklari ({today_str}):**\n\n{live_data}"
 
 
 # ─── 3. O'ZBEKISTON YANGILIKLARI ──────────────────────────────
 
 async def get_uzbekistan_news(ai_manager: Optional["AIManager"] = None) -> str:
     """O'zbekistonning eng so'nggi muhim voqealari tahlili."""
-    search_query = "O'zbekiston so'nggi yangiliklar iqtisodiyot texnologiya ta'lim 2026"
-    live_data = await search_web(search_query, max_results=4)
+    from core.search_agent import search_realtime_news
+    import datetime
+
+    today_str = datetime.datetime.now().strftime("%Y-yil %d-%B")
+    # Kun.uz RSS orqali to'g'ridan-to'g'ri bugungi so'nggi voqealar
+    live_data = await search_realtime_news("O'zbekiston iqtisodiyot texnologiya ta'lim", category="uzbekistan", max_results=5)
 
     if not ai_manager:
-        return f"🇺🇿 **O'zbekiston Yangiliklari:**\n\n{live_data}"
+        return f"🇺🇿 **O'zbekiston Yangiliklari ({today_str}):**\n\n{live_data}"
 
     prompt = (
-        "Siz O'zbekiston yangiliklari va tahliliy tahlilchisisiz.\n\n"
-        f"Internetdan olingan eng so'nggi voqealar:\n{live_data}\n\n"
-        "Ushbu ma'lumotlar asosida O'zbekistonning eng muhim 3 ta sohasidagi (Iqtisodiyot, Raqamli Texnologiyalar/IT, "
-        "va Jamiyat) yangiliklarni aniq raqamlar, qabul qilingan qarorlar va natijalar bilan "
-        "saralangan holda chiroyli O'zbek tilida bayon eting."
+        f"Bugungi sana: {today_str}.\n"
+        "Siz O'zbekiston yangiliklari bo'yicha tahlilchisisiz.\n\n"
+        f"O'zbekistonning bugungi so'nggi yangiliklari (Kun.uz / Rasmiy manbalar):\n{live_data}\n\n"
+        "Ushbu ma'lumotlar asosida O'zbekistonning eng muhim sohalaridagi (Iqtisodiyot, Texnologiyalar "
+        "va Jamiyat) yangiliklarni aniq sanasi, qabul qilingan qarorlar va natijalar bilan "
+        "saralangan holda chiroyli O'zbek tilida bayon eting. Faqat bugungi va eng so'nggi faktlarni taqdim eting."
     )
 
     try:
@@ -197,7 +218,7 @@ async def get_uzbekistan_news(ai_manager: Optional["AIManager"] = None) -> str:
         return report.strip()
     except Exception as exc:
         logger.error("O'zbekiston yangiliklari AI xatosi: %s", exc)
-        return f"🇺🇿 **O'zbekiston Yangiliklari:**\n\n{live_data}"
+        return f"🇺🇿 **O'zbekiston Yangiliklari ({today_str}):**\n\n{live_data}"
 
 
 # ─── 4. KITOBLAR VA TAVSIYALAR ────────────────────────────────
