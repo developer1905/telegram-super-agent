@@ -922,14 +922,15 @@ async def handle_ai_chat(message: Message, ai_manager: AIManager) -> None:
         await safe_edit_text(wait_msg, result_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
         return
 
-    # 4.1 Midjourney v6 AI Rasm Chizish Skilli (/imagine, /midjourney, chiz:, rasm chiz:)
-    mj_match = re.match(r"^(?:/imagine|/midjourney|chiz|rasm\s+chiz|rasm\s+yarat|chizib\s+ber|draw)[:\s]+(.+)$", user_text, re.IGNORECASE | re.DOTALL)
+    # 4.1 FLUX.1 & Midjourney v6 AI Rasm Chizish Skilli (/flux, /draw, /imagine, /midjourney, chiz:, rasm chiz:)
+    mj_match = re.match(r"^(?:/imagine|/midjourney|/flux|/draw|/art|chiz|rasm\s+chiz|rasm\s+yarat|chizib\s+ber|draw)[:\s]+(.+)$", user_text, re.IGNORECASE | re.DOTALL)
     if mj_match:
         raw_prompt = mj_match.group(1).strip()
         if raw_prompt:
             wait_msg = await message.answer(
-                "🎨 **Midjourney v6 rasm chizmoqda...**\n\n"
-                "✨ Prompt AI tomonidan kinoxit darajasiga boyitilmoqda va fotorealistik ishlanmoqda..."
+                "🎨 <b>FLUX.1 & Midjourney v6 rasm chizmoqda...</b>\n\n"
+                "✨ <i>Prompt AI tomonidan kinoxit darajasiga boyitilmoqda va fotorealistik ishlanmoqda...</i>",
+                parse_mode="HTML",
             )
             await message.bot.send_chat_action(message.chat.id, "upload_photo")
             img_bytes, enhanced_prompt, ar, seed = await draw_midjourney_image(
@@ -955,24 +956,27 @@ async def handle_ai_chat(message: Message, ai_manager: AIManager) -> None:
                     InlineKeyboardButton(text="📐 1:1", callback_data=f"mj:ar:1:1:{task_id}"),
                     InlineKeyboardButton(text="📐 9:16", callback_data=f"mj:ar:9:16:{task_id}"),
                 )
-                input_file = BufferedInputFile(file=img_bytes, filename=f"mj_{task_id}.jpg")
+                input_file = BufferedInputFile(file=img_bytes, filename=f"flux_{task_id}.jpg")
+                p_esc = html.escape(raw_prompt)
+                enh_esc = html.escape(enhanced_prompt[:250])
                 caption = (
-                    f"🎨 **Midjourney v6 Badiiy Asari:**\n\n"
-                    f"📝 **Asl so'rov:** _{raw_prompt}_\n"
-                    f"✨ **Midjourney Prompt:** _{enhanced_prompt[:250]}..._\n"
-                    f"📐 O'lcham: `{ar}` | 🎲 Seed: `{seed}`"
+                    f"🎨 <b>FLUX.1 & Midjourney Badiiy Asari:</b>\n\n"
+                    f"📝 <b>Asl so'rov:</b> <i>{p_esc}</i>\n"
+                    f"✨ <b>AI Prompt:</b> <i>{enh_esc}...</i>\n"
+                    f"📐 O'lcham: <code>{ar}</code> | 🎲 Seed: <code>{seed}</code>\n\n"
+                    f"🤖 <b>Super-Agent Studio</b>"
                 )
                 await wait_msg.delete()
                 await message.answer_photo(
                     photo=input_file,
                     caption=caption,
                     reply_markup=builder.as_markup(),
-                    parse_mode="Markdown",
+                    parse_mode="HTML",
                 )
                 LogCollector().add(
                     action_type="midjourney_image",
-                    description=f"Midjourney: {raw_prompt[:40]}",
-                    model_used="midjourney_v6",
+                    description=f"FLUX: {raw_prompt[:40]}",
+                    model_used="flux_midjourney",
                 )
                 return
             else:

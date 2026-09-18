@@ -525,11 +525,13 @@ async def api_generate_image_handler(request: web.Request) -> web.Response:
         data = await request.json()
         prompt = data.get("prompt", "").strip()
         aspect_ratio = data.get("aspect_ratio", "1:1")
+        style = data.get("style", "photo")
         if not prompt:
             return web.json_response({"status": "error", "message": "Prompt kiritilmadi"}, status=400)
         from core.midjourney_agent import draw_midjourney_image
         import base64
-        img_bytes, enhanced, ar, seed = await draw_midjourney_image(prompt, ai_manager, aspect_ratio=aspect_ratio)
+        full_prompt = prompt if "--style" in prompt else f"{prompt} --style {style}"
+        img_bytes, enhanced, ar, seed = await draw_midjourney_image(full_prompt, ai_manager, aspect_ratio=aspect_ratio)
         if img_bytes:
             b64_img = base64.b64encode(img_bytes).decode("utf-8")
             return web.json_response({

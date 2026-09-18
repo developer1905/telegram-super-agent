@@ -47,10 +47,14 @@ OMNIROUTE_BASE_URL: str = os.getenv("OMNIROUTE_BASE_URL", "http://localhost:2012
 OMNIROUTE_API_KEY: str = os.getenv("OMNIROUTE_API_KEY", "omniroute")
 OMNIROUTE_MODEL: str = os.getenv("OMNIROUTE_MODEL", "auto")
 
-# ─── Midjourney / AI Image Generation ────────────────────────
+# ─── Midjourney / FLUX / AI Image Generation ────────────────
 MIDJOURNEY_API_KEY: str = os.getenv("MIDJOURNEY_API_KEY", "")
 MIDJOURNEY_API_URL: str = os.getenv("MIDJOURNEY_API_URL", "https://api.goapi.ai/api/v1/task")
-# Bepul 100% cheksiz Midjourney v6 / Flux-Realism dvigateli
+POLLINATIONS_API_KEY: str = os.getenv("POLLINATIONS_API_KEY", "")
+HUGGINGFACE_API_KEY: str = os.getenv("HUGGINGFACE_API_KEY", "")
+CLOUDFLARE_ACCOUNT_ID: str = os.getenv("CLOUDFLARE_ACCOUNT_ID", "")
+CLOUDFLARE_API_TOKEN: str = os.getenv("CLOUDFLARE_API_TOKEN", "")
+CLOUDFLARE_IMAGE_MODEL: str = os.getenv("CLOUDFLARE_IMAGE_MODEL", "@cf/black-forest-labs/flux-1-schnell")
 # ─── Text-to-Speech (edge-tts) ───────────────────────────────
 DEFAULT_VOICE: str = os.getenv("DEFAULT_VOICE", "uz-UZ-MadinaNeural")
 VOICE_OPTIONS: dict[str, str] = {

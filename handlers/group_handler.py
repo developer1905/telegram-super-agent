@@ -340,33 +340,37 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
             return
 
     # ── B. RASM CHIZISH (FLUX.1 / Midjourney) ──
-    img_match = re.match(r"^(?:/draw|/imagine|/midjourney|rasm\s+chiz|rasm|chiz|chizib\s+ber)[:\s]+(.+)$", clean_text, re.IGNORECASE | re.DOTALL)
+    img_match = re.match(r"^(?:/draw|/imagine|/midjourney|/flux|/art|rasm\s+chiz|rasm|chiz|chizib\s+ber)[:\s]*(.*)$", clean_text, re.IGNORECASE | re.DOTALL)
     if img_match:
         prompt_query = img_match.group(1).strip()
-        wait_m = await message.reply("🎨 **FLUX.1 rasm chizmoqda...** Bir necha soniya kuting...")
-        try:
-            await bot.send_chat_action(message.chat.id, "upload_photo")
-            img_bytes, enhanced_p, ar, seed = await draw_midjourney_image(
-                raw_prompt=prompt_query,
-                ai_manager=ai_manager,
-                enhance=True,
-            )
-            if img_bytes:
-                photo_file = BufferedInputFile(file=img_bytes, filename=f"flux_{uuid.uuid4().hex[:6]}.jpg")
-                caption = (
-                    f"🎨 **FLUX.1 Badiiy Asari:**\n"
-                    f"📝 *{prompt_query}*\n"
-                    f"📐 O'lcham: `{ar}` | 🎲 Seed: `{seed}`"
+        if not prompt_query and message.reply_to_message:
+            prompt_query = message.reply_to_message.text or message.reply_to_message.caption or ""
+        if prompt_query:
+            wait_m = await message.reply("🎨 **FLUX.1 rasm chizmoqda...** Bir necha soniya kuting...")
+            try:
+                await bot.send_chat_action(message.chat.id, "upload_photo")
+                img_bytes, enhanced_p, ar, seed = await draw_midjourney_image(
+                    raw_prompt=prompt_query,
+                    ai_manager=ai_manager,
+                    enhance=True,
                 )
-                await wait_m.delete()
-                await message.reply_photo(photo=photo_file, caption=caption, parse_mode="Markdown")
-                return
-            else:
-                await wait_m.edit_text("❌ Rasm chizishda xatolik yuz berdi. Iltimos, qayta urinib ko'ring.")
-        except Exception as exc:
-            logger.error("Guruhda rasm chizish xatosi: %s", exc)
-            await wait_m.edit_text(f"❌ Rasm generatsiyasida xatolik: {exc}")
-        return
+                if img_bytes:
+                    photo_file = BufferedInputFile(file=img_bytes, filename=f"flux_{uuid.uuid4().hex[:6]}.jpg")
+                    caption = (
+                        f"🎨 **FLUX.1 Badiiy Asari:**\n\n"
+                        f"📝 <i>{html.escape(prompt_query)}</i>\n"
+                        f"📐 O'lcham: <code>{ar}</code> | 🎲 Seed: <code>{seed}</code>\n"
+                        f"🤖 <b>Super-Agent Studio</b>"
+                    )
+                    await wait_m.delete()
+                    await message.reply_photo(photo=photo_file, caption=caption, parse_mode="HTML")
+                    return
+                else:
+                    await wait_m.edit_text("❌ Rasm chizishda xatolik yuz berdi. Iltimos, qayta urinib ko'ring.")
+            except Exception as exc:
+                logger.error("Guruhda rasm chizish xatosi: %s", exc)
+                await wait_m.edit_text(f"❌ Rasm generatsiyasida xatolik: {exc}")
+            return
 
     # ── C. VIDEO YUKLASH (Instagram, TikTok, YouTube, X, Pinterest) ──
     media_url = extract_media_url(raw_text)
@@ -657,16 +661,36 @@ async def handle_channel_post(message: Message, ai_manager: AIManager, bot: Bot)
     is_question = raw_text.endswith("?") or text_lower.startswith("savol:")
     is_summary = "#xulosa" in text_lower or text_lower.startswith("xulosa:") or "#tahlil" in text_lower
     is_fact_check = "#fakt" in text_lower or text_lower.startswith("fakt:")
+    is_image_request = bool(re.search(r"(?:#rasm|#draw|/draw|/imagine|/flux|rasm\s+chiz|chizib\s+ber)", text_lower))
 
-    if not (has_bot_call or is_question or is_summary or is_fact_check):
+    if not (has_bot_call or is_question or is_summary or is_fact_check or is_image_request):
         return
+
+    clean_text = re.sub(r"^(?:bot|/ai|/bot|/ask|ai:|#ai|#bot|#xulosa|#tahlil|#fakt|#rasm|#draw|/draw|/imagine|/flux|rasm\s+chiz:|chiz:|xulosa:|fakt:|savol:)[\s,:!-]+", "", raw_text, flags=re.IGNORECASE).strip()
+
+    # Agar kanalda rasm so'ralgan bo'lsa
+    if is_image_request:
+        p_query = clean_text or raw_text
+        try:
+            await bot.send_chat_action(message.chat.id, "upload_photo")
+            img_bytes, enhanced_p, ar, seed = await draw_midjourney_image(raw_prompt=p_query, ai_manager=ai_manager, enhance=True)
+            if img_bytes:
+                photo_file = BufferedInputFile(file=img_bytes, filename=f"channel_flux_{uuid.uuid4().hex[:6]}.jpg")
+                caption = (
+                    f"🎨 <b>FLUX.1 Badiiy Asari:</b>\n\n"
+                    f"📝 <i>{html.escape(p_query)}</i>\n\n"
+                    f"🤖 <b>Super-Agent Studio</b>"
+                )
+                await message.reply_photo(photo=photo_file, caption=caption, parse_mode="HTML")
+                return
+        except Exception as img_err:
+            logger.error("Kanalda rasm chizish xatosi: %s", img_err)
+            return
 
     try:
         await bot.send_chat_action(message.chat.id, "typing")
     except Exception:
         pass
-
-    clean_text = re.sub(r"^(?:bot|/ai|/bot|/ask|ai:|#ai|#bot|#xulosa|#tahlil|#fakt|xulosa:|fakt:|savol:)[\s,:!-]+", "", raw_text, flags=re.IGNORECASE).strip()
 
     if is_summary:
         prompt = f"Kanal posti: '{clean_text or raw_text}'.\n\nUshbu post bo'yicha 3 ta eng muhim tezis-xulosa va 4 ta ommabop hashtag tuzib ber (o'zbek tilida)."

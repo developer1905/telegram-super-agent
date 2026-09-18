@@ -983,6 +983,19 @@
             </div>
           </div>
 
+          <!-- Style Selector -->
+          <div class="mb-3">
+            <label class="form-label small text-muted mb-1">Badiiy Uslub (Art Style):</label>
+            <div class="d-flex gap-2 flex-wrap" id="mj-style-selector">
+              <span class="subtab-pill active" data-style="photo" onclick="setMjStyle('photo', this)">📸 Fotorealistik (FLUX.1)</span>
+              <span class="subtab-pill" data-style="anime" onclick="setMjStyle('anime', this)">🎌 Anime (Z-Image)</span>
+              <span class="subtab-pill" data-style="3d" onclick="setMjStyle('3d', this)">✨ 3D Disney/Pixar</span>
+              <span class="subtab-pill" data-style="cyberpunk" onclick="setMjStyle('cyberpunk', this)">👾 Kiberpank</span>
+              <span class="subtab-pill" data-style="art" onclick="setMjStyle('art', this)">🎨 Moybo'yoq San'ati</span>
+              <span class="subtab-pill" data-style="vector" onclick="setMjStyle('vector', this)">📐 Vektor Grafika</span>
+            </div>
+          </div>
+
           <button class="btn btn-neon-primary w-100 py-2" id="btn-generate-mj" onclick="handleGenerateMidjourney()">
             <i class="bi bi-stars"></i> Rasm Chizish
           </button>
@@ -2217,11 +2230,21 @@
       if (subId === 'cleaner') loadCleanerInfo();
     }
 
-    // Midjourney Studio In-App Generator
+    // Midjourney / FLUX.1 Studio In-App Generator
+    let currentMjAr = '1:1';
+    let currentMjStyle = 'photo';
+
     function setMjAr(ar, el) {
       haptic('light');
       currentMjAr = ar;
       document.querySelectorAll('#mj-ar-selector .subtab-pill').forEach(p => p.classList.remove('active'));
+      if (el) el.classList.add('active');
+    }
+
+    function setMjStyle(style, el) {
+      haptic('light');
+      currentMjStyle = style;
+      document.querySelectorAll('#mj-style-selector .subtab-pill').forEach(p => p.classList.remove('active'));
       if (el) el.classList.add('active');
     }
 
@@ -2249,13 +2272,13 @@
 
       haptic('medium');
       btn.disabled = true;
-      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Midjourney chizmoqda (10-25s)...';
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> FLUX.1 chizmoqda (8-20s)...';
 
       try {
         const res = await fetch('/api/generate_image', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ prompt: prompt, aspect_ratio: currentMjAr })
+          body: JSON.stringify({ prompt: prompt, aspect_ratio: currentMjAr, style: currentMjStyle })
         });
 
         if (res.ok) {
