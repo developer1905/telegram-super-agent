@@ -810,30 +810,44 @@ async def main() -> None:
     except Exception as exc:
         logger.warning("delete_webhook xatosi: %s", exc)
 
-    logger.info("🤖 Bot polling boshlandi...")
+    logger.info("🤖 Bot polling boshlandi (Doimiy 24/7 uzluksiz rejim)...")
+    retry_delay = 3.0
     try:
-        await dp.start_polling(
-            bot,
-            allowed_updates=[
-                "message",
-                "edited_message",
-                "channel_post",
-                "edited_channel_post",
-                "my_chat_member",
-                "chat_member",
-                "callback_query",
-            ],
-        )
-    except Exception as poll_err:
-        err_text = str(poll_err)
-        if "Conflict" in err_text or "terminated by other getUpdates" in err_text:
-            logger.critical(
-                "❌ TELEGRAM TO'QNASHUV (ConflictError): Serverda boshqa bot nusxasi ishlab turibdi! "
-                "Iltimos, eski jarayonni o'chiring: `sudo pkill -9 -f 'python main.py'`"
-            )
-        else:
-            logger.error("⚠️ Pollingda xatolik yuz berdi: %s", poll_err)
-        raise
+        while True:
+            try:
+                await dp.start_polling(
+                    bot,
+                    allowed_updates=[
+                        "message",
+                        "edited_message",
+                        "channel_post",
+                        "edited_channel_post",
+                        "my_chat_member",
+                        "chat_member",
+                        "callback_query",
+                    ],
+                )
+                # Agar polling to'g'ri yakunlansa (masalan, stop chaqirilsa)
+                break
+            except asyncio.CancelledError:
+                logger.info("🛑 Polling bekor qilindi (To'xtatish buyrug'i).")
+                break
+            except Exception as poll_err:
+                err_text = str(poll_err)
+                if "Conflict" in err_text or "terminated by other getUpdates" in err_text:
+                    logger.critical(
+                        "❌ TELEGRAM TO'QNASHUV (ConflictError): Serverda boshqa bot nusxasi ishlab turibdi! "
+                        "10 soniyadan so'ng qayta ulanishga harakat qilinadi..."
+                    )
+                    await asyncio.sleep(10.0)
+                else:
+                    logger.warning(
+                        "⚠️ Tarmoq xatosi yoki aloqa uzilishi: %s. %.1f soniyadan so'ng avtomatik qayta ulanmoqda...",
+                        poll_err,
+                        retry_delay,
+                    )
+                    await asyncio.sleep(retry_delay)
+                    retry_delay = min(retry_delay * 1.4, 20.0)
     finally:
         # To'xtatishda barcha resurslarni xavfsiz tozalash
         if scheduler:

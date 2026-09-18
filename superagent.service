@@ -1,0 +1,20 @@
+[Unit]
+Description=Telegram Super-Agent AI Bot
+After=network.target network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/telegram-super-agent
+ExecStartPre=/bin/bash -c "fuser -k 8080/tcp 2>/dev/null || true"
+ExecStart=/home/ubuntu/telegram-super-agent/venv/bin/python main.py
+Restart=always
+RestartSec=5s
+LimitNOFILE=65536
+KillMode=process
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target

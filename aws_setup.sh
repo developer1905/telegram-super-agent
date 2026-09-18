@@ -76,17 +76,23 @@ if [ ! -f "$PYTHON_EXEC" ]; then
     PYTHON_EXEC="/usr/bin/python3"
 fi
 
-sudo tee /etc/systemd/system/superagent.service > /dev/null <<EOF
 [Unit]
 Description=Telegram Super-Agent AI Bot
-After=network.target
+After=network.target network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
 
 [Service]
+Type=simple
 User=ubuntu
 WorkingDirectory=$APP_DIR
+ExecStartPre=/bin/bash -c "fuser -k 8080/tcp 2>/dev/null || true"
 ExecStart=$PYTHON_EXEC main.py
 Restart=always
-RestartSec=5
+RestartSec=5s
+LimitNOFILE=65536
+KillMode=process
+TimeoutStopSec=15
 
 [Install]
 WantedBy=multi-user.target
@@ -95,7 +101,12 @@ EOF
 sudo systemctl daemon-reload
 sudo systemctl enable superagent
 sudo systemctl restart superagent
-echo "✅ Super-Agent servisi ishga tushirildi."
+echo "✅ Super-Agent servisi uzluksiz rejimda ishga tushirildi."
+
+# 7. Watchdog (Qo'riqchi) ni sozlash
+chmod +x "$APP_DIR/scripts/watchdog.sh"
+(crontab -l 2>/dev/null | grep -v "watchdog.sh" ; echo "* * * * * bash $APP_DIR/scripts/watchdog.sh >/dev/null 2>&1") | crontab -
+echo "✅ Watchdog (avtomatik o'z-o'zini tiklovchi) cron ga ulandi."
 
 echo ""
 echo "=================================================="
