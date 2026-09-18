@@ -76,6 +76,7 @@ if [ ! -f "$PYTHON_EXEC" ]; then
     PYTHON_EXEC="/usr/bin/python3"
 fi
 
+sudo tee /etc/systemd/system/superagent.service > /dev/null <<EOF
 [Unit]
 Description=Telegram Super-Agent AI Bot
 After=network.target network-online.target
