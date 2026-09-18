@@ -627,13 +627,87 @@ async def handle_ai_chat(message: Message, ai_manager: AIManager) -> None:
     user_text = message.text.strip()
     await db.log_event("user_msg", user_text[:80])
 
-    # 1. Email buyruqlarini tekshirish
+    # 1. Ijtimoiy tarmoqlardan video yuklash (Instagram, TikTok, YouTube, X, Pinterest)
+    from core.media_downloader import extract_media_url, download_social_video, detect_platform, get_or_create_mp3
+    media_url = extract_media_url(user_text)
+    if media_url:
+        platform_name = detect_platform(media_url)
+        wait_msg = await message.answer(f"⏳ <b>{platform_name} videosi yuklab olinmoqda...</b>\n<code>{html.escape(media_url[:80])}</code>\n\n<i>Iltimos, kuting (HD, suvsiz formatda)...</i>", parse_mode="HTML")
+        await message.bot.send_chat_action(message.chat.id, "upload_video")
+        video_info = await download_social_video(media_url)
+        if video_info and os.path.exists(video_info.get("file_path", "")):
+            try:
+                from aiogram.types import FSInputFile
+                task_id = uuid.uuid4().hex[:8]
+                _media_cache[task_id] = video_info
+
+                v_file = FSInputFile(video_info["file_path"])
+                p_safe = html.escape(video_info.get("platform", "Video"))
+                t_safe = html.escape(video_info.get("title", "")[:80])
+                sz = video_info.get("size_mb", 0)
+
+                music_line = ""
+                if video_info.get("music_title"):
+                    music_line = f"\n🎵 <b>Musiqa:</b> {html.escape(video_info['music_title'][:60])}"
+                    if video_info.get("music_author"):
+                        music_line += f" — <i>{html.escape(video_info['music_author'][:40])}</i>"
+
+                caption = (
+                    f"🎬 <b>{p_safe} yuklandi!</b>\n\n"
+                    f"📝 <b>Nomi:</b> {t_safe}\n"
+                    f"📦 <b>Hajmi:</b> <code>{sz} MB</code>"
+                    f"{music_line}\n\n"
+                    f"🤖 <b>Super-Agent</b>"
+                )
+
+                # Tugmalar: MP3 yuklash va Qo'shiqni aniqlash
+                builder = InlineKeyboardBuilder()
+                builder.row(
+                    InlineKeyboardButton(text="🎵 Musiqasini olish (MP3)", callback_data=f"media:mp3:{task_id}"),
+                    InlineKeyboardButton(text="🔍 Qo'shiqni aniqlash", callback_data=f"media:shazam:{task_id}"),
+                )
+
+                try:
+                    await message.reply_video(video=v_file, caption=caption, parse_mode="HTML", reply_markup=builder.as_markup())
+                except Exception as vid_err:
+                    logger.warning("reply_video muvaffaqiyatsiz (%s), reply_document orqali yuborilmoqda", vid_err)
+                    await message.reply_document(document=v_file, caption=caption, parse_mode="HTML", reply_markup=builder.as_markup())
+
+                await wait_msg.delete()
+                LogCollector().add(action_type="media_download", description=f"Video: {platform_name}")
+
+                # Agar foydalanuvchi so'rovida "mp3" yoki "musiqa" yozilgan bo'lsa, MP3 ni ham darhol jo'natish
+                if any(w in user_text.lower() for w in ["mp3", "musiqa", "audio", "qo'shiq"]):
+                    mp3_info = await get_or_create_mp3(video_info)
+                    if mp3_info and os.path.exists(mp3_info["audio_path"]):
+                        a_file = FSInputFile(mp3_info["audio_path"])
+                        m_caption = (
+                            f"🎵 <b>{html.escape(mp3_info.get('title', 'Musiqa')[:80])}</b>\n"
+                            f"👤 <b>Ijrochi:</b> {html.escape(mp3_info.get('artist', 'Super-Agent')[:80])}\n\n"
+                            f"🤖 <b>Super-Agent Audio</b>"
+                        )
+                        await message.reply_audio(
+                            audio=a_file,
+                            title=mp3_info.get("title", "Audio Track")[:80],
+                            performer=mp3_info.get("artist", "Super-Agent")[:80],
+                            caption=m_caption,
+                            parse_mode="HTML",
+                        )
+            except Exception as v_err:
+                logger.error("Video yuborishda xato: %s", v_err)
+                await safe_edit_text(wait_msg, f"❌ Videoni yuborishda xatolik: {v_err}", parse_mode=None)
+            return
+        else:
+            await safe_edit_text(wait_msg, f"❌ Kechirasiz, {platform_name} videosini yuklab bo'lmadi yoki video hajmi 50MB dan katta.", parse_mode=None)
+            return
+
+    # 1.1 Email buyruqlarini tekshirish
     if await handle_email_text_command(message, ai_manager):
         return
 
-    # 2. Veb-Havola (URL) Tahlili va Kanal Posti Generatori
+    # 2. Veb-Maqola (URL) Tahlili va Kanal Posti Generatori
     url_match = re.search(r"https?://[^\s]+", user_text)
-    if url_match and (len(user_text) < 150 or "post" in user_text.lower() or "tahlil" in user_text.lower() or "tezis" in user_text.lower()):
+    if url_match and ("maqola" in user_text.lower() or "post tayyorla" in user_text.lower() or "tahlil qil" in user_text.lower() or "tezis" in user_text.lower()):
         target_url = url_match.group(0)
         wait_msg = await message.answer(f"🌐 `{target_url}` sahifasi yuklanib, 3 ta asosiy tezis va kanal posti tayyorlanmoqda...", parse_mode="Markdown")
         analysis = await analyze_url_and_generate_post(target_url, ai_manager)
@@ -992,79 +1066,6 @@ async def handle_ai_chat(message: Message, ai_manager: AIManager) -> None:
             LogCollector().add(action_type="viral_smm", description=f"SMM: {smm_input[:30]}")
             return
 
-    # 4.2.E Ijtimoiy tarmoqlardan video yuklash (Instagram, TikTok, YouTube, X, Pinterest)
-    from core.media_downloader import extract_media_url, download_social_video, detect_platform, get_or_create_mp3
-    media_url = extract_media_url(user_text)
-    if media_url:
-        platform_name = detect_platform(media_url)
-        wait_msg = await message.answer(f"⏳ <b>{platform_name} videosi yuklab olinmoqda...</b>\n<code>{html.escape(media_url[:80])}</code>\n\n<i>Iltimos, kuting (HD, suvsiz formatda)...</i>", parse_mode="HTML")
-        await message.bot.send_chat_action(message.chat.id, "upload_video")
-        video_info = await download_social_video(media_url)
-        if video_info and os.path.exists(video_info.get("file_path", "")):
-            try:
-                from aiogram.types import FSInputFile
-                task_id = uuid.uuid4().hex[:8]
-                _media_cache[task_id] = video_info
-
-                v_file = FSInputFile(video_info["file_path"])
-                p_safe = html.escape(video_info.get("platform", "Video"))
-                t_safe = html.escape(video_info.get("title", "")[:80])
-                sz = video_info.get("size_mb", 0)
-
-                music_line = ""
-                if video_info.get("music_title"):
-                    music_line = f"\n🎵 <b>Musiqa:</b> {html.escape(video_info['music_title'][:60])}"
-                    if video_info.get("music_author"):
-                        music_line += f" — <i>{html.escape(video_info['music_author'][:40])}</i>"
-
-                caption = (
-                    f"🎬 <b>{p_safe} yuklandi!</b>\n\n"
-                    f"📝 <b>Nomi:</b> {t_safe}\n"
-                    f"📦 <b>Hajmi:</b> <code>{sz} MB</code>"
-                    f"{music_line}\n\n"
-                    f"🤖 <b>Super-Agent</b>"
-                )
-
-                # Tugmalar: MP3 yuklash va Qo'shiqni aniqlash
-                builder = InlineKeyboardBuilder()
-                builder.row(
-                    InlineKeyboardButton(text="🎵 Musiqasini olish (MP3)", callback_data=f"media:mp3:{task_id}"),
-                    InlineKeyboardButton(text="🔍 Qo'shiqni aniqlash", callback_data=f"media:shazam:{task_id}"),
-                )
-
-                try:
-                    await message.reply_video(video=v_file, caption=caption, parse_mode="HTML", reply_markup=builder.as_markup())
-                except Exception as vid_err:
-                    logger.warning("reply_video muvaffaqiyatsiz (%s), reply_document orqali yuborilmoqda", vid_err)
-                    await message.reply_document(document=v_file, caption=caption, parse_mode="HTML", reply_markup=builder.as_markup())
-
-                await wait_msg.delete()
-                LogCollector().add(action_type="media_download", description=f"Video: {platform_name}")
-
-                # Agar foydalanuvchi so'rovida "mp3" yoki "musiqa" yozilgan bo'lsa, MP3 ni ham darhol jo'natish
-                if any(w in user_text.lower() for w in ["mp3", "musiqa", "audio", "qo'shiq"]):
-                    mp3_info = await get_or_create_mp3(video_info)
-                    if mp3_info and os.path.exists(mp3_info["audio_path"]):
-                        a_file = FSInputFile(mp3_info["audio_path"])
-                        m_caption = (
-                            f"🎵 <b>{html.escape(mp3_info.get('title', 'Musiqa')[:80])}</b>\n"
-                            f"👤 <b>Ijrochi:</b> {html.escape(mp3_info.get('artist', 'Super-Agent')[:80])}\n\n"
-                            f"🤖 <b>Super-Agent Audio</b>"
-                        )
-                        await message.reply_audio(
-                            audio=a_file,
-                            title=mp3_info.get("title", "Audio Track")[:80],
-                            performer=mp3_info.get("artist", "Super-Agent")[:80],
-                            caption=m_caption,
-                            parse_mode="HTML",
-                        )
-            except Exception as v_err:
-                logger.error("Video yuborishda xato: %s", v_err)
-                await safe_edit_text(wait_msg, f"❌ Videoni yuborishda xatolik: {v_err}", parse_mode=None)
-            return
-        else:
-            await safe_edit_text(wait_msg, f"❌ Kechirasiz, {platform_name} videosini yuklab bo'lmadi yoki video hajmi 50MB dan katta.", parse_mode=None)
-            return
 
     # 4.3 Ovoz Sintezi — Text-to-Speech (/voice, ovoz:, gapir:)
     voice_match = re.match(r"^(?:/voice|ovoz|gapir|ovozga\s+aylantir)[:\s]+(.+)$", user_text, re.IGNORECASE | re.DOTALL)
