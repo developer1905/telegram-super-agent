@@ -146,7 +146,11 @@ async def handle_document(message: Message, bot: Bot, ai_manager: AIManager) -> 
     )
     builder.row(
         InlineKeyboardButton(
-            text="💾 Doimiy Xotiraga Saqlash (Memory)",
+            text="⚖️ Shartnoma Xatarlarini Tekshirish",
+            callback_data=f"contract_audit:{wait_msg.message_id}",
+        ),
+        InlineKeyboardButton(
+            text="💾 Xotiraga Saqlash",
             callback_data=f"save_kb:{wait_msg.message_id}",
         )
     )
@@ -170,6 +174,33 @@ async def handle_document(message: Message, bot: Bot, ai_manager: AIManager) -> 
         description=f"Fayl tahlili: {filename} ({file_type})",
         model_used=ai_manager.current_provider,
     )
+
+
+# ─── Shartnoma Auditi Callback ────────────────────────────────
+
+@router.callback_query(ADMIN_FILTER, F.data.startswith("contract_audit:"))
+async def cb_contract_audit(cb: CallbackQuery, ai_manager: AIManager) -> None:
+    """Hujjatdagi shartnoma xatarlari va noqulay bandlarni tahlil qiladi."""
+    msg_id_str = cb.data.replace("contract_audit:", "")
+    msg_id = int(msg_id_str) if msg_id_str.isdigit() else 0
+    file_data = _pending_rewrites.get(msg_id)
+    if not file_data:
+        await cb.answer("Fayl ma'lumotlari topilmadi", show_alert=True)
+        return
+
+    file_bytes, file_type, filename = file_data
+    from core.file_editor import extract_text_from_bytes
+    text = extract_text_from_bytes(file_bytes, file_type)
+    if not text or text.startswith("["):
+        await cb.answer("Fayldan matn ajratib bo'lmadi", show_alert=True)
+        return
+
+    await cb.answer("⚖️ Shartnoma xatarlari o'rganilmoqda...")
+    from core.expert_agents import DocumentContractAgent
+    agent = DocumentContractAgent(ai_manager)
+    report = await agent.analyze_document(text)
+    from core.safe_send import safe_send_message
+    await safe_send_message(cb.bot, cb.message.chat.id, report, parse_mode="Markdown")
 
 
 # ─── Qayta Yozish Callback ────────────────────────────────────

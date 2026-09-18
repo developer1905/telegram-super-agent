@@ -68,30 +68,35 @@ def build_reply_keyboard_menu() -> ReplyKeyboardMarkup:
             KeyboardButton(text="👤 Shaxsiy Profil (Mem0)"),
         ],
         [
-            KeyboardButton(text="🎙 Ovozli Agent (STT & TTS)"),
+            KeyboardButton(text="🔬 Deep Research"),
+            KeyboardButton(text="💻 Kod & Shartnoma Auditi"),
+        ],
+        [
+            KeyboardButton(text="🎯 Viral SMM"),
             KeyboardButton(text="🎬 Video Yuklovchi"),
         ],
         [
+            KeyboardButton(text="🎙 Ovozli Agent (STT & TTS)"),
             KeyboardButton(text="🤖 AI Modellar"),
+        ],
+        [
             KeyboardButton(text="🎭 Tizim Rollari"),
-        ],
-        [
             KeyboardButton(text="⏰ Rejalashtirilgan Postlar"),
+        ],
+        [
             KeyboardButton(text="🧠 Doimiy Xotira"),
-        ],
-        [
             KeyboardButton(text="🔄 Tarixni Sinxronlash"),
-            KeyboardButton(text="📊 Holat & Statistika"),
         ],
         [
-            KeyboardButton(text="📧 Email Pochta"),
+            KeyboardButton(text="📊 Holat & Statistika"),
             KeyboardButton(text="📡 Telegram Xulosasi"),
         ],
         [
+            KeyboardButton(text="📧 Email Pochta"),
             KeyboardButton(text="🔍 Raqobatchilar Tahlili"),
-            KeyboardButton(text="🧹 Xotirani Tozalash"),
         ],
         [
+            KeyboardButton(text="🧹 Xotirani Tozalash"),
             KeyboardButton(text="❓ Yordam"),
         ],
     ]
@@ -333,6 +338,51 @@ async def rk_tts(message: Message) -> None:
         "   `/voice Salom, bugun qanday yangiliklar bor?`\n\n"
         "4. **Ovozli vazifalar:**\n"
         "   *\"Vazifa qo'sh: Ertaga soat 10 da hisobot topshirish\"* deb ovoz yozsangiz, u avtomatik Notion rejalarga tushadi!"
+    )
+    await message.answer(text, parse_mode="Markdown")
+
+
+@router.message(ADMIN_FILTER, F.text.in_({"🔬 Deep Research", "Deep Research", "/research", "/tadqiqot"}))
+async def rk_deep_research(message: Message) -> None:
+    text = (
+        "🔬 **Deep Research Agent (Chuqur Internet Tadqiqoti)**\n\n"
+        "OpenAI Deep Research tamoyilida ishlovchi avtonom agent!\n"
+        "U internetdagi 3-5 ta manbani parallel qidirib, solishtirib, to'liq ilmiy va analitik hisobot tuzadi.\n\n"
+        "📌 **Qanday ishlatiladi?**\n"
+        "`/research O'zbekistonda 2026-yilda quyosh energetikasi istiqbollari`\n"
+        "`/tadqiqot Kripto bozoridagi eng so'nggi o'zgarishlar va trendlar`"
+    )
+    await message.answer(text, parse_mode="Markdown")
+
+
+@router.message(ADMIN_FILTER, F.text.in_({"💻 Kod & Shartnoma Auditi", "Kod & Shartnoma Auditi", "/code", "/audit", "/inspect"}))
+async def rk_code_audit(message: Message) -> None:
+    text = (
+        "💻 **Kod Auditi & Shartnoma Tahlilchisi**\n\n"
+        "1. **Dasturiy Kod Auditi & Bug Fixer:**\n"
+        "   Koddagi xatolar, xavfsizlik zaifliklari va sekinlashuvlarni topib, tayyor to'g'irlangan kod beradi:\n"
+        "   `/code def login(user, pass): db.execute('SELECT * FROM users WHERE...')`\n\n"
+        "2. **Smart Shartnoma & Hujjat Tahlili:**\n"
+        "   Shartnomadagi yashirin xatarlar, jarimalar va bir tomonlama majburiyatlarni tekshiradi:\n"
+        "   `/inspect [shartnoma matnini yuboring]`\n"
+        "   yoki botga to'g'ridan-to'g'ri PDF/DOCX shartnoma faylini yuboring!"
+    )
+    await message.answer(text, parse_mode="Markdown")
+
+
+@router.message(ADMIN_FILTER, F.text.in_({"🎯 Viral SMM", "Viral SMM", "/smm", "/viral", "/post"}))
+async def rk_viral_smm(message: Message) -> None:
+    text = (
+        "🎯 **Viral SMM & Content Strategy Agent**\n\n"
+        "Telegram kanallar, Instagram va YouTube uchun millionlab ko'rishlar keltiruvchi kontent-paket tayyorlaydi!\n\n"
+        "📦 **Hisobot tarkibi:**\n"
+        "• 3 xil kuchli Hook (intriga, fakt, og'riqli savol)\n"
+        "• Yuqori konversiyali asosiy post matni\n"
+        "• Harakatga undovchi CTA va trend hashtaglar\n"
+        "• 7 kunlik haftalik kontent-reja matritsasi\n\n"
+        "📌 **Ishlatish:**\n"
+        "`/smm Sun'iy intellekt va dasturlash kanali uchun`\n"
+        "`/post Yangi online kurs sotuvi uchun`"
     )
     await message.answer(text, parse_mode="Markdown")
 

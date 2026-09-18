@@ -555,16 +555,106 @@ async def api_download_video_handler(request: web.Request) -> web.Response:
         from core.media_downloader import download_social_video
         info = await download_social_video(url)
         if info:
+            filename = info.get("filename") or os.path.basename(info.get("file_path"))
             return web.json_response({
                 "status": "ok",
                 "title": info.get("title"),
                 "platform": info.get("platform"),
                 "size_mb": info.get("size_mb"),
+                "filename": filename,
+                "download_url": f"/api/video/stream/{filename}",
                 "message": f"✅ {info.get('platform')} videosi muvaffaqiyatli tayyorlandi!"
             })
         return web.json_response({"status": "error", "message": "Video yuklab bo'lmadi yoki hajm 50MB dan katta"}, status=400)
     except Exception as exc:
         logger.error("api_download_video xatosi: %s", exc)
+        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+
+
+async def api_video_stream_handler(request: web.Request) -> web.StreamResponse:
+    """Yuklangan videoni Web App ga oqim ko'rinishida uzatish."""
+    filename = request.match_info.get("filename", "")
+    filename = os.path.basename(filename)
+    if not filename.endswith(".mp4"):
+        return web.Response(text="Fayl formati noto'g'ri", status=400)
+
+    file_path = os.path.join(os.path.dirname(__file__), "data", "temp", filename)
+    if not os.path.exists(file_path):
+        return web.Response(text="Video fayl topilmadi yoki o'chirilgan", status=404)
+
+    response = web.FileResponse(file_path)
+    response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+    response.headers["Content-Type"] = "video/mp4"
+    return response
+
+
+async def api_agent_research_handler(request: web.Request) -> web.Response:
+    """Mini App: Deep Research Agent API."""
+    try:
+        ai_manager: AIManager = request.app["ai_manager"]
+        data = await request.json()
+        topic = data.get("topic", "").strip()
+        if not topic:
+            return web.json_response({"status": "error", "message": "Tadqiqot mavzusi kiritilmadi"}, status=400)
+        from core.expert_agents import DeepResearchAgent
+        agent = DeepResearchAgent(ai_manager)
+        report = await agent.conduct_research(topic)
+        return web.json_response({"status": "ok", "report": report})
+    except Exception as exc:
+        logger.error("api_agent_research xatosi: %s", exc)
+        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+
+
+async def api_agent_code_review_handler(request: web.Request) -> web.Response:
+    """Mini App: Code Reviewer & Bug Fixer API."""
+    try:
+        ai_manager: AIManager = request.app["ai_manager"]
+        data = await request.json()
+        code_text = data.get("code", "").strip()
+        language = data.get("language")
+        if not code_text:
+            return web.json_response({"status": "error", "message": "Kod matni kiritilmadi"}, status=400)
+        from core.expert_agents import CodeReviewerAgent
+        agent = CodeReviewerAgent(ai_manager)
+        report = await agent.review_code(code_text, language=language)
+        return web.json_response({"status": "ok", "report": report})
+    except Exception as exc:
+        logger.error("api_agent_code_review xatosi: %s", exc)
+        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+
+
+async def api_agent_inspect_doc_handler(request: web.Request) -> web.Response:
+    """Mini App: Smart Contract & Document Analyzer API."""
+    try:
+        ai_manager: AIManager = request.app["ai_manager"]
+        data = await request.json()
+        doc_text = data.get("doc_text", "").strip()
+        if not doc_text:
+            return web.json_response({"status": "error", "message": "Hujjat matni kiritilmadi"}, status=400)
+        from core.expert_agents import DocumentContractAgent
+        agent = DocumentContractAgent(ai_manager)
+        report = await agent.analyze_document(doc_text)
+        return web.json_response({"status": "ok", "report": report})
+    except Exception as exc:
+        logger.error("api_agent_inspect_doc xatosi: %s", exc)
+        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+
+
+async def api_agent_smm_creator_handler(request: web.Request) -> web.Response:
+    """Mini App: Viral SMM & Content Strategy API."""
+    try:
+        ai_manager: AIManager = request.app["ai_manager"]
+        data = await request.json()
+        topic = data.get("topic", "").strip()
+        platform = data.get("platform", "Telegram")
+        if not topic:
+            return web.json_response({"status": "error", "message": "Mavzu kiritilmadi"}, status=400)
+        from core.expert_agents import ViralSMMAgent
+        agent = ViralSMMAgent(ai_manager)
+        report = await agent.generate_content(topic, platform=platform)
+        return web.json_response({"status": "ok", "report": report})
+    except Exception as exc:
+        logger.error("api_agent_smm_creator xatosi: %s", exc)
         return web.json_response({"status": "error", "message": str(exc)}, status=500)
 
 
@@ -631,7 +721,12 @@ async def start_web_server(ai_manager: AIManager, bot: Optional[Bot] = None) -> 
     app.router.add_get("/api/profile", api_profile_handler)
     app.router.add_post("/api/generate_image", api_generate_image_handler)
     app.router.add_post("/api/download_video", api_download_video_handler)
+    app.router.add_get("/api/video/stream/{filename}", api_video_stream_handler)
     app.router.add_post("/api/tts_voice", api_tts_voice_handler)
+    app.router.add_post("/api/agent/research", api_agent_research_handler)
+    app.router.add_post("/api/agent/code_review", api_agent_code_review_handler)
+    app.router.add_post("/api/agent/inspect_doc", api_agent_inspect_doc_handler)
+    app.router.add_post("/api/agent/smm_creator", api_agent_smm_creator_handler)
 
     port = int(os.getenv("PORT", "8080"))
     runner = web.AppRunner(app)

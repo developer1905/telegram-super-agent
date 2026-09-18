@@ -36,11 +36,16 @@ os.makedirs(TEMP_DIR, exist_ok=True)
 
 # URL Patternlari
 URL_REGEX = re.compile(
-    r"(https?://(?:www\.)?(?:instagram\.com/(?:p|reel|tv)/[A-Za-z0-9_-]+|"
-    r"tiktok\.com/@?[A-Za-z0-9_.-]+/video/\d+|vm\.tiktok\.com/[A-Za-z0-9_-]+|vt\.tiktok\.com/[A-Za-z0-9_-]+|"
-    r"youtube\.com/watch\?v=[A-Za-z0-9_-]+|youtu\.be/[A-Za-z0-9_-]+|youtube\.com/shorts/[A-Za-z0-9_-]+|"
+    r"(https?://(?:www\.|m\.)?(?:"
+    r"instagram\.com/(?:[a-zA-Z0-9_.]+/)?(?:p|reel|reels|tv|share)/[A-Za-z0-9_-]+|"
+    r"tiktok\.com/(?:@[a-zA-Z0-9_.-]+/video/\d+|vm/[A-Za-z0-9_-]+|vt/[A-Za-z0-9_-]+|t/[A-Za-z0-9_-]+|[A-Za-z0-9_-]+)|"
+    r"vt\.tiktok\.com/[A-Za-z0-9_-]+|vm\.tiktok\.com/[A-Za-z0-9_-]+|"
+    r"youtube\.com/(?:watch\?v=[A-Za-z0-9_-]+|shorts/[A-Za-z0-9_-]+|embed/[A-Za-z0-9_-]+|v/[A-Za-z0-9_-]+)|"
+    r"youtu\.be/[A-Za-z0-9_-]+|"
     r"twitter\.com/\w+/status/\d+|x\.com/\w+/status/\d+|"
-    r"pin\.it/[A-Za-z0-9_-]+|pinterest\.com/pin/\d+)[^\s]*)",
+    r"pin\.it/[A-Za-z0-9_-]+|pinterest\.com/pin/\d+|"
+    r"facebook\.com/(?:watch/?\?v=\d+|.+/videos/\d+)|fb\.watch/[A-Za-z0-9_-]+"
+    r")[^\s]*)",
     re.IGNORECASE
 )
 
@@ -53,13 +58,11 @@ DEFAULT_HEADERS = {
 
 def extract_media_url(text: str) -> Optional[str]:
     """Matn ichidan video havolasini ajratib oladi."""
+    if not text:
+        return None
     match = URL_REGEX.search(text)
     if match:
-        url = match.group(1).strip()
-        clean_url = url.split("?")[0]
-        if "tiktok.com" in url or "youtu" in url:
-            return url
-        return clean_url
+        return match.group(1).strip()
     return None
 
 
@@ -275,29 +278,35 @@ async def download_social_video(url: str) -> Optional[Dict[str, Any]]:
     if platform == "Instagram":
         res = await download_instagram_reel(url, output_path)
         if res:
+            res["filename"] = output_filename
             return res
         res = await download_with_ytdlp(url, output_path)
         if res:
+            res["filename"] = output_filename
             return res
 
     # 2. TikTok: Birinchi TikWM (suvsiz), keyin yt-dlp
     elif platform == "TikTok":
         res = await download_tiktok_tikwm(url, output_path)
         if res:
+            res["filename"] = output_filename
             return res
         res = await download_with_ytdlp(url, output_path)
         if res:
+            res["filename"] = output_filename
             return res
 
     # 3. YouTube, X (Twitter), Pinterest yoki boshqalar: yt-dlp
     else:
         res = await download_with_ytdlp(url, output_path)
         if res:
+            res["filename"] = output_filename
             return res
 
     # Oxirgi chora: agar yuqoridagilar o'xshamagan bo'lsa
     res = await download_with_ytdlp(url, output_path)
     if res:
+        res["filename"] = output_filename
         return res
 
     # Agar yuklab bo'lmasa, tozalash

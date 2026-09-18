@@ -860,16 +860,80 @@ async def handle_ai_chat(message: Message, ai_manager: AIManager) -> None:
             )
             return
 
-    # 4.2.1 Ijtimoiy tarmoqlardan video yuklash (Instagram, TikTok, YouTube, X)
+    # 4.2.A DEEP RESEARCH AGENT (/research, /tadqiqot, tadqiqot:, research:)
+    research_match = re.match(r"^(?:/research|/tadqiqot|tadqiqot|research)[:\s]+(.+)$", user_text, re.IGNORECASE | re.DOTALL)
+    if research_match:
+        research_topic = research_match.group(1).strip()
+        if research_topic:
+            wait_msg = await message.answer(
+                f"🔬 **Deep Research Agent ishga tushdi...**\n`{research_topic[:60]}`\n\n"
+                "🌐 Internetdan ko'p bosqichli manbalar qidirilmoqda, faktlar tahlil qilinib hisobot tayyorlanmoqda..."
+            )
+            await message.bot.send_chat_action(message.chat.id, "typing")
+            from core.expert_agents import DeepResearchAgent
+            agent = DeepResearchAgent(ai_manager)
+            res = await agent.conduct_research(research_topic)
+            await safe_edit_text(wait_msg, res, parse_mode="Markdown")
+            LogCollector().add(action_type="deep_research", description=f"Tadqiqot: {research_topic[:40]}")
+            return
+
+    # 4.2.B CODE REVIEWER & BUG FIXER (/code, /audit, /kod, kod:, audit:)
+    code_match = re.match(r"^(?:/code|/audit|/kod|kod|audit)[:\s]+(.+)$", user_text, re.IGNORECASE | re.DOTALL)
+    if code_match:
+        code_input = code_match.group(1).strip()
+        if code_input:
+            wait_msg = await message.answer(
+                "💻 **Code Reviewer & Security Auditor tahlilni boshladi...**\n\n"
+                "🔍 Sintaksis, mantiqiy xatolar, xavfsizlik zaifliklari va samaradorlik tekshirilmoqda..."
+            )
+            await message.bot.send_chat_action(message.chat.id, "typing")
+            from core.expert_agents import CodeReviewerAgent
+            agent = CodeReviewerAgent(ai_manager)
+            res = await agent.review_code(code_input)
+            await safe_edit_text(wait_msg, res, parse_mode="Markdown")
+            LogCollector().add(action_type="code_review", description=f"Code Review: {code_input[:30]}")
+            return
+
+    # 4.2.C SMART CONTRACT & DOCUMENT ANALYZER (/inspect, /doc, /shartnoma, shartnoma:, hujjat:)
+    doc_match = re.match(r"^(?:/inspect|/doc|/shartnoma|shartnoma|hujjat)[:\s]+(.+)$", user_text, re.IGNORECASE | re.DOTALL)
+    if doc_match:
+        doc_input = doc_match.group(1).strip()
+        if doc_input:
+            wait_msg = await message.answer(
+                "📄 **Smart Contract & Document Analyzer ishga tushdi...**\n\n"
+                "⚖️ Hujjatdagi xavfli bandlar, moliyaviy majburiyatlar va huquqiy tuzoqlar tekshirilmoqda..."
+            )
+            await message.bot.send_chat_action(message.chat.id, "typing")
+            from core.expert_agents import DocumentContractAgent
+            agent = DocumentContractAgent(ai_manager)
+            res = await agent.analyze_document(doc_input)
+            await safe_edit_text(wait_msg, res, parse_mode="Markdown")
+            LogCollector().add(action_type="doc_inspect", description=f"Doc Inspect: {doc_input[:30]}")
+            return
+
+    # 4.2.D VIRAL SMM & CONTENT STRATEGY AGENT (/smm, /post, /viral, smm:, post:)
+    smm_match = re.match(r"^(?:/smm|/post|/viral|smm|post)[:\s]+(.+)$", user_text, re.IGNORECASE | re.DOTALL)
+    if smm_match:
+        smm_input = smm_match.group(1).strip()
+        if smm_input:
+            wait_msg = await message.answer(
+                f"🎯 **Viral SMM Strateg ishga tushdi...**\n`{smm_input[:50]}`\n\n"
+                "🚀 3 ta kuchli hook, jalb qiluvchi post, CTA, hashtaglar va haftalik reja tuzilmoqda..."
+            )
+            await message.bot.send_chat_action(message.chat.id, "typing")
+            from core.expert_agents import ViralSMMAgent
+            agent = ViralSMMAgent(ai_manager)
+            res = await agent.generate_content(smm_input)
+            await safe_edit_text(wait_msg, res, parse_mode="Markdown")
+            LogCollector().add(action_type="viral_smm", description=f"SMM: {smm_input[:30]}")
+            return
+
+    # 4.2.E Ijtimoiy tarmoqlardan video yuklash (Instagram, TikTok, YouTube, X)
     from core.media_downloader import extract_media_url, download_social_video, detect_platform
     media_url = extract_media_url(user_text)
-    if media_url and (
-        any(k in user_text.lower() for k in ["yukla", "download", "video", "/dl", "/video"])
-        or user_text.strip() == media_url
-        or len(user_text.split()) <= 3
-    ):
+    if media_url:
         platform_name = detect_platform(media_url)
-        wait_msg = await message.answer(f"⏳ **{platform_name} videosi yuklab olinmoqda...**\n`{media_url}`\n\n_Iltimos, kuting (HD, suvsiz)..._")
+        wait_msg = await message.answer(f"⏳ **{platform_name} videosi yuklab olinmoqda...**\n`{media_url}`\n\n_Iltimos, kuting (HD, suvsiz formatda)..._")
         await message.bot.send_chat_action(message.chat.id, "upload_video")
         video_info = await download_social_video(media_url)
         if video_info and os.path.exists(video_info["file_path"]):
@@ -882,7 +946,11 @@ async def handle_ai_chat(message: Message, ai_manager: AIManager) -> None:
                     f"📦 **Hajmi:** `{video_info.get('size_mb', 0)} MB`\n\n"
                     f"🤖 Super-Agent"
                 )
-                await message.reply_video(video=v_file, caption=caption, parse_mode="Markdown")
+                try:
+                    await message.reply_video(video=v_file, caption=caption, parse_mode="Markdown")
+                except Exception as vid_err:
+                    logger.warning("reply_video muvaffaqiyatsiz (%s), reply_document orqali yuborilmoqda", vid_err)
+                    await message.reply_document(document=v_file, caption=caption, parse_mode="Markdown")
                 await wait_msg.delete()
                 LogCollector().add(action_type="media_download", description=f"Video: {platform_name}")
             except Exception as v_err:

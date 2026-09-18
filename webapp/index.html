@@ -928,6 +928,18 @@
         <div class="subtab-pill" data-tool="video" onclick="switchToolSubTab('video', this)">
           <i class="bi bi-film me-1"></i> Video Yuklovchi
         </div>
+        <div class="subtab-pill" data-tool="research" onclick="switchToolSubTab('research', this)">
+          <i class="bi bi-search-heart-fill me-1"></i> 🔬 Deep Research
+        </div>
+        <div class="subtab-pill" data-tool="codereview" onclick="switchToolSubTab('codereview', this)">
+          <i class="bi bi-code-slash me-1"></i> 💻 Code Reviewer
+        </div>
+        <div class="subtab-pill" data-tool="docinspect" onclick="switchToolSubTab('docinspect', this)">
+          <i class="bi bi-file-earmark-check-fill me-1"></i> 📄 Shartnoma Auditi
+        </div>
+        <div class="subtab-pill" data-tool="smm" onclick="switchToolSubTab('smm', this)">
+          <i class="bi bi-rocket-takeoff-fill me-1"></i> 🎯 Viral SMM
+        </div>
         <div class="subtab-pill" data-tool="uptime" onclick="switchToolSubTab('uptime', this)">
           <i class="bi bi-activity me-1"></i> Uptime Monitor
         </div>
@@ -1019,13 +1031,19 @@
             <span class="quick-chip" onclick="setQuickVideo('https://youtube.com/shorts/')">▶️ YouTube Shorts</span>
           </div>
           <div id="video-dl-result" style="display: none;" class="p-3 bg-light rounded-3 mt-2">
-            <div class="d-flex align-items-center gap-2 mb-1">
-              <span class="badge bg-success text-white" id="video-dl-platform">TikTok</span>
-              <span class="small fw-bold text-dark" id="video-dl-title">Video</span>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="badge bg-success text-white px-2 py-1" id="video-dl-platform">TikTok</span>
+              <span class="badge bg-primary-subtle text-primary border" id="video-dl-size">0 MB</span>
             </div>
-            <div class="small text-muted mb-2">Hajmi: <b id="video-dl-size">0 MB</b></div>
-            <div class="alert alert-success py-2 px-3 small mb-0">
-              <i class="bi bi-check-circle-fill me-1"></i> Video tayyor! Telegram botingizda ham video avtomatik yuboriladi.
+            <div class="small fw-bold text-dark mb-2" id="video-dl-title">Video</div>
+            <div class="text-center mb-2">
+              <video id="video-dl-player" controls playsinline style="width: 100%; max-height: 280px; border-radius: 10px; background: #000;" src=""></video>
+            </div>
+            <a id="video-dl-save-btn" href="#" class="btn btn-neon-primary w-100 py-2 mb-2" download="video.mp4">
+              <i class="bi bi-download me-1"></i> Videoni Saqlash (MP4)
+            </a>
+            <div class="alert alert-success py-2 px-3 small mb-0 text-center">
+              <i class="bi bi-check-circle-fill me-1"></i> Video muvaffaqiyatli tayyorlandi!
             </div>
           </div>
         </div>
@@ -1126,6 +1144,174 @@
           </button>
           <div class="text-muted text-center mt-2" style="font-size: 10px;">
             🛡️ superagent.db bazasi, .env va sessiyalar HECH QACHON o'chirilmaydi!
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. Deep Research Agent Subtab -->
+      <div class="tool-content-pane" id="tool-pane-research" style="display: none;">
+        <div class="neon-card p-3 mb-3">
+          <div class="neon-card-header">
+            <span><i class="bi bi-search-heart-fill me-2 text-primary"></i>Deep Research Agent</span>
+            <span class="badge bg-primary text-white">OpenAI Deep Research Analogi</span>
+          </div>
+          <p class="text-muted small mb-2">
+            Mavzu yozing — agent internetdan 3-5 ta mustaqil manbani chuqur o'rganib, faktlar va manbalari bilan to'liq tahliliy hisobot tayyorlaydi:
+          </p>
+          <div class="mb-2">
+            <input type="text" class="form-control" id="research-topic-input" placeholder="Masalan: O'zbekistonda 2026-yilda sun'iy intellekt va startaplar ekotizimi" />
+          </div>
+          <div class="d-flex gap-1 overflow-x-auto text-nowrap mb-3">
+            <span class="quick-chip" onclick="setQuickResearch('O\'zbekistonda 2026-yilda quyosh va yashil energetika loyihalari')">☀️ Quyosh Energetikasi</span>
+            <span class="quick-chip" onclick="setQuickResearch('Kriptovalyutalar bozoridagi eng yangi trendlar va Bitcoin bashorati')">🪙 Kripto Bozor</span>
+            <span class="quick-chip" onclick="setQuickResearch('O\'zbekiston IT eksporti va xalqaro startaplar statistikasi')">💻 IT Eksport</span>
+          </div>
+          <button class="btn btn-neon-primary w-100 py-2" id="btn-run-research" onclick="handleDeepResearchWeb()">
+            <i class="bi bi-cpu-fill me-1"></i> 🔬 Chuqur Tadqiqot O'tkazish
+          </button>
+        </div>
+
+        <div class="neon-card p-3 mb-3" id="research-result-box" style="display: none;">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="fw-bold small text-dark"><i class="bi bi-file-earmark-text me-1 text-primary"></i>Tahliliy Hisobot</span>
+            <button class="btn btn-sm btn-outline-secondary py-1 px-2" onclick="copyResearchResult()">
+              <i class="bi bi-clipboard me-1"></i> Nusxa olish
+            </button>
+          </div>
+          <div class="p-3 bg-light rounded-3 small text-dark" id="research-report-content" style="white-space: pre-wrap; max-height: 480px; overflow-y: auto; line-height: 1.6;">
+            <!-- Report content -->
+          </div>
+        </div>
+      </div>
+
+      <!-- 6. Code Reviewer & Bug Fixer Subtab -->
+      <div class="tool-content-pane" id="tool-pane-codereview" style="display: none;">
+        <div class="neon-card p-3 mb-3">
+          <div class="neon-card-header">
+            <span><i class="bi bi-code-slash me-2 text-primary"></i>Code Reviewer & Bug Fixer</span>
+            <span class="badge bg-success text-white">Security & Performance</span>
+          </div>
+          <p class="text-muted small mb-2">
+            Dastur kodingizni kiriting — agent xatolarni topadi, xavfsizlik (SQLi, XSS) auditini o'tkazadi va tayyor tuzatilgan kod beradi:
+          </p>
+          <div class="row g-2 mb-2">
+            <div class="col-8">
+              <label class="form-label small text-muted mb-1">Dasturlash tili:</label>
+              <select class="form-select form-select-sm" id="codereview-lang-select">
+                <option value="python">Python</option>
+                <option value="javascript">JavaScript / TypeScript</option>
+                <option value="php">PHP</option>
+                <option value="sql">SQL Database</option>
+                <option value="html/css">HTML & CSS</option>
+                <option value="golang">Go (Golang)</option>
+                <option value="cpp">C / C++</option>
+              </select>
+            </div>
+            <div class="col-4 d-flex align-items-end">
+              <button class="btn btn-outline-secondary btn-sm w-100 py-1" onclick="setQuickSampleCode()">
+                Namuna kod
+              </button>
+            </div>
+          </div>
+          <div class="mb-3">
+            <textarea class="form-control font-monospace" id="codereview-input" rows="6" placeholder="Kodingizni shu yerga kiriting...&#10;def get_user_data(user_id):&#10;    query = f'SELECT * FROM users WHERE id = {user_id}'&#10;    return db.execute(query)"></textarea>
+          </div>
+          <button class="btn btn-neon-primary w-100 py-2" id="btn-run-codereview" onclick="handleCodeReviewWeb()">
+            <i class="bi bi-shield-check me-1"></i> 💻 Kodni Audit Qilish & Tuzatish
+          </button>
+        </div>
+
+        <div class="neon-card p-3 mb-3" id="codereview-result-box" style="display: none;">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="fw-bold small text-dark"><i class="bi bi-check2-all me-1 text-success"></i>Audit & Refaktoring Hisoboti</span>
+            <button class="btn btn-sm btn-outline-secondary py-1 px-2" onclick="copyCodeReviewResult()">
+              <i class="bi bi-clipboard me-1"></i> Nusxa olish
+            </button>
+          </div>
+          <div class="p-3 bg-light rounded-3 small text-dark font-monospace" id="codereview-report-content" style="white-space: pre-wrap; max-height: 480px; overflow-y: auto; line-height: 1.5;">
+            <!-- Code review report -->
+          </div>
+        </div>
+      </div>
+
+      <!-- 7. Smart Contract & Document Analyzer Subtab -->
+      <div class="tool-content-pane" id="tool-pane-docinspect" style="display: none;">
+        <div class="neon-card p-3 mb-3">
+          <div class="neon-card-header">
+            <span><i class="bi bi-file-earmark-check-fill me-2 text-primary"></i>Shartnoma & Hujjat Auditi</span>
+            <span class="badge bg-warning text-dark">Legal & Risk</span>
+          </div>
+          <p class="text-muted small mb-2">
+            Shartnoma yoki kelishuv matnini kiriting — agent undagi yashirin tuzoqlar, jarimalar va noqulay bandlarni fosh qiladi:
+          </p>
+          <div class="mb-2">
+            <textarea class="form-control" id="docinspect-input" rows="5" placeholder="Shartnoma matni yoki bandlarini shu yerga kiriting...&#10;Misol: Buyurtmachi xizmat haqini to'lamagan taqdirda, har bir kechiktirilgan kun uchun 5% jarima hisoblanadi..."></textarea>
+          </div>
+          <div class="d-flex gap-1 overflow-x-auto text-nowrap mb-3">
+            <span class="quick-chip" onclick="setQuickSampleContract('it_service')">📑 IT Xizmat Shartnomasi</span>
+            <span class="quick-chip" onclick="setQuickSampleContract('nda')">🔒 NDA (Maxfiylik Kelishuvi)</span>
+            <span class="quick-chip" onclick="setQuickSampleContract('rent')">🏠 Ijara Shartnomasi</span>
+          </div>
+          <button class="btn btn-neon-primary w-100 py-2" id="btn-run-docinspect" onclick="handleDocInspectWeb()">
+            <i class="bi bi-shield-exclamation me-1"></i> 📄 Shartnomani Xavflarga Tekshirish
+          </button>
+        </div>
+
+        <div class="neon-card p-3 mb-3" id="docinspect-result-box" style="display: none;">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="fw-bold small text-dark"><i class="bi bi-shield-shaded me-1 text-primary"></i>Huquqiy Xulosa</span>
+            <button class="btn btn-sm btn-outline-secondary py-1 px-2" onclick="copyDocInspectResult()">
+              <i class="bi bi-clipboard me-1"></i> Nusxa olish
+            </button>
+          </div>
+          <div class="p-3 bg-light rounded-3 small text-dark" id="docinspect-report-content" style="white-space: pre-wrap; max-height: 480px; overflow-y: auto; line-height: 1.6;">
+            <!-- Doc inspect report -->
+          </div>
+        </div>
+      </div>
+
+      <!-- 8. Viral SMM & Content Strategy Subtab -->
+      <div class="tool-content-pane" id="tool-pane-smm" style="display: none;">
+        <div class="neon-card p-3 mb-3">
+          <div class="neon-card-header">
+            <span><i class="bi bi-rocket-takeoff-fill me-2 text-primary"></i>Viral SMM & Kontent Strateg</span>
+            <span class="badge bg-danger text-white">Views & Conversion</span>
+          </div>
+          <p class="text-muted small mb-2">
+            Mavzuni yozing va platformani tanlang — agent 3 ta kuchli hook, formatlangan post matni, CTA va 7 kunlik kontent-reja yaratadi:
+          </p>
+          <div class="row g-2 mb-2">
+            <div class="col-7">
+              <input type="text" class="form-control" id="smm-topic-input" placeholder="Mavzu: Masalan: Yangi dasturlash kursi ochilishi" />
+            </div>
+            <div class="col-5">
+              <select class="form-select form-select-sm h-100" id="smm-platform-select">
+                <option value="Telegram">📱 Telegram Kanal</option>
+                <option value="Instagram">📸 Instagram Reels/Post</option>
+                <option value="YouTube">▶️ YouTube Shorts</option>
+                <option value="LinkedIn">💼 LinkedIn Maqola</option>
+              </select>
+            </div>
+          </div>
+          <div class="d-flex gap-1 overflow-x-auto text-nowrap mb-3">
+            <span class="quick-chip" onclick="setQuickSmm('Sun\'iy intellekt orqali biznesni avtomatlashtirish sirlari')">🤖 AI Biznes</span>
+            <span class="quick-chip" onclick="setQuickSmm('Dasturlashni o\'rganishda 90% odam qiladigan 5 ta xato')">💡 5 Xato</span>
+            <span class="quick-chip" onclick="setQuickSmm('Telegram orqali oyiga 1000$ topishning 3 ta real usuli')">💰 Daromad</span>
+          </div>
+          <button class="btn btn-neon-primary w-100 py-2" id="btn-run-smm" onclick="handleSmmWeb()">
+            <i class="bi bi-stars me-1"></i> 🎯 Viral Kontent & Reja Yaratish
+          </button>
+        </div>
+
+        <div class="neon-card p-3 mb-3" id="smm-result-box" style="display: none;">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="fw-bold small text-dark"><i class="bi bi-card-text me-1 text-primary"></i>Tayyor Viral Kontent-Paket</span>
+            <button class="btn btn-sm btn-outline-secondary py-1 px-2" onclick="copySmmResult()">
+              <i class="bi bi-clipboard me-1"></i> Nusxa olish
+            </button>
+          </div>
+          <div class="p-3 bg-light rounded-3 small text-dark" id="smm-report-content" style="white-space: pre-wrap; max-height: 480px; overflow-y: auto; line-height: 1.6;">
+            <!-- SMM report -->
           </div>
         </div>
       </div>
@@ -2136,6 +2322,19 @@
           platformBadge.innerText = data.platform || 'Video';
           titleEl.innerText = data.title || 'Muvaffaqiyatli yuklandi';
           sizeEl.innerText = `${data.size_mb || 0} MB`;
+
+          const player = document.getElementById('video-dl-player');
+          const saveBtn = document.getElementById('video-dl-save-btn');
+          if (data.download_url) {
+            if (player) {
+              player.src = data.download_url;
+              player.load();
+            }
+            if (saveBtn) {
+              saveBtn.href = data.download_url;
+              saveBtn.download = data.filename || 'video.mp4';
+            }
+          }
           resBox.style.display = 'block';
           showToast('Video yuklandi va tayyorlandi!');
           haptic('success');
@@ -2147,6 +2346,245 @@
       } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="bi bi-download"></i>';
+      }
+    }
+
+    // ─── DEEP RESEARCH AGENT ─────────────────────────────────────
+    let lastResearchReport = '';
+    function setQuickResearch(topic) {
+      const input = document.getElementById('research-topic-input');
+      if (input) {
+        input.value = topic;
+        input.focus();
+      }
+    }
+
+    async function handleDeepResearchWeb() {
+      const input = document.getElementById('research-topic-input');
+      const topic = input ? input.value.trim() : '';
+      const btn = document.getElementById('btn-run-research');
+      const box = document.getElementById('research-result-box');
+      const content = document.getElementById('research-report-content');
+
+      if (!topic) {
+        showToast('Tadqiqot mavzusini kiriting', true);
+        return;
+      }
+
+      haptic('medium');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Internet o\'rganilmoqda (15-30s)...';
+
+      try {
+        const res = await fetch('/api/agent/research', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ topic: topic })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          lastResearchReport = data.report || '';
+          content.innerText = lastResearchReport;
+          box.style.display = 'block';
+          showToast('Hisobot muvaffaqiyatli tayyorlandi!');
+          haptic('success');
+        } else {
+          showToast('Tadqiqotda xatolik yuz berdi', true);
+        }
+      } catch (err) {
+        showToast('Tarmoq xatosi', true);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-cpu-fill me-1"></i> 🔬 Chuqur Tadqiqot O\'tkazish';
+      }
+    }
+
+    function copyResearchResult() {
+      if (lastResearchReport) {
+        navigator.clipboard.writeText(lastResearchReport);
+        showToast('Hisobot nusxalandi!');
+        haptic('light');
+      }
+    }
+
+    // ─── CODE REVIEWER & BUG FIXER ──────────────────────────────
+    let lastCodeReviewReport = '';
+    function setQuickSampleCode() {
+      const input = document.getElementById('codereview-input');
+      if (input) {
+        input.value = "def transfer_funds(from_user, to_user, amount):\n    # Tekshiruvsiz to'g'ridan-to'g'ri o'tkazish\n    cursor.execute(f\"UPDATE balances SET amount = amount - {amount} WHERE user = '{from_user}'\")\n    cursor.execute(f\"UPDATE balances SET amount = amount + {amount} WHERE user = '{to_user}'\")\n    return {'status': 'success'}";
+      }
+    }
+
+    async function handleCodeReviewWeb() {
+      const input = document.getElementById('codereview-input');
+      const langSelect = document.getElementById('codereview-lang-select');
+      const code = input ? input.value.trim() : '';
+      const lang = langSelect ? langSelect.value : 'python';
+      const btn = document.getElementById('btn-run-codereview');
+      const box = document.getElementById('codereview-result-box');
+      const content = document.getElementById('codereview-report-content');
+
+      if (!code) {
+        showToast('Kod matnini kiriting', true);
+        return;
+      }
+
+      haptic('medium');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Kod tahlil qilinmoqda...';
+
+      try {
+        const res = await fetch('/api/agent/code_review', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ code: code, language: lang })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          lastCodeReviewReport = data.report || '';
+          content.innerText = lastCodeReviewReport;
+          box.style.display = 'block';
+          showToast('Kod auditi tayyor!');
+          haptic('success');
+        } else {
+          showToast('Kodni tahlil qilishda xatolik', true);
+        }
+      } catch (err) {
+        showToast('Tarmoq xatosi', true);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-shield-check me-1"></i> 💻 Kodni Audit Qilish & Tuzatish';
+      }
+    }
+
+    function copyCodeReviewResult() {
+      if (lastCodeReviewReport) {
+        navigator.clipboard.writeText(lastCodeReviewReport);
+        showToast('Audit nusxalandi!');
+        haptic('light');
+      }
+    }
+
+    // ─── SMART CONTRACT & DOCUMENT ANALYZER ─────────────────────
+    let lastDocInspectReport = '';
+    function setQuickSampleContract(type) {
+      const input = document.getElementById('docinspect-input');
+      if (!input) return;
+      if (type === 'it_service') {
+        input.value = "XIZMAT KO'RSATISH SHARTNOMASI\n\n1. Ijrochi har qanday holatda dasturning uzluksiz ishlashiga kafolat bermaydi.\n2. Buyurtmachi to'lovni 1 kunga kechiktirsa ham, har bir kun uchun jami shartnoma summasining 10% miqdorida jarima to'laydi.\n3. Ijrochi shartnomani istalgan vaqtda bir tomonlama ogohlantirishsiz bekor qilish huquqiga ega, bunda to'langan mablag'lar qaytarilmaydi.";
+      } else if (type === 'nda') {
+        input.value = "MAXFIYLIK KELISHUVI (NDA)\n\n1. Qabul qiluvchi tomon oshkor qilingan har qanday ma'lumotni muddatsiz (cheksiz vaqt) sir saqlashi shart.\n2. Har qanday gumon yoki ehtimoliy ma'lumot sizishi aniqlansa, Qabul qiluvchi tomon 50,000 AQSH dollari miqdorida so'zsiz kompensatsiya to'laydi.";
+      } else {
+        input.value = "IJARA SHARTNOMASI\n\n1. Ijaraga beruvchi ijara haqini istalgan payt o'z xohishiga ko'ra 50% gacha oshirishi mumkin.\n2. Depozit summasi har qanday sabab bilan shartnoma tugaganda qaytarilmaydi.";
+      }
+    }
+
+    async function handleDocInspectWeb() {
+      const input = document.getElementById('docinspect-input');
+      const text = input ? input.value.trim() : '';
+      const btn = document.getElementById('btn-run-docinspect');
+      const box = document.getElementById('docinspect-result-box');
+      const content = document.getElementById('docinspect-report-content');
+
+      if (!text) {
+        showToast('Hujjat matnini kiriting', true);
+        return;
+      }
+
+      haptic('medium');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Xavflar tekshirilmoqda...';
+
+      try {
+        const res = await fetch('/api/agent/inspect_doc', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ doc_text: text })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          lastDocInspectReport = data.report || '';
+          content.innerText = lastDocInspectReport;
+          box.style.display = 'block';
+          showToast('Shartnoma tahlili tayyor!');
+          haptic('success');
+        } else {
+          showToast('Hujjatni tahlil qilishda xatolik', true);
+        }
+      } catch (err) {
+        showToast('Tarmoq xatosi', true);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-shield-exclamation me-1"></i> 📄 Shartnomani Xavflarga Tekshirish';
+      }
+    }
+
+    function copyDocInspectResult() {
+      if (lastDocInspectReport) {
+        navigator.clipboard.writeText(lastDocInspectReport);
+        showToast('Xulosa nusxalandi!');
+        haptic('light');
+      }
+    }
+
+    // ─── VIRAL SMM & CONTENT STRATEGY ───────────────────────────
+    let lastSmmReport = '';
+    function setQuickSmm(topic) {
+      const input = document.getElementById('smm-topic-input');
+      if (input) {
+        input.value = topic;
+        input.focus();
+      }
+    }
+
+    async function handleSmmWeb() {
+      const input = document.getElementById('smm-topic-input');
+      const platSelect = document.getElementById('smm-platform-select');
+      const topic = input ? input.value.trim() : '';
+      const platform = platSelect ? platSelect.value : 'Telegram';
+      const btn = document.getElementById('btn-run-smm');
+      const box = document.getElementById('smm-result-box');
+      const content = document.getElementById('smm-report-content');
+
+      if (!topic) {
+        showToast('Kontent mavzusini kiriting', true);
+        return;
+      }
+
+      haptic('medium');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Viral kontent tuzilmoqda...';
+
+      try {
+        const res = await fetch('/api/agent/smm_creator', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ topic: topic, platform: platform })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          lastSmmReport = data.report || '';
+          content.innerText = lastSmmReport;
+          box.style.display = 'block';
+          showToast('Viral kontent-paket tayyor!');
+          haptic('success');
+        } else {
+          showToast('Kontent yaratishda xatolik', true);
+        }
+      } catch (err) {
+        showToast('Tarmoq xatosi', true);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-stars me-1"></i> 🎯 Viral Kontent & Reja Yaratish';
+      }
+    }
+
+    function copySmmResult() {
+      if (lastSmmReport) {
+        navigator.clipboard.writeText(lastSmmReport);
+        showToast('Kontent nusxalandi!');
+        haptic('light');
       }
     }
 
