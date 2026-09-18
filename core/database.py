@@ -10,6 +10,7 @@ aks holda avtomatik lokal SQLite bazasiga tayanadi (Zero-Downtime Fallback).
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import datetime
 import json
 import logging
@@ -45,11 +46,18 @@ class DatabaseManager:
 
         self._init_sqlite()
 
-    def _get_sqlite_conn(self) -> sqlite3.Connection:
-        """Optimallashtirilgan SQLite ulanishi (30s timeout, busy_timeout)."""
+    @contextlib.contextmanager
+    def _get_sqlite_conn(self):
+        """Optimallashtirilgan SQLite ulanishi (30s timeout, busy_timeout va avtomatik close)."""
         conn = sqlite3.connect(SQLITE_PATH, timeout=30.0)
         conn.execute("PRAGMA busy_timeout = 15000;")
-        return conn
+        try:
+            yield conn
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
     def _init_sqlite(self) -> None:
         """Lokal SQLite bazasi va kerakli jadvallarni initsializatsiya qilish."""
@@ -132,15 +140,32 @@ class DatabaseManager:
                 )
             """)
 
-            # 7. Chat History (Suhbat tarixi — server qayta yonganda ham o'chib ketmaydi)
+            # 7. Chat History (Ko'p chatli doimiy suhbat tarixi — guruh, kanal va shaxsiy chatlar uchun)
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS chat_history (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    chat_id TEXT NOT NULL DEFAULT '0',
+                    user_id TEXT DEFAULT '',
+                    sender_name TEXT DEFAULT '',
+                    chat_type TEXT DEFAULT 'private',
                     role TEXT NOT NULL,
                     content TEXT NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_chat_hist_chat ON chat_history (chat_id, id DESC);")
+
+            # Mavjud bazani yangi ustunlar bilan xavfsiz kengaytirish
+            for col, col_def in [
+                ("chat_id", "TEXT DEFAULT '0'"),
+                ("user_id", "TEXT DEFAULT ''"),
+                ("sender_name", "TEXT DEFAULT ''"),
+                ("chat_type", "TEXT DEFAULT 'private'"),
+            ]:
+                try:
+                    cursor.execute(f"ALTER TABLE chat_history ADD COLUMN {col} {col_def};")
+                except Exception:
+                    pass
 
             # 8. Tasks (TodoList & Notion sinxronizatsiyasi)
             cursor.execute("""
@@ -701,13 +726,30 @@ class DatabaseManager:
 
     # ─── 7. DOIMIY SUHBAT XOTIRASI (CHAT HISTORY) ─────────────────
 
-    async def add_chat_message(self, role: str, content: str) -> None:
-        """Suhbat xabarini saqlash (Supabase va SQLite)."""
+    async def add_chat_message(
+        self,
+        role: str,
+        content: str,
+        chat_id: str = "0",
+        user_id: str = "",
+        sender_name: str = "",
+        chat_type: str = "private",
+    ) -> None:
+        """Suhbat xabarini chat_id bo'yicha saqlash (Supabase va SQLite)."""
         now_iso = datetime.datetime.utcnow().isoformat()
+        chat_id_str = str(chat_id)
         if self.use_supabase and self._supabase_client:
             try:
                 loop = asyncio.get_running_loop()
-                data = {"role": role, "content": content, "created_at": now_iso}
+                data = {
+                    "chat_id": chat_id_str,
+                    "user_id": str(user_id),
+                    "sender_name": sender_name,
+                    "chat_type": chat_type,
+                    "role": role,
+                    "content": content,
+                    "created_at": now_iso,
+                }
                 await loop.run_in_executor(
                     None,
                     lambda: self._supabase_client.table("chat_history").insert(data).execute()
@@ -719,24 +761,26 @@ class DatabaseManager:
         def _insert():
             with self._get_sqlite_conn() as conn:
                 cur = conn.cursor()
-                cur.execute("INSERT INTO chat_history (role, content) VALUES (?, ?)", (role, content))
+                cur.execute("""
+                    INSERT INTO chat_history (chat_id, user_id, sender_name, chat_type, role, content)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (chat_id_str, str(user_id), sender_name, chat_type, role, content))
                 conn.commit()
         await loop.run_in_executor(None, _insert)
 
-    async def get_recent_chat_history(self, limit: int = 20) -> list[dict]:
-        """Oxirgi suhbat xabarlarini yuklash (restartdan keyin ham eslab qolish uchun)."""
+    async def get_recent_chat_history(self, chat_id: Optional[str] = None, limit: int = 30) -> list[dict]:
+        """Oxirgi suhbat xabarlarini chat_id bo'yicha yuklash."""
+        chat_id_str = str(chat_id) if chat_id is not None else None
         if self.use_supabase and self._supabase_client:
             try:
                 loop = asyncio.get_running_loop()
-                res = await loop.run_in_executor(
-                    None,
-                    lambda: self._supabase_client.table("chat_history")
-                        .select("role, content")
-                        .order("id", desc=True)
-                        .limit(limit)
-                        .execute()
-                )
-                if res.data:
+                def _sb_query():
+                    q = self._supabase_client.table("chat_history").select("role, content, sender_name, chat_id, created_at")
+                    if chat_id_str is not None:
+                        q = q.eq("chat_id", chat_id_str)
+                    return q.order("id", desc=True).limit(limit).execute()
+                res = await loop.run_in_executor(None, _sb_query)
+                if res and hasattr(res, "data") and res.data:
                     return list(reversed(res.data))
             except Exception:
                 pass
@@ -746,30 +790,42 @@ class DatabaseManager:
             with self._get_sqlite_conn() as conn:
                 conn.row_factory = sqlite3.Row
                 cur = conn.cursor()
-                cur.execute(
-                    "SELECT role, content FROM chat_history ORDER BY id DESC LIMIT ?",
-                    (limit,)
-                )
+                if chat_id_str is not None:
+                    cur.execute(
+                        "SELECT role, content, sender_name, chat_id, created_at FROM chat_history WHERE chat_id = ? ORDER BY id DESC LIMIT ?",
+                        (chat_id_str, limit)
+                    )
+                else:
+                    cur.execute(
+                        "SELECT role, content, sender_name, chat_id, created_at FROM chat_history ORDER BY id DESC LIMIT ?",
+                        (limit,)
+                    )
                 rows = cur.fetchall()
                 return list(reversed([dict(r) for r in rows]))
         return await loop.run_in_executor(None, _query)
 
-    async def clear_chat_history(self) -> None:
-        """Suhbat tarixini tozalash."""
+    async def clear_chat_history(self, chat_id: Optional[str] = None) -> None:
+        """Suhbat tarixini tozalash (chat_id berilsa faqat o'sha chat, berilmasa barchasi)."""
+        chat_id_str = str(chat_id) if chat_id is not None else None
         if self.use_supabase and self._supabase_client:
             try:
                 loop = asyncio.get_running_loop()
-                await loop.run_in_executor(
-                    None,
-                    lambda: self._supabase_client.table("chat_history").delete().neq("id", 0).execute()
-                )
+                def _sb_delete():
+                    q = self._supabase_client.table("chat_history").delete()
+                    if chat_id_str is not None:
+                        return q.eq("chat_id", chat_id_str).execute()
+                    return q.neq("id", 0).execute()
+                await loop.run_in_executor(None, _sb_delete)
             except Exception:
                 pass
 
         loop = asyncio.get_running_loop()
         def _clear():
             with self._get_sqlite_conn() as conn:
-                conn.execute("DELETE FROM chat_history")
+                if chat_id_str is not None:
+                    conn.execute("DELETE FROM chat_history WHERE chat_id = ?", (chat_id_str,))
+                else:
+                    conn.execute("DELETE FROM chat_history")
                 conn.commit()
         await loop.run_in_executor(None, _clear)
 
