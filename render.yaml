@@ -1,0 +1,68 @@
+# render.yaml — Render.com deployment konfiguratsiyasi
+# Dokumentatsiya: https://render.com/docs/yaml-spec
+
+services:
+  - type: web
+    name: telegram-super-agent
+    runtime: python
+    region: frankfurt          # Yaqin region (O'zbekistonga eng yaqin)
+    plan: free                 # Bepul tier
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+
+    # Render PORT ni avtomatik beradi, bot shu portda health server ochadi
+    healthCheckPath: /health
+
+    # Muhit o'zgaruvchilari (Render dashboard da ham qo'shish mumkin)
+    envVars:
+      - key: BOT_TOKEN
+        sync: false            # Dashboard da qo'lda kiritiladigan maxfiy qiymat
+
+      - key: ADMIN_ID
+        sync: false
+
+      - key: LOG_CHANNEL_ID
+        sync: false
+
+      - key: API_ID
+        sync: false
+
+      - key: API_HASH
+        sync: false
+
+      - key: USERBOT_SESSION
+        sync: false
+
+      - key: USERBOT_PHONE
+        sync: false
+
+      - key: GEMINI_API_KEY
+        sync: false
+
+      - key: OPENROUTER_API_KEY
+        sync: false
+
+      - key: WATERMARK_TEXT
+        value: "© SuperAgent"  # Ommaviy qiymat, xavfsiz
+
+      - key: PYTHONUNBUFFERED
+        value: "1"             # Loglarni real vaqtda ko'rish uchun
+
+      - key: EMAIL_USER
+        sync: false
+
+      - key: EMAIL_PASS
+        sync: false
+
+      - key: EMAIL_IMAP_SERVER
+        value: "imap.gmail.com"
+
+      - key: EMAIL_SMTP_SERVER
+        value: "smtp.gmail.com"
+
+      - key: SUPABASE_URL
+        sync: false
+
+      - key: SUPABASE_KEY
+        sync: false
+

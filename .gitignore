@@ -1,0 +1,56 @@
+# Super-Agent — GitHub uchun ignore fayl
+# Maxfiy ma'lumotlar GitHubga tushmaydi
+
+# Muhit o'zgaruvchilari (ASLO MUHIM — hech qachon GitHub ga!)
+.env
+*.env
+.env.local
+.env.production
+
+# Telethon sessiya fayllari
+*.session
+*.session-journal
+userbot.session*
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environment
+.venv/
+venv/
+env/
+ENV/
+
+# IDE fayllar
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Database fayllar
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Log fayllar
+*.log
+logs/
+
+# Test fayllar
+test_imports.py
+
+# OS fayllar
+.DS_Store
+Thumbs.db
+desktop.ini

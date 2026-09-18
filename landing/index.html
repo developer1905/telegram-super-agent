@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="uz" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Super-Agent AI — Biznesingizni 24/7 Avtopilotga O'tkazing</title>
+  <meta name="description" content="Telegram Super-Agent va Mini App tizimi. Shaxsiy akkauntdan avto-javob, guruhlar moderatori, ovozli xabarlar tahlili va doimiy xotira. Muallif: Umrzoq Ramazonov." />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef8ff',
+              100: '#d8eeff',
+              200: '#b9e2ff',
+              300: '#89d1ff',
+              400: '#52b6ff',
+              500: '#2b93ff',
+              600: '#1572fc',
+              700: '#0d59e6',
+              800: '#1047b9',
+              900: '#133e91',
+              950: '#081738',
+            },
+            neon: {
+              cyan: '#00f0ff',
+              blue: '#0070f3',
+              purple: '#8a2be2',
+              emerald: '#10b981',
+              amber: '#f59e0b',
+            }
+          },
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+            display: ['"Outfit"', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          animation: {
+            'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'float': 'float 6s ease-in-out infinite',
+            'glow': 'glow 3s ease-in-out infinite alternate',
+          },
+          keyframes: {
+            float: {
+              '0%, 100%': { transform: 'translateY(0px)' },
+              '50%': { transform: 'translateY(-12px)' },
+            },
+            glow: {
+              '0%': { opacity: '0.4', filter: 'blur(30px)' },
+              '100%': { opacity: '0.8', filter: 'blur(45px)' },
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+  <style>
+    body {
+      background-color: #080c14;
+      color: #e2e8f0;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      overflow-x: hidden;
+    }
+    .font-display { font-family: 'Outfit', sans-serif; }
+    
+    /* Mesh Gradients & Glows */
+    .hero-glow-1 {
+      background: radial-gradient(circle, rgba(0, 240, 255, 0.18) 0%, rgba(13, 89, 230, 0.12) 40%, transparent 70%);
+    }
+    .hero-glow-2 {
+      background: radial-gradient(circle, rgba(138, 43, 226, 0.2) 0%, rgba(16, 185, 129, 0.08) 50%, transparent 75%);
+    }
+    
+    /* Glassmorphism */
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glass-panel:hover {
+      border-color: rgba(0, 240, 255, 0.3);
+      box-shadow: 0 10px 30px -10px rgba(0, 240, 255, 0.15);
+    }
+    .glass-card-active {
+      background: rgba(13, 89, 230, 0.12);
+      border: 1px solid rgba(0, 240, 255, 0.4);
+      box-shadow: 0 0 25px rgba(0, 240, 255, 0.18);
+    }
+
+    /* Gradient Text */
+    .gradient-text-cyan {
+      background: linear-gradient(135deg, #ffffff 10%, #67e8f9 50%, #0284c7 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .gradient-text-gold {
+      background: linear-gradient(135deg, #fef08a 0%, #f59e0b 50%, #ea580c 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #080c14; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #0284c7; }
+  </style>
+</head>
+<body class="selection:bg-cyan-500 selection:text-black">
+
+  <!-- ════════════════ TOP BANNER: URGENCY & AKSIYA ════════════════ -->
+  <div class="sticky top-0 z-50 bg-gradient-to-r from-blue-900/95 via-indigo-950/95 to-slate-950/95 border-b border-cyan-500/20 backdrop-blur-md text-xs py-2 px-4">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+      <div class="flex items-center gap-2">
+        <span class="flex h-2 w-2 relative">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+        </span>
+        <span class="font-semibold text-white tracking-wide">
+          🔥 MAXSUS AKSIYA: Birinchi 10 ta biznes uchun <span class="line-through text-slate-400">$450</span> emas, atigi <span class="text-amber-400 font-bold text-sm">$250</span>!
+        </span>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="hidden sm:flex items-center gap-1.5 bg-slate-900/80 px-2.5 py-1 rounded-full border border-cyan-500/30 text-[11px] text-cyan-300">
+          <i class="bi bi-clock-history text-amber-400"></i>
+          <span>Qolgan joylar:</span>
+          <span class="font-bold text-amber-400" id="spots-left">3 ta</span>
+        </div>
+        <a href="https://t.me/scc_0519" target="_blank" class="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold px-3 py-1 rounded-full text-[11px] transition transform hover:scale-105 shadow-sm">
+          Joyni band qilish &rarr;
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════ NAVBAR ════════════════ -->
+  <header class="relative z-40 border-b border-slate-800/80 bg-slate-950/70 backdrop-blur-xl">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+      <!-- Logo -->
+      <a href="#" class="flex items-center gap-3 group">
+        <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-cyan-500 via-blue-600 to-indigo-600 flex items-center justify-center text-white text-xl shadow-lg shadow-cyan-500/20 group-hover:scale-105 transition">
+          <i class="bi bi-cpu-fill"></i>
+        </div>
+        <div>
+          <div class="font-display font-black text-xl tracking-tight text-white flex items-center gap-1.5">
+            SuperAgent <span class="text-cyan-400 text-sm font-mono px-1.5 py-0.5 rounded bg-cyan-950/80 border border-cyan-500/30">2.0</span>
+          </div>
+          <p class="text-[11px] text-slate-400 font-medium">B2B AI Automation Ecosystem</p>
+        </div>
+      </a>
+
+      <!-- Desktop Nav -->
+      <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
+        <a href="#features" class="hover:text-cyan-400 transition">Imkoniyatlar</a>
+        <a href="#live-demo" class="hover:text-cyan-400 transition">Jonli Demo</a>
+        <a href="#author" class="hover:text-cyan-400 transition">Dasturchi</a>
+        <a href="#pricing" class="hover:text-cyan-400 transition">Narx & Aksiya</a>
+        <a href="#faq" class="hover:text-cyan-400 transition">FAQ</a>
+      </nav>
+
+      <!-- Quick Contact Buttons -->
+      <div class="flex items-center gap-3">
+        <a href="tel:+998992990519" class="hidden sm:flex items-center gap-2 text-xs font-semibold text-slate-300 hover:text-white bg-slate-900 border border-slate-700/80 hover:border-slate-500 px-3.5 py-2 rounded-xl transition">
+          <i class="bi bi-telephone-fill text-cyan-400"></i>
+          <span>99 299 05 19</span>
+        </a>
+        <a href="https://t.me/scc_0519" target="_blank" class="flex items-center gap-2 text-xs font-bold text-slate-950 bg-gradient-to-r from-cyan-400 via-sky-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 px-4 py-2.5 rounded-xl shadow-lg shadow-cyan-500/20 transition transform hover:-translate-y-0.5">
+          <i class="bi bi-telegram text-sm"></i>
+          <span>@scc_0519</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- ════════════════ HERO SECTION ════════════════ -->
+  <section class="relative pt-16 pb-24 overflow-hidden">
+    <!-- Ambient Lights -->
+    <div class="absolute top-10 left-1/2 -translate-x-1/2 w-[800px] h-[500px] hero-glow-1 animate-glow pointer-events-none -z-10"></div>
+    <div class="absolute top-40 right-10 w-[500px] h-[400px] hero-glow-2 animate-glow pointer-events-none -z-10"></div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <!-- Badge -->
+      <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900/90 border border-cyan-500/30 text-cyan-300 text-xs font-semibold mb-6 shadow-inner">
+        <i class="bi bi-patch-check-fill text-cyan-400"></i>
+        <span>100% Tayyor, Serverda Ishlab Turgan B2B Mahsulot</span>
+        <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+        <span class="text-slate-400">TATU Muhandisi Ishlanmasi</span>
+      </div>
+
+      <!-- Main Headline -->
+      <h1 class="font-display font-extrabold text-4xl sm:text-6xl lg:text-7xl tracking-tight text-white max-w-5xl mx-auto leading-[1.12] mb-6">
+        Mijozlarni Kechasi Ham Boy Bermaydigan <br class="hidden sm:inline" />
+        <span class="gradient-text-cyan">24/7 AI Super-Menejer</span>
+      </h1>
+
+      <!-- Subtitle -->
+      <p class="text-base sm:text-xl text-slate-300 max-w-3xl mx-auto leading-relaxed mb-10 font-normal">
+        Shaxsiy Telegram akkauntingizdan xuddi insondek javob beradi, guruh va kanallarni boshqaradi, ovozli xabarlarni tushunadi va Telegram Mini App orqali to'liq CRM boshqaruvini taqdim etadi.
+      </p>
+
+      <!-- CTA Buttons -->
+      <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-14">
+        <a href="https://t.me/scc_0519" target="_blank" class="w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-600 hover:from-cyan-300 hover:to-indigo-500 text-slate-950 font-display font-black text-base transition transform hover:scale-105 shadow-2xl shadow-cyan-500/30">
+          <i class="bi bi-lightning-charge-fill text-lg"></i>
+          <span>Chegirmada Olish — $250</span>
+          <span class="text-xs bg-slate-950/20 px-2 py-0.5 rounded text-slate-950 line-through">$450</span>
+        </a>
+        <a href="tel:+998992990519" class="w-full sm:w-auto flex items-center justify-center gap-3 px-7 py-4 rounded-2xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-white font-semibold text-base transition">
+          <i class="bi bi-telephone-outbound text-cyan-400"></i>
+          <span>+998 99 299 05 19</span>
+        </a>
+      </div>
+
+      <!-- Trust Counters -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto pt-6 border-t border-slate-800/80 text-left">
+        <div class="p-3">
+          <div class="text-2xl lg:text-3xl font-display font-black text-cyan-400">0 soniya</div>
+          <div class="text-xs text-slate-400 mt-1">Mijozga javob qaytarish tezligi</div>
+        </div>
+        <div class="p-3">
+          <div class="text-2xl lg:text-3xl font-display font-black text-amber-400">100% Avtomat</div>
+          <div class="text-xs text-slate-400 mt-1">Shaxsiy profil + Guruhlar</div>
+        </div>
+        <div class="p-3">
+          <div class="text-2xl lg:text-3xl font-display font-black text-emerald-400">15+ AI Modellar</div>
+          <div class="text-xs text-slate-400 mt-1">Gemini, Llama, Nemotron & OmniRoute</div>
+        </div>
+        <div class="p-3">
+          <div class="text-2xl lg:text-3xl font-display font-black text-blue-400">1 Yil Bepul</div>
+          <div class="text-xs text-slate-400 mt-1">AWS Cloud infratuzilmasi sozlangan</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════ INTERACTIVE DEMO SHOWCASE ════════════════ -->
+  <section id="live-demo" class="py-20 relative bg-slate-950/60 border-y border-slate-800/80">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center max-w-3xl mx-auto mb-14">
+        <div class="text-cyan-400 text-xs font-mono tracking-wider uppercase mb-2">Jonli Interaktiv Namoyish</div>
+        <h2 class="font-display font-extrabold text-3xl sm:text-4xl text-white">
+          Tizim Real Hayotda Qanday Ishlaydi?
+        </h2>
+        <p class="text-slate-400 text-sm sm:text-base mt-3">
+          Quyidagi simulyator orqali bot mijozlar bilan qanday muloqot qilishini va Telegram Mini App boshqaruv panelini ko'rishingiz mumkin.
+        </p>
+      </div>
+
+      <!-- Demo Container (Tab Switcher) -->
+      <div class="max-w-5xl mx-auto">
+        <!-- Switcher Buttons -->
+        <div class="flex items-center justify-center gap-3 mb-8">
+          <button id="btn-tab-chat" onclick="switchDemoTab('chat')" class="px-5 py-2.5 rounded-xl text-sm font-bold transition flex items-center gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 shadow-lg shadow-cyan-500/20">
+            <i class="bi bi-chat-dots-fill"></i>
+            <span>Telegram Bot & Userbot Simulyatori</span>
+          </button>
+          <button id="btn-tab-app" onclick="switchDemoTab('app')" class="px-5 py-2.5 rounded-xl text-sm font-semibold transition flex items-center gap-2 bg-slate-900 text-slate-300 hover:text-white border border-slate-700/80">
+            <i class="bi bi-app-indicator"></i>
+            <span>Telegram Mini App Paneli</span>
+          </button>
+        </div>
+
+        <!-- 1. CHAT SIMULATOR -->
+        <div id="demo-chat-box" class="glass-panel rounded-3xl p-4 sm:p-8 border border-slate-700/80 shadow-2xl relative overflow-hidden">
+          <!-- Chat Window Header -->
+          <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-6">
+            <div class="flex items-center gap-3">
+              <div class="relative">
+                <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white text-xl shadow">
+                  <i class="bi bi-robot"></i>
+                </div>
+                <div class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-slate-900"></div>
+              </div>
+              <div>
+                <div class="text-white font-bold text-base flex items-center gap-2">
+                  Super-Agent AI Assistant
+                  <span class="text-[10px] font-mono bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded-full">bot</span>
+                </div>
+                <div class="text-xs text-emerald-400 flex items-center gap-1">
+                  <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  24/7 doim onlayn • 0.3s javob tezligi
+                </div>
+              </div>
+            </div>
+            <div class="hidden sm:flex items-center gap-2 text-xs text-slate-400 bg-slate-900/80 px-3 py-1.5 rounded-xl border border-slate-800">
+              <i class="bi bi-shield-lock-fill text-cyan-400"></i>
+              <span>Anti-Ban & FloodWait himoyasi faol</span>
+            </div>
+          </div>
+
+          <!-- Chat Dialog Stream -->
+          <div class="space-y-4 text-sm max-w-3xl mx-auto py-2">
+            <!-- Client 1 -->
+            <div class="flex items-start gap-3">
+              <div class="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-300 text-xs shrink-0">Mijoz</div>
+              <div class="bg-slate-800/90 text-slate-200 px-4 py-3 rounded-2xl rounded-tl-none border border-slate-700 max-w-md">
+                Salom! Sizlarda IELTS kurslari narxi qancha va qaysi kunlari bo'ladi?
+              </div>
+            </div>
+
+            <!-- Bot 1 -->
+            <div class="flex items-start justify-end gap-3">
+              <div class="bg-gradient-to-br from-blue-900/90 to-indigo-900/90 text-white px-4 py-3.5 rounded-2xl rounded-tr-none border border-cyan-500/30 max-w-lg shadow-md">
+                <div class="font-bold text-cyan-300 text-xs mb-1 flex items-center gap-1.5">
+                  <i class="bi bi-stars"></i> Super-Agent AI:
+                </div>
+                Assalomu alaykum! Bizda IELTS kurslari 2 xil formatda mavjud:<br>
+                • <b>IELTS Standard:</b> Dushanba-Chorshanba-Juma (14:00 - 16:00) — <b>650,000 so'm/oy</b><br>
+                • <b>IELTS Intensive:</b> Har kuni — <b>950,000 so'm/oy</b><br><br>
+                Sizning darajangiz qanday? Qaysi guruhga bepul sinov darsiga yozib qo'yay?
+              </div>
+              <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white text-xs shrink-0">AI</div>
+            </div>
+
+            <!-- Client Voice -->
+            <div class="flex items-start gap-3">
+              <div class="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-300 text-xs shrink-0">Mijoz</div>
+              <div class="bg-slate-800/90 text-slate-200 px-4 py-2.5 rounded-2xl rounded-tl-none border border-slate-700 flex items-center gap-3">
+                <i class="bi bi-mic-fill text-cyan-400 text-lg"></i>
+                <div>
+                  <div class="text-xs font-semibold">Ovozli xabar (0:14)</div>
+                  <div class="text-[11px] text-slate-400">"Mening darajam Intermediate, ertaga soat 14:00 ga yozib qo'ying"</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Bot Voice Answer -->
+            <div class="flex items-start justify-end gap-3">
+              <div class="bg-gradient-to-br from-blue-900/90 to-indigo-900/90 text-white px-4 py-3 rounded-2xl rounded-tr-none border border-cyan-500/30 max-w-lg shadow-md">
+                <div class="font-bold text-cyan-300 text-xs mb-1 flex items-center gap-1.5">
+                  <i class="bi bi-check-circle-fill text-emerald-400"></i> Ovoz tahlili muvaffaqiyatli:
+                </div>
+                Ajoyib! Siz <b>ertaga, soat 14:00 dagi IELTS Intermediate</b> guruhiga muvaffaqiyatli ro'yxatga olindingiz.<br>
+                ⏰ <i>Eslatma kalendarga qo'shildi va administratorga xabar yuborildi.</i> Manzilimiz: Chilonzor, 9-mavze. Ko'rishguncha!
+              </div>
+              <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white text-xs shrink-0">AI</div>
+            </div>
+          </div>
+
+          <!-- Interactive prompt buttons -->
+          <div class="mt-6 pt-4 border-t border-slate-800 flex flex-wrap items-center justify-center gap-2">
+            <span class="text-xs text-slate-400">Tezkor sinov:</span>
+            <span class="text-xs bg-slate-900 border border-slate-700 text-cyan-300 px-3 py-1.5 rounded-lg cursor-pointer hover:border-cyan-400 transition" onclick="alert('Demo: Bot shaxsiy profilingiz nomidan har qanday savolga RAG faktlar asosida javob qaytaradi!')">
+              💬 "Klinikangizda UZI bormi va narxi qancha?"
+            </span>
+            <span class="text-xs bg-slate-900 border border-slate-700 text-cyan-300 px-3 py-1.5 rounded-lg cursor-pointer hover:border-cyan-400 transition" onclick="alert('Demo: Bot Telegram kanaliga avtomatik reja bilan chiroyli formatlangan post joylaydi!')">
+              📱 "Kanalga IT yangiliklari haqida post chiqar"
+            </span>
+          </div>
+        </div>
+
+        <!-- 2. MINI APP SIMULATOR -->
+        <div id="demo-app-box" class="hidden glass-panel rounded-3xl p-6 sm:p-8 border border-slate-700/80 shadow-2xl">
+          <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-6">
+            <div>
+              <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                <i class="bi bi-window-sidebar text-cyan-400"></i> Telegram Mini App (CRM & Dashboard)
+              </h3>
+              <p class="text-xs text-slate-400">Mijozlar, modellar, eslatmalar va statistikani Telegram ichidan boshqaring</p>
+            </div>
+            <span class="text-xs px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+              AWS EC2 + SSL Active
+            </span>
+          </div>
+
+          <!-- Mock Dashboard Grid -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <div class="bg-slate-900/90 p-4 rounded-2xl border border-slate-800">
+              <div class="text-[11px] text-slate-400 font-semibold uppercase">Bugungi Muloqotlar</div>
+              <div class="text-2xl font-display font-black text-cyan-400 mt-1">1,482 ta</div>
+              <div class="text-[10px] text-emerald-400 mt-1">↑ 100% avtomat javob</div>
+            </div>
+            <div class="bg-slate-900/90 p-4 rounded-2xl border border-slate-800">
+              <div class="text-[11px] text-slate-400 font-semibold uppercase">Yozib Olingan Mijoz</div>
+              <div class="text-2xl font-display font-black text-amber-400 mt-1">47 kishi</div>
+              <div class="text-[10px] text-slate-400 mt-1">Bazada saqlangan</div>
+            </div>
+            <div class="bg-slate-900/90 p-4 rounded-2xl border border-slate-800">
+              <div class="text-[11px] text-slate-400 font-semibold uppercase">Faol AI Model</div>
+              <div class="text-lg font-display font-bold text-white mt-1">Gemini 3.1 Flash</div>
+              <div class="text-[10px] text-cyan-400 mt-1">15+ zaxira modellari</div>
+            </div>
+            <div class="bg-slate-900/90 p-4 rounded-2xl border border-slate-800">
+              <div class="text-[11px] text-slate-400 font-semibold uppercase">Server Uptime</div>
+              <div class="text-2xl font-display font-black text-emerald-400 mt-1">99.99%</div>
+              <div class="text-[10px] text-slate-400 mt-1">AWS Cloud 24/7</div>
+            </div>
+          </div>
+
+          <div class="bg-slate-900/60 p-4 rounded-2xl border border-slate-800/80 text-xs text-slate-300">
+            <div class="font-bold text-white mb-2 flex items-center gap-2">
+              <i class="bi bi-check2-all text-cyan-400"></i> Boshqaruv Panelida Nimalar Bor?
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-400">
+              <div>• <b>Jonli AI Chat:</b> Telegramdan chiqmasdan istalgan savol/buyruqni sinash.</div>
+              <div>• <b>Model Tanlash:</b> 1 tugma bilan Gemini, Nemotron, LFM, GLM orasida almashish.</div>
+              <div>• <b>Doimiy Xotira (RAG):</b> Yangi xizmat yoki narx qo'shish (bot darhol eslab qoladi).</div>
+              <div>• <b>Eslatmalar va Postlar:</b> Barcha rejalashtirilgan postlarni boshqarish va o'chirish.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════ 100% IMKONIYATLAR (FEATURE MATRIX) ════════════════ -->
+  <section id="features" class="py-24 relative">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center max-w-3xl mx-auto mb-16">
+        <div class="text-cyan-400 text-xs font-mono tracking-wider uppercase mb-2">Bozordagi Eng Kuchli Ekotizim</div>
+        <h2 class="font-display font-extrabold text-3xl sm:text-5xl text-white">
+          Tizimning 100% Imkoniyatlari
+        </h2>
+        <p class="text-slate-400 text-sm sm:text-base mt-3">
+          Oddiy bot emas, balki butun biznesingizning mijozlar oqimini tartibga soluvchi 7 ta kuchli modul bitta loyihada jamlangan.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Feature 1: Userbot -->
+        <div class="glass-panel p-8 rounded-3xl transition duration-300 relative group">
+          <div class="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 text-2xl mb-6 group-hover:scale-110 transition">
+            <i class="bi bi-person-check-fill"></i>
+          </div>
+          <h3 class="font-display font-bold text-xl text-white mb-3">Telethon Userbot (Shaxsiy Profil)</h3>
+          <p class="text-slate-400 text-sm leading-relaxed mb-4">
+            Mijozlar sizning shaxsiy Telegram profilingizga yozganda ham, xuddi sizdek samimiy, aniq va savodli javob qaytaradi. Bitta ham mijoz e'tiborsiz qolmaydi.
+          </p>
+          <ul class="text-xs text-slate-300 space-y-1.5 border-t border-slate-800 pt-3">
+            <li><i class="bi bi-check text-cyan-400 me-1"></i>Avtomatik suhbat tarixini eslab qolish</li>
+            <li><i class="bi bi-check text-cyan-400 me-1"></i>Telegram FloodWait & Anti-Ban himoyasi</li>
+          </ul>
+        </div>
+
+        <!-- Feature 2: Guruh va Kanal -->
+        <div class="glass-panel p-8 rounded-3xl transition duration-300 relative group">
+          <div class="w-14 h-14 rounded-2xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400 text-2xl mb-6 group-hover:scale-110 transition">
+            <i class="bi bi-megaphone-fill"></i>
+          </div>
+          <h3 class="font-display font-bold text-xl text-white mb-3">Guruh & Kanal Avtopiloti</h3>
+          <p class="text-slate-400 text-sm leading-relaxed mb-4">
+            Mijozlar guruhida kimdir savol bersa, bot darhol javob beradi. Kanallardagi uzun postlarga esa 1 soniyada ixcham xulosalar (`#ai_xulosa`) yozib beradi.
+          </p>
+          <ul class="text-xs text-slate-300 space-y-1.5 border-t border-slate-800 pt-3">
+            <li><i class="bi bi-check text-blue-400 me-1"></i>Yangi a'zolarni chiroyli tabriklash</li>
+            <li><i class="bi bi-check text-blue-400 me-1"></i>Rejali postlarni avtomat chiqarish</li>
+          </ul>
+        </div>
+
+        <!-- Feature 3: Mini App -->
+        <div class="glass-panel p-8 rounded-3xl transition duration-300 relative group">
+          <div class="w-14 h-14 rounded-2xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400 text-2xl mb-6 group-hover:scale-110 transition">
+            <i class="bi bi-phone-flip"></i>
+          </div>
+          <h3 class="font-display font-bold text-xl text-white mb-3">Telegram Mini App (Boshqaruv)</h3>
+          <p class="text-slate-400 text-sm leading-relaxed mb-4">
+            Alohida veb-saytga kirmaysiz. To'g'ridan-to'g'ri Telegram ichida zamonaviy White & Blue Neon interfeys orqali butun tizimni nazorat qilasiz.
+          </p>
+          <ul class="text-xs text-slate-300 space-y-1.5 border-t border-slate-800 pt-3">
+            <li><i class="bi bi-check text-purple-400 me-1"></i>Jonli statistika va xabarlar soni</li>
+            <li><i class="bi bi-check text-purple-400 me-1"></i>Doimiy xotiraga yangi fakt qo'shish</li>
+          </ul>
+        </div>
+
+        <!-- Feature 4: Ovozli tahlil -->
+        <div class="glass-panel p-8 rounded-3xl transition duration-300 relative group">
+          <div class="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-2xl mb-6 group-hover:scale-110 transition">
+            <i class="bi bi-mic-fill"></i>
+          </div>
+          <h3 class="font-display font-bold text-xl text-white mb-3">Voice-to-Task (Ovozni Tushunish)</h3>
+          <p class="text-slate-400 text-sm leading-relaxed mb-4">
+            O'zbekcha ovozli xabarlarni (audiolarni) aniq transkripsiya qiladi va agar mijoz biror narsa buyurtma qilgan bo'lsa, uni reja jadvaliga oladi.
+          </p>
+          <ul class="text-xs text-slate-300 space-y-1.5 border-t border-slate-800 pt-3">
+            <li><i class="bi bi-check text-emerald-400 me-1"></i>O'zbek tili lahjalari bilan ham ishlaydi</li>
+            <li><i class="bi bi-check text-emerald-400 me-1"></i>Ovozli eslatmalarni soatiga ko'ra qo'yadi</li>
+          </ul>
+        </div>
+
+        <!-- Feature 5: RAG & Doimiy Xotira -->
+        <div class="glass-panel p-8 rounded-3xl transition duration-300 relative group">
+          <div class="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 text-2xl mb-6 group-hover:scale-110 transition">
+            <i class="bi bi-database-fill-check"></i>
+          </div>
+          <h3 class="font-display font-bold text-xl text-white mb-3">Doimiy Xotira (RAG + Supabase)</h3>
+          <p class="text-slate-400 text-sm leading-relaxed mb-4">
+            Kompaniyangiz narxlari, manzili, aksiyalari va qoidalarini bir marta yozib qo'yasiz. Bot buni hech qachon unutmaydi va mijozlarga faqat to'g'ri ma'lumot beradi.
+          </p>
+          <ul class="text-xs text-slate-300 space-y-1.5 border-t border-slate-800 pt-3">
+            <li><i class="bi bi-check text-amber-400 me-1"></i>Supabase Cloud + SQLite gibrid xotira</li>
+            <li><i class="bi bi-check text-amber-400 me-1"></i>Server qayta yonsa ham hech narsa o'chmaydi</li>
+          </ul>
+        </div>
+
+        <!-- Feature 6: Multi-LLM Zero-Downtime -->
+        <div class="glass-panel p-8 rounded-3xl transition duration-300 relative group">
+          <div class="w-14 h-14 rounded-2xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400 text-2xl mb-6 group-hover:scale-110 transition">
+            <i class="bi bi-hdd-network-fill"></i>
+          </div>
+          <h3 class="font-display font-bold text-xl text-white mb-3">15+ Bepul AI (Zero-Downtime)</h3>
+          <p class="text-slate-400 text-sm leading-relaxed mb-4">
+            Bitta AI qotib qolsa ham tizim to'xtamaydi. Gemini 3.1, OpenRouter-dagi 13 ta bepul modellar va OmniRoute Gateway o'rtasida avto-marshrutlash mavjud.
+          </p>
+          <ul class="text-xs text-slate-300 space-y-1.5 border-t border-slate-800 pt-3">
+            <li><i class="bi bi-check text-sky-400 me-1"></i>Tokenlar uchun har oy pul to'lash shart emas</li>
+            <li><i class="bi bi-check text-sky-400 me-1"></i>Avtomatik xatolarni chetlab o'tish</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════ AUTHOR & CREDIBILITY SECTION ════════════════ -->
+  <section id="author" class="py-20 bg-slate-950/80 border-t border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="glass-panel rounded-3xl p-8 sm:p-12 border border-cyan-500/20 max-w-5xl mx-auto relative overflow-hidden">
+        <!-- Glow -->
+        <div class="absolute -right-20 -bottom-20 w-80 h-80 bg-blue-600/20 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div class="flex flex-col md:flex-row items-center gap-8 lg:gap-12">
+          <!-- Profile Badge Visual -->
+          <div class="relative shrink-0">
+            <div class="w-32 h-32 sm:w-40 sm:h-40 rounded-3xl bg-gradient-to-tr from-cyan-500 via-blue-600 to-indigo-700 p-1 shadow-2xl shadow-cyan-500/20">
+              <div class="w-full h-full bg-slate-950 rounded-[22px] flex flex-col items-center justify-center text-center p-4">
+                <i class="bi bi-shield-check text-4xl text-cyan-400 mb-1"></i>
+                <div class="font-display font-black text-white text-sm">Umrzoq</div>
+                <div class="text-[11px] text-cyan-300 font-medium">Ramazonov</div>
+              </div>
+            </div>
+            <div class="absolute -bottom-2.5 -right-2.5 bg-emerald-500 text-slate-950 font-bold text-[10px] px-2.5 py-1 rounded-full border-2 border-slate-900 shadow">
+              ✓ TATU Muhandisi
+            </div>
+          </div>
+
+          <!-- Author Info -->
+          <div class="space-y-4 text-center md:text-left">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-950/80 border border-cyan-500/30 text-cyan-300 text-xs font-semibold">
+              <i class="bi bi-mortarboard-fill"></i> Muallif va Arxitektor
+            </div>
+            <h3 class="font-display font-black text-2xl sm:text-3xl text-white">
+              Umrzoq Ramazonov
+            </h3>
+            <p class="text-slate-300 text-sm sm:text-base leading-relaxed">
+              <b>Toshkent Axborot Texnologiyalari Universiteti (TATU)</b> bitiruvchisi, <b>Dasturchi va Telekommunikatsiyalar muhandisi</b>. 
+              Sun'iy intellekt, MTProto Telegram protokollari va yuqori yuklamali bulutli serverlar (AWS, Linux, Caddy, Docker) bo'yicha amaliy tajribaga ega.
+            </p>
+            <div class="bg-slate-900/90 rounded-2xl p-4 border border-slate-800 text-xs text-slate-300 space-y-2">
+              <div class="flex items-center gap-2 text-cyan-300 font-semibold">
+                <i class="bi bi-patch-check-fill text-emerald-400"></i> Muhandislik kafolati:
+              </div>
+              <p class="text-slate-400">
+                "Ushbu tizim havaskorlik bilan emas, balki telekommunikatsiya xavfsizligi, uzluksiz ishlash (99.9% uptime) va biznes ma'lumotlarini qat'iy himoya qilish standartlari asosida noldan arxitektura qilingan."
+              </p>
+            </div>
+
+            <!-- Direct Contact -->
+            <div class="pt-2 flex flex-wrap items-center justify-center md:justify-start gap-4 text-sm font-semibold">
+              <a href="tel:+998992990519" class="text-cyan-400 hover:text-cyan-300 flex items-center gap-2">
+                <i class="bi bi-telephone-fill"></i> +998 99 299 05 19
+              </a>
+              <span class="text-slate-600">•</span>
+              <a href="https://t.me/scc_0519" target="_blank" class="text-cyan-400 hover:text-cyan-300 flex items-center gap-2">
+                <i class="bi bi-telegram"></i> @scc_0519 (Shaxsiy chat)
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════ ROI & FOYDA HISOB-KITOBI ════════════════ -->
+  <section class="py-20 relative">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="glass-panel rounded-3xl p-8 sm:p-12 border border-slate-800 max-w-4xl mx-auto">
+        <div class="text-center max-w-2xl mx-auto mb-10">
+          <h2 class="font-display font-extrabold text-2xl sm:text-3xl text-white">
+            Biznesingiz Qancha Pul Tejab Qoladi?
+          </h2>
+          <p class="text-slate-400 text-sm mt-2">Oddiy xodimlar va Super-Agent AI o'rtasidagi real taqqoslash</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- Traditional Staff -->
+          <div class="bg-slate-900/80 p-6 rounded-2xl border border-red-500/20">
+            <div class="text-red-400 font-bold text-sm mb-3 flex items-center gap-2">
+              <i class="bi bi-x-circle-fill"></i> Oddiy Operator / Menejer
+            </div>
+            <ul class="text-xs text-slate-300 space-y-2.5">
+              <li>• Oylik maosh: <b>$300 – $500 / oy</b> (yiliga $3,600+)</li>
+              <li>• Ish vaqti: Faqat 09:00 dan 18:00 gacha (Kechasi mijozlar yo'qotiladi)</li>
+              <li>• Insoniy omillar: Kasal bo'ladi, ta'tilga chiqadi, charchaydi</li>
+              <li>• Javob tezligi: 5 daqiqadan 1 soatgacha kechikish</li>
+            </ul>
+          </div>
+
+          <!-- Super-Agent AI -->
+          <div class="bg-gradient-to-br from-cyan-950/60 to-blue-950/60 p-6 rounded-2xl border border-cyan-500/40 shadow-xl">
+            <div class="text-cyan-300 font-bold text-sm mb-3 flex items-center gap-2">
+              <i class="bi bi-check-circle-fill text-emerald-400"></i> Super-Agent 2.0 AI
+            </div>
+            <ul class="text-xs text-white space-y-2.5">
+              <li>• Xarajat: <b>Bir martalik $250</b> (Oylik maosh umuman yo'q!)</li>
+              <li>• Ish vaqti: <b>24/7/365 tun-u kun uzluksiz</b></li>
+              <li>• Aniq intellekt: Hech qachon charchamaydi, xato qilmaydi</li>
+              <li>• Javob tezligi: <b>0.3 soniyada darhol javob</b></li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="mt-8 p-4 rounded-xl bg-slate-950 text-center text-xs text-slate-300 border border-slate-800">
+          💡 <b>Xulosa:</b> Botingiz birinchi oyning o'zidayoq operator maoshidan kamida <b>$300-$500</b> tejaydi va 100% o'z narxini oqlaydi!
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════ PRICING SECTION (SKIDKA $250) ════════════════ -->
+  <section id="pricing" class="py-24 relative bg-slate-950/70 border-t border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <div class="max-w-2xl mx-auto mb-14">
+        <div class="text-amber-400 text-xs font-mono tracking-wider uppercase mb-2">Cheklangan Maxsus Taklif</div>
+        <h2 class="font-display font-extrabold text-3xl sm:text-5xl text-white">
+          Aksiya Narxida Band Qiling
+        </h2>
+        <p class="text-slate-400 text-sm sm:text-base mt-3">
+          To'liq kalit topshirish tarzida: serverga o'rnatish, biznesingizga moslashtirish va 1 yillik bepul infratuzilma bilan.
+        </p>
+      </div>
+
+      <!-- Pricing Card -->
+      <div class="max-w-xl mx-auto glass-card-active rounded-3xl p-8 sm:p-10 text-left relative overflow-hidden">
+        <!-- Badge -->
+        <div class="absolute top-6 right-6 bg-gradient-to-r from-amber-500 to-red-500 text-slate-950 text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider shadow">
+          -45% Chegirma
+        </div>
+
+        <div class="text-xs font-bold uppercase tracking-wider text-cyan-400 mb-1">ALL-IN-ONE BIZNES PAKETI</div>
+        <h3 class="font-display font-black text-2xl sm:text-3xl text-white mb-4">
+          To'liq Super-Agent Ekotizimi
+        </h3>
+
+        <!-- Prices -->
+        <div class="flex items-baseline gap-3 mb-6 pb-6 border-b border-slate-800">
+          <span class="font-display font-black text-5xl sm:text-6xl text-white">$250</span>
+          <span class="text-xl text-slate-500 line-through font-semibold">$450</span>
+          <span class="text-xs text-amber-400 font-bold bg-amber-400/10 px-2.5 py-1 rounded-lg border border-amber-400/20">
+            Dastlabki 10 kishiga!
+          </span>
+        </div>
+
+        <!-- Inclusions -->
+        <div class="space-y-3.5 text-sm text-slate-300 mb-8">
+          <div class="flex items-start gap-3">
+            <i class="bi bi-check-circle-fill text-cyan-400 text-base shrink-0 mt-0.5"></i>
+            <span><b>To'liq 100% Manba Kodi (Source Code):</b> Loyihaning barcha fayllari to'liq sizga topshiriladi.</span>
+          </div>
+          <div class="flex items-start gap-3">
+            <i class="bi bi-check-circle-fill text-cyan-400 text-base shrink-0 mt-0.5"></i>
+            <span><b>Biznesingizga Moslashtirish:</b> Narxlar, xizmatlar, mahsulotlar va kompaniyangiz qoidalarini RAG xotiraga kiritib berish.</span>
+          </div>
+          <div class="flex items-start gap-3">
+            <i class="bi bi-check-circle-fill text-cyan-400 text-base shrink-0 mt-0.5"></i>
+            <span><b>AWS Cloud Serveriga 24/7 O'rnatish:</b> 12 oy mutlaqo bepul ishlaydigan AWS EC2 serveriga bexato sozlab berish.</span>
+          </div>
+          <div class="flex items-start gap-3">
+            <i class="bi bi-check-circle-fill text-cyan-400 text-base shrink-0 mt-0.5"></i>
+            <span><b>Telegram Mini App + Doimiy SSL:</b> Maxsus boshqaruv CRM paneli va bepul xavfsiz domen.</span>
+          </div>
+          <div class="flex items-start gap-3">
+            <i class="bi bi-check-circle-fill text-cyan-400 text-base shrink-0 mt-0.5"></i>
+            <span><b>Shaxsiy Userbot Ulanishi:</b> Shaxsiy profilingiz nomidan mijozlarga avtomatik javob berish sozlamasi.</span>
+          </div>
+          <div class="flex items-start gap-3">
+            <i class="bi bi-check-circle-fill text-cyan-400 text-base shrink-0 mt-0.5"></i>
+            <span><b>1 Oylik Bepul Texnik Ko'mak:</b> Dasturchi Umrzoq Ramazonov tomonidan shaxsiy kafolat va texnik yordam.</span>
+          </div>
+        </div>
+
+        <!-- Action Button -->
+        <a href="https://t.me/scc_0519" target="_blank" class="w-full flex items-center justify-center gap-3 py-4 rounded-2xl bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-600 hover:from-cyan-300 hover:to-indigo-500 text-slate-950 font-display font-black text-lg transition transform hover:scale-[1.02] shadow-xl shadow-cyan-500/25 mb-4 text-center">
+          <i class="bi bi-telegram text-xl"></i>
+          <span>Telegramda Buyurtma Qilish &rarr;</span>
+        </a>
+
+        <!-- Phone fallback -->
+        <div class="text-center">
+          <a href="tel:+998992990519" class="text-xs text-slate-400 hover:text-white transition">
+            Yoki qo'ng'iroq qiling: <b class="text-cyan-400">+998 99 299 05 19</b>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════ FAQ SECTION ════════════════ -->
+  <section id="faq" class="py-20 relative">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-12">
+        <h2 class="font-display font-extrabold text-3xl text-white">Ko'p Beriladigan Savollar</h2>
+        <p class="text-slate-400 text-sm mt-2">Xarid qilishdan oldin eng muhim savollarga javoblar</p>
+      </div>
+
+      <div class="space-y-4">
+        <div class="glass-panel p-5 rounded-2xl">
+          <h4 class="font-bold text-white text-base mb-2">1. Kelajakda qandaydir oylik to'lovlar bormi?</h4>
+          <p class="text-slate-400 text-sm leading-relaxed">
+            <b>Yo'q!</b> Server AWS Free Tier doirasida 12 oy bepul ishlaydi. Sun'iy intellekt modellariga ham (Gemini, OpenRouter bepul modellari) oylik to'lov to'lamaysiz. Barcha tizim 100% sizning ixtiyoringizda bo'ladi.
+          </p>
+        </div>
+
+        <div class="glass-panel p-5 rounded-2xl">
+          <h4 class="font-bold text-white text-base mb-2">2. O'rnatish qancha vaqt oladi?</h4>
+          <p class="text-slate-400 text-sm leading-relaxed">
+            Buyurtma berganingizdan so'ng, <b>24 soat ichida</b> to'liq sizning biznesingizga (narxlar, xizmatlar, bot va akkaunt) moslashtirilib, serverda 24/7 ishga tushirib beriladi.
+          </p>
+        </div>
+
+        <div class="glass-panel p-5 rounded-2xl">
+          <h4 class="font-bold text-white text-base mb-2">3. Telegram akkauntim bloklanib qolmaydimi (Anti-Ban)?</h4>
+          <p class="text-slate-400 text-sm leading-relaxed">
+            <b>Xavfsiz!</b> Tizimda maxsus FloodWait va inson harakatlarini taqlid qiluvchi random intervallar (3.0s — 7.0s kechikish) sozlangan. Telekommunikatsiya me'yorlariga to'liq rioya qilingan.
+          </p>
+        </div>
+
+        <div class="glass-panel p-5 rounded-2xl">
+          <h4 class="font-bold text-white text-base mb-2">4. Dasturchi bilan to'g'ridan-to'g'ri gaplashsam bo'ladimi?</h4>
+          <p class="text-slate-400 text-sm leading-relaxed">
+            Albatta! Loyiha muallifi <b>Umrzoq Ramazonov</b> bilan to'g'ridan-to'g'ri telefon (<code>99 299 05 19</code>) yoki Telegram (<code>@scc_0519</code>) orqali muloqot qilasiz va barcha savollaringizga shaxsan javob olasiz.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════ FOOTER ════════════════ -->
+  <footer class="border-t border-slate-800/80 bg-slate-950 py-12 text-center text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto px-4 space-y-4">
+      <div class="font-display font-bold text-lg text-white">
+        Super-Agent AI 2.0
+      </div>
+      <p class="max-w-md mx-auto text-slate-400">
+        TATU bitiruvchisi Umrzoq Ramazonov tomonidan yaratilgan B2B avtomatlashtirish ekotizimi.
+      </p>
+      <div class="flex justify-center items-center gap-6 text-slate-400 font-medium">
+        <a href="tel:+998992990519" class="hover:text-cyan-400 transition"><i class="bi bi-telephone me-1"></i> +998 99 299 05 19</a>
+        <a href="https://t.me/scc_0519" target="_blank" class="hover:text-cyan-400 transition"><i class="bi bi-telegram me-1"></i> @scc_0519</a>
+      </div>
+      <div class="pt-4 text-slate-600">
+        © 2026 Umrzoq Ramazonov. Barcha huquqlar himoyalangan.
+      </div>
+    </div>
+  </footer>
+
+  <!-- ════════════════ FLOATING ACTION BUTTON (STICKY) ════════════════ -->
+  <div class="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+    <!-- Call Pill -->
+    <a href="tel:+998992990519" class="hidden sm:flex items-center gap-2 bg-slate-900/90 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2.5 rounded-full border border-slate-700 shadow-2xl backdrop-blur-lg transition transform hover:scale-105">
+      <i class="bi bi-telephone-fill text-cyan-400"></i>
+      <span>99 299 05 19</span>
+    </a>
+
+    <!-- Main Telegram Pulse Button -->
+    <a href="https://t.me/scc_0519" target="_blank" class="relative group flex items-center gap-2.5 bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-600 hover:from-cyan-300 hover:to-indigo-500 text-slate-950 font-display font-black text-sm px-5 py-3.5 rounded-full shadow-2xl shadow-cyan-500/40 transition transform hover:scale-110">
+      <span class="flex h-3 w-3 relative">
+        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-slate-950 opacity-50"></span>
+        <span class="relative inline-flex rounded-full h-3 w-3 bg-slate-950"></span>
+      </span>
+      <i class="bi bi-telegram text-lg"></i>
+      <span>Buyurtma Berish ($250)</span>
+    </a>
+  </div>
+
+  <!-- Interactive Demo Script -->
+  <script>
+    function switchDemoTab(tab) {
+      const chatBox = document.getElementById('demo-chat-box');
+      const appBox = document.getElementById('demo-app-box');
+      const btnChat = document.getElementById('btn-tab-chat');
+      const btnApp = document.getElementById('btn-tab-app');
+
+      if (tab === 'chat') {
+        chatBox.classList.remove('hidden');
+        appBox.classList.add('hidden');
+        btnChat.className = 'px-5 py-2.5 rounded-xl text-sm font-bold transition flex items-center gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 shadow-lg shadow-cyan-500/20';
+        btnApp.className = 'px-5 py-2.5 rounded-xl text-sm font-semibold transition flex items-center gap-2 bg-slate-900 text-slate-300 hover:text-white border border-slate-700/80';
+      } else {
+        chatBox.classList.add('hidden');
+        appBox.classList.remove('hidden');
+        btnApp.className = 'px-5 py-2.5 rounded-xl text-sm font-bold transition flex items-center gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 shadow-lg shadow-cyan-500/20';
+        btnChat.className = 'px-5 py-2.5 rounded-xl text-sm font-semibold transition flex items-center gap-2 bg-slate-900 text-slate-300 hover:text-white border border-slate-700/80';
+      }
+    }
+  </script>
+</body>
+</html>

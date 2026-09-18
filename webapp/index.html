@@ -1,0 +1,1527 @@
+<!DOCTYPE html>
+<html lang="uz" data-bs-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Super-Agent 2.0 — White & Blue Neon Panel</title>
+  
+  <!-- Telegram WebApp SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <!-- Google Fonts: Plus Jakarta Sans & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Bootstrap 5.3 CSS & Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+
+  <style>
+    :root {
+      --primary-blue: #0d6efd;
+      --primary-neon: #00d2ff;
+      --neon-glow: 0 0 15px rgba(0, 210, 255, 0.45);
+      --card-border: rgba(13, 110, 253, 0.14);
+      --bg-page: #f4f7fb;
+      --text-dark: #0f172a;
+      --text-muted: #64748b;
+      --radius-custom: 16px;
+    }
+
+    * {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: radial-gradient(at 0% 0%, rgba(13, 110, 253, 0.08) 0px, transparent 50%),
+                  radial-gradient(at 100% 100%, rgba(0, 210, 255, 0.08) 0px, transparent 50%),
+                  var(--bg-page);
+      color: var(--text-dark);
+      padding-bottom: 115px; /* Ample space for fixed dock */
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    h1, h2, h3, h4, h5, .brand-title {
+      font-family: 'Outfit', sans-serif;
+    }
+
+    /* Topbar Header */
+    .top-header {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--card-border);
+      box-shadow: 0 4px 20px rgba(13, 110, 253, 0.06);
+      position: sticky;
+      top: 0;
+      z-index: 1020;
+    }
+
+    .brand-icon-box {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-neon) 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      font-size: 20px;
+      box-shadow: 0 4px 15px rgba(13, 110, 253, 0.4), var(--neon-glow);
+    }
+
+    .brand-title {
+      font-weight: 800;
+      font-size: 18px;
+      letter-spacing: -0.3px;
+      color: #0d6efd;
+      text-shadow: 0 0 10px rgba(13, 110, 253, 0.15);
+    }
+
+    .neon-badge-online {
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      color: #059669;
+      font-weight: 700;
+      font-size: 12px;
+      padding: 6px 12px;
+      border-radius: 20px;
+      box-shadow: 0 0 12px rgba(16, 185, 129, 0.25);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+
+    .neon-pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+      animation: pulse-green 1.8s infinite;
+    }
+
+    @keyframes pulse-green {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+      70% { transform: scale(1.1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
+    /* Cards White & Blue Neon Style */
+    .neon-card {
+      background: #ffffff;
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-custom);
+      box-shadow: 0 8px 24px rgba(13, 110, 253, 0.05);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .neon-card-header {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 700;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #0d6efd;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* Stat Cards */
+    .stat-card {
+      background: #ffffff;
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-custom);
+      padding: 14px 16px;
+      box-shadow: 0 6px 20px rgba(13, 110, 253, 0.04);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, #0d6efd, #00d2ff);
+    }
+
+    .stat-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .stat-val {
+      font-family: 'Outfit', sans-serif;
+      font-size: 24px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-top: 2px;
+    }
+
+    .stat-sub {
+      font-size: 11px;
+      font-weight: 600;
+      color: #0d6efd;
+    }
+
+    /* Neon Pill Buttons */
+    .neon-pill {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      color: #1e293b;
+      font-weight: 600;
+      font-size: 13px;
+      padding: 9px 12px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: center;
+    }
+
+    .neon-pill:hover {
+      background: #f1f5f9;
+      border-color: #cbd5e1;
+    }
+
+    .neon-pill.active {
+      background: linear-gradient(135deg, #0d6efd 0%, #00b4d8 100%);
+      color: #ffffff;
+      border-color: transparent;
+      font-weight: 700;
+      box-shadow: 0 4px 15px rgba(13, 110, 253, 0.35), var(--neon-glow);
+    }
+
+    /* Action Buttons */
+    .btn-neon-primary {
+      background: linear-gradient(135deg, #0d6efd 0%, #00b4d8 100%);
+      border: none;
+      color: #ffffff;
+      font-family: 'Outfit', sans-serif;
+      font-weight: 700;
+      padding: 12px 18px;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(13, 110, 253, 0.3), var(--neon-glow);
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-neon-primary:hover, .btn-neon-primary:focus {
+      background: linear-gradient(135deg, #0b5ed7 0%, #0096c7 100%);
+      color: #ffffff;
+      box-shadow: 0 6px 20px rgba(13, 110, 253, 0.4), 0 0 20px rgba(0, 210, 255, 0.5);
+    }
+
+    .btn-neon-primary:active {
+      opacity: 0.92;
+    }
+
+    /* Quick Chips */
+    .quick-chip {
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      border-radius: 20px;
+      padding: 5px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #475569;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: inline-block;
+    }
+
+    .quick-chip:hover, .quick-chip:active {
+      background: rgba(13, 110, 253, 0.1);
+      border-color: #0d6efd;
+      color: #0d6efd;
+      box-shadow: 0 0 8px rgba(13, 110, 253, 0.2);
+    }
+
+    /* Form Controls White-Blue */
+    .form-control, .form-select {
+      background-color: #ffffff;
+      border: 1px solid #cbd5e1;
+      color: #0f172a;
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-size: 13.5px;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .form-control:focus, .form-select:focus {
+      background-color: #ffffff;
+      border-color: #00d2ff;
+      color: #0f172a;
+      box-shadow: 0 0 0 3px rgba(0, 210, 255, 0.25), 0 0 12px rgba(13, 110, 253, 0.15);
+    }
+
+    /* Item List styling */
+    .white-list-item {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .white-list-item:hover {
+      border-color: rgba(13, 110, 253, 0.3);
+      box-shadow: 0 4px 12px rgba(13, 110, 253, 0.05);
+    }
+
+    .item-badge-blue {
+      background: rgba(13, 110, 253, 0.1);
+      color: #0d6efd;
+      border: 1px solid rgba(13, 110, 253, 0.25);
+      border-radius: 6px;
+      padding: 2px 8px;
+      font-size: 11px;
+      font-weight: 700;
+      display: inline-block;
+      margin-bottom: 3px;
+    }
+
+    .btn-trash {
+      background: rgba(239, 68, 68, 0.08);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      color: #ef4444;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+    }
+
+    .btn-trash:hover {
+      background: #ef4444;
+      color: #ffffff;
+      box-shadow: 0 0 10px rgba(239, 68, 68, 0.35);
+    }
+
+    /* ─── CHAT AGENT IN-APP UI ───────────────────────────── */
+    .chat-container {
+      background: #ffffff;
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-custom);
+      box-shadow: 0 8px 24px rgba(13, 110, 253, 0.06);
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 200px);
+      min-height: 440px;
+      overflow: hidden;
+    }
+
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: #fcfdfe;
+    }
+
+    .chat-bubble {
+      max-width: 85%;
+      padding: 11px 15px;
+      border-radius: 16px;
+      font-size: 13.5px;
+      line-height: 1.55;
+      word-break: break-word;
+      animation: bubbleIn 0.2s ease-out;
+    }
+
+    @keyframes bubbleIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .chat-bubble-agent {
+      background: #ffffff;
+      border: 1px solid rgba(13, 110, 253, 0.2);
+      color: #0f172a;
+      align-self: flex-start;
+      border-bottom-left-radius: 4px;
+      box-shadow: 0 4px 14px rgba(13, 110, 253, 0.05);
+    }
+
+    .chat-bubble-user {
+      background: linear-gradient(135deg, #0d6efd 0%, #00a6fb 100%);
+      color: #ffffff;
+      align-self: flex-end;
+      border-bottom-right-radius: 4px;
+      box-shadow: 0 4px 14px rgba(13, 110, 253, 0.25);
+    }
+
+    .chat-footer {
+      padding: 10px 14px;
+      background: #ffffff;
+      border-top: 1px solid rgba(13, 110, 253, 0.1);
+    }
+
+    /* ─── BOTTOM DOCK NAVIGATION (100% WORKING) ────────── */
+    .bottom-dock {
+      position: fixed;
+      bottom: 12px;
+      left: 10px;
+      right: 10px;
+      height: 64px;
+      background: rgba(255, 255, 255, 0.96);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(13, 110, 253, 0.22);
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(13, 110, 253, 0.15), 0 0 15px rgba(0, 210, 255, 0.2);
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      z-index: 1050;
+      padding: 2px 4px;
+    }
+
+    .dock-tab {
+      border: none;
+      background: transparent;
+      outline: none;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #64748b;
+      padding: 6px 2px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .dock-tab * {
+      pointer-events: none; /* Never intercept touch on icon or text */
+    }
+
+    .dock-tab i {
+      font-size: 19px;
+      transition: transform 0.15s ease;
+    }
+
+    .dock-tab span {
+      font-size: 10px;
+      font-weight: 700;
+      margin-top: 2px;
+      letter-spacing: -0.2px;
+    }
+
+    .dock-tab.active {
+      color: #0d6efd;
+      font-weight: 700;
+    }
+
+    .dock-tab.active i {
+      transform: translateY(-2px);
+      text-shadow: 0 0 10px rgba(0, 210, 255, 0.6);
+    }
+
+    /* Floating Toast */
+    .neon-toast {
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-70px);
+      background: #ffffff;
+      border: 1px solid #0d6efd;
+      color: #0f172a;
+      padding: 10px 20px;
+      border-radius: 30px;
+      font-weight: 700;
+      font-size: 13px;
+      box-shadow: 0 10px 25px rgba(13, 110, 253, 0.2), var(--neon-glow);
+      z-index: 2000;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      pointer-events: none;
+    }
+
+    .neon-toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    /* Tab Panes Visibility */
+    .tab-pane-content {
+      display: none !important;
+    }
+
+    .tab-pane-content.active {
+      display: block !important;
+      animation: tabFadeIn 0.25s ease-out;
+    }
+
+    @keyframes tabFadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Floating Neon Toast -->
+  <div class="neon-toast" id="toast">
+    <i class="bi bi-lightning-charge-fill text-primary" id="toast-icon"></i>
+    <span id="toast-text">Bildirishnoma</span>
+  </div>
+
+  <!-- Topbar Header -->
+  <header class="top-header py-2 px-3 mb-3">
+    <div class="container-fluid d-flex justify-content-between align-items-center p-0">
+      <div class="d-flex align-items-center gap-2">
+        <div class="brand-icon-box">
+          <i class="bi bi-robot"></i>
+        </div>
+        <div>
+          <div class="brand-title">Super-Agent 2.0</div>
+          <div class="d-flex align-items-center gap-2 text-muted" style="font-size: 11px;">
+            <span>Toshkent:</span>
+            <span class="fw-bold text-primary font-monospace" id="live-clock">--:--:--</span>
+          </div>
+        </div>
+      </div>
+      <div class="neon-badge-online" id="btn-refresh" title="Yangilash">
+        <div class="neon-pulse-dot"></div>
+        <span id="status-text">Onlayn</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="container px-3">
+
+    <!-- ══════════════ TAB 1: AI AGENT (JONLI CHAT) ══════════════ -->
+    <div class="tab-pane-content active" id="tab-agent">
+      <div class="chat-container">
+        <!-- Chat Header -->
+        <div class="p-3 border-bottom d-flex justify-content-between align-items-center bg-white flex-wrap gap-2">
+          <div class="d-flex align-items-center gap-2">
+            <div class="brand-icon-box" style="width: 32px; height: 32px; font-size: 16px;">
+              <i class="bi bi-stars"></i>
+            </div>
+            <div>
+              <div class="fw-bold small text-dark">AI Agent (Jonli Suhbat)</div>
+              <div class="text-muted" style="font-size: 10px;" id="agent-active-badge">Gemini 3.1 Flash • Universal</div>
+            </div>
+          </div>
+          <div class="d-flex align-items-center gap-1">
+            <select class="form-select form-select-sm py-1 px-2" style="font-size: 11px; width: auto; max-width: 175px;" id="chat-model-quick-select" title="Modelni almashtirish">
+              <option value="gemini">✨ Google Gemini (Tezkor)</option>
+              <option value="hermes">⚡ Nous Hermes 3 (405B Agent)</option>
+              <option value="hermes70b">🧠 Nous Hermes 3 (70B Reasoning)</option>
+              <option value="auto">🔀 Auto (Eng tez bepul)</option>
+              <option value="nex_mini">⚡ Nex N2.5 Mini</option>
+              <option value="nemotron_reasoning">🧠 Nemotron 30B Fikr</option>
+              <option value="liquid">💧 Liquid LFM 2.6B</option>
+              <option value="ling_vl">👁 Ling 3.0 Vision</option>
+              <option value="cohere_code">💻 Cohere Mini Code</option>
+              <option value="nemotron_ultra">⚡ Nemotron 550B</option>
+              <option value="nemotron_super">🚀 Nemotron 120B</option>
+              <option value="nemotron_lightning">⚡ Nemotron 3.5 Tez</option>
+              <option value="gemma31b">🌟 Google Gemma 31B</option>
+              <option value="gemma26b">✨ Google Gemma 26B</option>
+              <option value="glm">💬 GLM 5.2 Suhbat</option>
+              <option value="nex_pro">🔥 Nex-AGI N2.5 Pro</option>
+              <option value="inkling">💡 Inkling Ijodkor</option>
+              <option value="omniroute">🌐 OmniRoute Gateway</option>
+            </select>
+            <button class="btn btn-sm btn-outline-secondary rounded-pill px-2 py-1" style="font-size: 11px;" onclick="clearInAppChat()" title="Suhbatni tozalash">
+              <i class="bi bi-trash3"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Chat Messages -->
+        <div class="chat-messages" id="chat-messages-box">
+          <!-- Welcome Message -->
+          <div class="chat-bubble chat-bubble-agent">
+            <div class="fw-bold text-primary small mb-1"><i class="bi bi-robot me-1"></i>Super-Agent:</div>
+            Assalomu alaykum! Men sizning mustaqil AI yordamchingizman. Menga xuddi Telegram botdagidek istalgan vazifa, hisob-kitob yoki rasm chizish buyrug'ini berishingiz mumkin:
+            <div class="mt-2 small text-muted">
+              • <code>/imagine futuristik Toshkent kechasi --ar 16:9</code><br>
+              • <code>/hermes Biznes reja va moliyaviy hisob-kitob tuz</code><br>
+              • <code>21:30 da eslat: dori ichish</code><br>
+              • <code>qidir: O'zbekiston IT yangiliklari</code><br>
+              • <code>eslab qol: Karta: 8600 1234...</code>
+            </div>
+          </div>
+        </div>
+
+        <!-- Suggestion Chips -->
+        <div class="px-3 pt-2 pb-1 bg-white border-top overflow-x-auto text-nowrap">
+          <span class="quick-chip me-1" onclick="sendQuickPrompt('/imagine futuristik Toshkent kechasi --ar 16:9')">🎨 Midjourney Rasm</span>
+          <span class="quick-chip me-1" onclick="sendQuickPrompt('/hermes Startap loyiha uchun toliq biznes reja va moliyaviy hisob-kitob tuzib ber')">⚡ Hermes Agent</span>
+          <span class="quick-chip me-1" onclick="sendQuickPrompt('Bugungi ishlarni rejalashtirishga yordam ber')">📅 Kunlik Reja</span>
+          <span class="quick-chip me-1" onclick="sendQuickPrompt('21:30 da eslat: dori ichish')">⏰ Eslatma sinovi</span>
+          <span class="quick-chip me-1" onclick="sendQuickPrompt('qidir: O\'zbekistonda sun\'iy intellekt yangiliklari')">🌐 Qidiruv</span>
+          <span class="quick-chip me-1" onclick="sendQuickPrompt('Telegram kanal uchun IT yangilik haqida post yoz')">📱 Kanal Posti</span>
+        </div>
+
+        <!-- Chat Input Footer -->
+        <div class="chat-footer">
+          <div class="input-group">
+            <input type="text" class="form-control" id="agent-input" placeholder="Xabar yoki buyruq yozing..." autocomplete="off" />
+            <button class="btn btn-neon-primary px-3" id="btn-send-agent">
+              <i class="bi bi-send-fill"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════ TAB 2: ASOSIY (DASHBOARD) ══════════════ -->
+    <div class="tab-pane-content" id="tab-overview">
+      <!-- Realtime Stats Grid -->
+      <div class="row g-2 mb-3">
+        <div class="col-6 col-md-3">
+          <div class="stat-card">
+            <div class="stat-title">Bugungi Xabarlar</div>
+            <div class="stat-val text-primary" id="stat-msgs">0</div>
+            <div class="stat-sub">AI Muloqot</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="stat-card">
+            <div class="stat-title">Userbot Yuboruvlar</div>
+            <div class="stat-val text-info" id="stat-userbot">0</div>
+            <div class="stat-sub">Shaxsiy & Guruh</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="stat-card">
+            <div class="stat-title">Doimiy Xotira</div>
+            <div class="stat-val text-success" id="stat-kb">0</div>
+            <div class="stat-sub">RAG Faktlar</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="stat-card">
+            <div class="stat-title">Kutilayotgan Postlar</div>
+            <div class="stat-val text-warning" id="stat-posts">0</div>
+            <div class="stat-sub">Rejalashtirilgan</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI Model Switcher -->
+      <div class="neon-card p-3 mb-3">
+        <div class="neon-card-header">
+          <span><i class="bi bi-cpu me-2"></i>AI Modelni Tanlash (100% Bepul)</span>
+          <span class="badge bg-primary-subtle text-primary border border-primary-subtle">Tezkor</span>
+        </div>
+        <div class="row g-2" id="model-group">
+          <div class="col-6 col-md-4"><div class="neon-pill active" data-model="gemini">✨ Gemini 3.1 Flash</div></div>
+          <div class="col-6 col-md-4"><div class="neon-pill" data-model="auto">🔀 Auto (Tezkor)</div></div>
+          <div class="col-6 col-md-4"><div class="neon-pill" data-model="nex_mini">⚡ Nex N2.5 Mini</div></div>
+          <div class="col-6 col-md-4"><div class="neon-pill" data-model="nemotron_reasoning">🧠 Nemotron Fikr</div></div>
+          <div class="col-6 col-md-4"><div class="neon-pill" data-model="liquid">💧 Liquid LFM 2.6B</div></div>
+          <div class="col-6 col-md-4"><div class="neon-pill" data-model="ling_vl">👁 Ling 3.0 Vision</div></div>
+          <div class="col-6 col-md-4"><div class="neon-pill" data-model="cohere_code">💻 Cohere Mini Code</div></div>
+          <div class="col-6 col-md-4"><div class="neon-pill" data-model="nemotron_ultra">⚡ Nemotron 550B</div></div>
+          <div class="col-6 col-md-4"><div class="neon-pill" data-model="nemotron_super">🚀 Nemotron 120B</div></div>
+          <div class="col-6 col-md-4"><div class="neon-pill" data-model="nemotron_lightning">⚡ Nemotron Tezkor</div></div>
+          <div class="col-6 col-md-4"><div class="neon-pill" data-model="gemma31b">🌟 Google Gemma 31B</div></div>
+          <div class="col-6 col-md-4"><div class="neon-pill" data-model="gemma26b">✨ Google Gemma 26B</div></div>
+          <div class="col-6 col-md-4"><div class="neon-pill" data-model="glm">💬 GLM 5.2 Suhbat</div></div>
+          <div class="col-6 col-md-4"><div class="neon-pill" data-model="nex_pro">🔥 Nex-AGI N2.5 Pro</div></div>
+          <div class="col-6 col-md-4"><div class="neon-pill" data-model="inkling">💡 Inkling Ijodkor</div></div>
+          <div class="col-6 col-md-4"><div class="neon-pill" data-model="omniroute">🌐 OmniRoute (350+ AI)</div></div>
+        </div>
+      </div>
+
+      <!-- Role Switcher -->
+      <div class="neon-card p-3 mb-3">
+        <div class="neon-card-header">
+          <span><i class="bi bi-person-badge me-2"></i>Faol Tizim Roli</span>
+        </div>
+        <div class="row g-2" id="role-group">
+          <div class="col-6 col-md-4"><div class="neon-pill active" data-role="universal">Universal Yordamchi</div></div>
+          <div class="col-6 col-md-4"><div class="neon-pill" data-role="smm">SMM Mutaxassis</div></div>
+          <div class="col-6 col-md-4"><div class="neon-pill" data-role="copywriter">Kopirayter</div></div>
+          <div class="col-6 col-md-4"><div class="neon-pill" data-role="coder">Dasturchi (Coder)</div></div>
+          <div class="col-6 col-md-4"><div class="neon-pill" data-role="translator">Tarjimon</div></div>
+        </div>
+      </div>
+
+      <!-- Anti-Ban Security Card -->
+      <div class="neon-card p-3 mb-3">
+        <div class="neon-card-header">
+          <span><i class="bi bi-shield-check me-2 text-success"></i>Anti-Ban & Xavfsizlik Qalqoni</span>
+          <span class="badge bg-success-subtle text-success border border-success-subtle">100% Faol</span>
+        </div>
+        <div class="text-secondary small lh-lg">
+          <div><i class="bi bi-check-circle-fill text-primary me-2"></i><b>FloodWait himoyasi:</b> Har bir xabarga 3.0s — 7.0s random interval qo'yiladi.</div>
+          <div><i class="bi bi-check-circle-fill text-primary me-2"></i><b>Smart Inbox Triage:</b> Muhim mijoz va biznes xabarlarni saralash yoqilgan.</div>
+          <div><i class="bi bi-check-circle-fill text-primary me-2"></i><b>Gibrid Ma'lumotlar Bazasi:</b> Supabase Cloud + SQLite Zero-Downtime.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════ TAB 3: ESLATMALAR & POSTLAR ══════════════ -->
+    <div class="tab-pane-content" id="tab-reminders">
+      <!-- Active Reminders Section -->
+      <div class="neon-card p-3 mb-3">
+        <div class="neon-card-header">
+          <span><i class="bi bi-alarm me-2"></i>Faol Eslatmalar</span>
+          <span class="badge bg-primary text-white" id="rem-count-badge">0 ta</span>
+        </div>
+        <div id="reminders-list">
+          <div class="text-center text-muted py-3">Yuklanmoqda...</div>
+        </div>
+      </div>
+
+      <!-- Add Reminder Form -->
+      <div class="neon-card p-3 mb-3">
+        <div class="neon-card-header">
+          <span><i class="bi bi-plus-circle me-2"></i>Yangi Eslatma Qo'shish</span>
+        </div>
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          <span class="quick-chip" onclick="setQuickTime(15)">+15 daqiqa</span>
+          <span class="quick-chip" onclick="setQuickTime(30)">+30 daqiqa</span>
+          <span class="quick-chip" onclick="setQuickTime(60)">+1 soat</span>
+          <span class="quick-chip" onclick="setQuickTimeToday('21:30')">Bugun 21:30</span>
+          <span class="quick-chip" onclick="setQuickTimeTomorrow('09:00')">Ertaga 09:00</span>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small text-muted mb-1">Eslatish Vaqti (Toshkent)</label>
+          <input type="datetime-local" class="form-control" id="rem-time-input" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label small text-muted mb-1">Vazifa Mazmuni</label>
+          <input type="text" class="form-control" id="rem-text-input" placeholder="Masalan: Dori ichish yoki Akmal bilan uchrashuv" />
+        </div>
+        <button class="btn btn-neon-primary w-100" id="btn-add-reminder">
+          <i class="bi bi-bell-fill"></i> Eslatmani Saqlash
+        </button>
+      </div>
+
+      <!-- Scheduled Posts Section -->
+      <div class="neon-card p-3 mb-3">
+        <div class="neon-card-header">
+          <span><i class="bi bi-send-check me-2"></i>Kutilayotgan Kanal Postlari</span>
+        </div>
+        <div id="posts-list">
+          <div class="text-center text-muted py-3">Kutilayotgan postlar yo'q</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════ TAB 4: DOIMIY XOTIRA (RAG) ══════════════ -->
+    <div class="tab-pane-content" id="tab-memory">
+      <!-- Add Fact Card -->
+      <div class="neon-card p-3 mb-3">
+        <div class="neon-card-header">
+          <span><i class="bi bi-database-add me-2"></i>Xotiraga Yangi Fakt Qo'shish</span>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small text-muted mb-1">Kategoriya</label>
+          <select class="form-select" id="fact-category">
+            <option value="shaxsiy">👤 Shaxsiy Ma'lumot</option>
+            <option value="moliya">💳 Karta & Moliya</option>
+            <option value="biznes">💼 Biznes & Xizmatlar</option>
+            <option value="aloqa">📞 Manzil & Aloqa</option>
+            <option value="boshqa">📌 Boshqa</option>
+          </select>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small text-muted mb-1">Kalit So'z</label>
+          <input type="text" class="form-control" id="fact-key" placeholder="Masalan: karta_raqami, ofis_manzili, xizmat_narxi" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label small text-muted mb-1">Fakt Mazmuni</label>
+          <textarea class="form-control" id="fact-content" rows="2" placeholder="Masalan: 8600 1234 5678 9012, Toshkent Chilonzor..."></textarea>
+        </div>
+        <button class="btn btn-neon-primary w-100" id="btn-save-fact">
+          <i class="bi bi-save-fill"></i> Xotiraga Saqlash
+        </button>
+      </div>
+
+      <!-- Search and List Facts -->
+      <div class="neon-card p-3 mb-3">
+        <div class="neon-card-header">
+          <span><i class="bi bi-search me-2"></i>Saqlangan Faktlar Bazasi</span>
+          <span class="badge bg-primary text-white" id="fact-count-badge">0 ta</span>
+        </div>
+        <div class="mb-3">
+          <input type="text" class="form-control" id="fact-search" placeholder="🔍 Qidirish (kalit yoki matn bo'yicha)..." oninput="filterFacts()" />
+        </div>
+        <div id="facts-list">
+          <div class="text-center text-muted py-3">Yuklanmoqda...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════ TAB 5: GURUH & KANALLAR ══════════════ -->
+    <div class="tab-pane-content" id="tab-chats">
+      <div class="neon-card p-3 mb-3">
+        <div class="neon-card-header">
+          <span><i class="bi bi-megaphone me-2"></i>Ulanish Kanallari va Guruhlar</span>
+          <span class="badge bg-primary text-white" id="chats-count-badge">0 ta</span>
+        </div>
+        <p class="text-secondary small mb-3">
+          Bot administrator bo'lib qo'shilgan va avtomatik boshqarayotgan kanallar hamda guruhlar ro'yxati:
+        </p>
+        <div id="managed-chats-list">
+          <div class="text-center text-muted py-3">Yuklanmoqda...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════ TAB 6: TIZIM DIAGNOSTIKASI ══════════════ -->
+    <div class="tab-pane-content" id="tab-system">
+      <div class="neon-card p-3 mb-3">
+        <div class="neon-card-header">
+          <span><i class="bi bi-gear-wide-connected me-2"></i>Tizim Diagnostikasi</span>
+        </div>
+        <div class="d-flex flex-column gap-2">
+          <div class="white-list-item">
+            <div>
+              <div class="fw-bold small">Server Uptime</div>
+              <div class="text-secondary small" id="sys-uptime">Hisoblanmoqda...</div>
+            </div>
+            <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2">Faol</span>
+          </div>
+          <div class="white-list-item">
+            <div>
+              <div class="fw-bold small">Userbot (Telethon)</div>
+              <div class="text-secondary small" id="sys-userbot">Tekshirilmoqda...</div>
+            </div>
+            <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2" id="badge-userbot">Onlayn</span>
+          </div>
+          <div class="white-list-item">
+            <div>
+              <div class="fw-bold small">Ma'lumotlar Bazasi</div>
+              <div class="text-secondary small" id="sys-db">Supabase + SQLite</div>
+            </div>
+            <span class="badge bg-info-subtle text-info border border-info-subtle px-3 py-2">Gibrid</span>
+          </div>
+          <div class="white-list-item">
+            <div>
+              <div class="fw-bold small">Joriy Model & Rol</div>
+              <div class="text-secondary small" id="sys-model-role">Gemini 3.6 Flash / Universal</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Maintenance -->
+      <div class="neon-card p-3 mb-3">
+        <div class="neon-card-header">
+          <span><i class="bi bi-trash3 me-2 text-danger"></i>AI Suhbat Xotirasi</span>
+        </div>
+        <p class="text-secondary small mb-3">
+          AI bilan avvalgi suhbat kontekstini tozalash (Doimiy xotiradagi faktlaringiz saqlanib qoladi):
+        </p>
+        <button class="btn btn-outline-danger w-100 rounded-3 py-2 fw-bold" id="btn-clear-history">
+          <i class="bi bi-trash3-fill me-1"></i> AI Suhbat Tarixini Tozalash
+        </button>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Bottom Floating Dock Navigation (Direct Button Clickable) -->
+  <nav class="bottom-dock">
+    <button type="button" class="dock-tab active" data-tab="agent">
+      <i class="bi bi-chat-dots-fill"></i>
+      <span>AI Agent</span>
+    </button>
+    <button type="button" class="dock-tab" data-tab="overview">
+      <i class="bi bi-grid-fill"></i>
+      <span>Asosiy</span>
+    </button>
+    <button type="button" class="dock-tab" data-tab="reminders">
+      <i class="bi bi-alarm-fill"></i>
+      <span>Eslatmalar</span>
+    </button>
+    <button type="button" class="dock-tab" data-tab="memory">
+      <i class="bi bi-database-fill"></i>
+      <span>Xotira</span>
+    </button>
+    <button type="button" class="dock-tab" data-tab="chats">
+      <i class="bi bi-megaphone-fill"></i>
+      <span>Guruh/Kanal</span>
+    </button>
+    <button type="button" class="dock-tab" data-tab="system">
+      <i class="bi bi-sliders"></i>
+      <span>Tizim</span>
+    </button>
+  </nav>
+
+  <!-- JavaScript Logic -->
+  <script>
+    const tg = window.Telegram?.WebApp;
+    if (tg) {
+      tg.ready();
+      tg.expand();
+      try {
+        if (tg.enableClosingConfirmation) tg.enableClosingConfirmation();
+        if (tg.setHeaderColor) tg.setHeaderColor('#ffffff');
+        if (tg.setBackgroundColor) tg.setBackgroundColor('#f4f7fb');
+      } catch(e) {}
+    }
+
+    let allFactsData = [];
+
+    // Haptics helper
+    function haptic(type = 'light') {
+      try {
+        if (tg?.HapticFeedback) {
+          if (type === 'success' || type === 'error' || type === 'warning') {
+            tg.HapticFeedback.notificationOccurred(type);
+          } else {
+            tg.HapticFeedback.impactOccurred(type);
+          }
+        }
+      } catch(e) {}
+    }
+
+    // Toast helper
+    function showToast(text, isError = false) {
+      const toast = document.getElementById('toast');
+      const icon = document.getElementById('toast-icon');
+      const msg = document.getElementById('toast-text');
+
+      toast.className = 'neon-toast show';
+      if (isError) {
+        toast.style.borderColor = '#ef4444';
+        icon.className = 'bi bi-exclamation-triangle-fill text-danger';
+      } else {
+        toast.style.borderColor = '#0d6efd';
+        icon.className = 'bi bi-check-circle-fill text-primary';
+      }
+      msg.innerText = text;
+
+      haptic(isError ? 'error' : 'success');
+
+      setTimeout(() => {
+        toast.className = 'neon-toast';
+      }, 3000);
+    }
+
+    // Tab Switcher (Rock-Solid Multi-listener)
+    function switchTab(tabId, el) {
+      document.querySelectorAll('.tab-pane-content').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.dock-tab').forEach(d => d.classList.remove('active'));
+
+      const target = document.getElementById(`tab-${tabId}`);
+      if (target) target.classList.add('active');
+      if (el) el.classList.add('active');
+
+      haptic('light');
+
+      if (tabId === 'reminders') loadReminders();
+      if (tabId === 'memory') loadFacts();
+      if (tabId === 'chats') loadManagedChats();
+      if (tabId === 'system') loadSystemInfo();
+      if (tabId === 'overview') loadStats();
+    }
+
+    // Attach listeners directly to buttons to fix touch/click issues in WebViews
+    document.querySelectorAll('.dock-tab').forEach(btn => {
+      const tabHandler = (e) => {
+        e.preventDefault();
+        const tabId = btn.getAttribute('data-tab');
+        switchTab(tabId, btn);
+      };
+      btn.addEventListener('click', tabHandler);
+      btn.addEventListener('touchend', (e) => {
+        tabHandler(e);
+      }, { passive: false });
+    });
+
+    // Live Clock (Tashkent UTC+5)
+    function updateLiveClock() {
+      const now = new Date();
+      const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+      const tashkent = new Date(utc + (3600000 * 5));
+      const h = String(tashkent.getHours()).padStart(2, '0');
+      const m = String(tashkent.getMinutes()).padStart(2, '0');
+      const s = String(tashkent.getSeconds()).padStart(2, '0');
+      document.getElementById('live-clock').innerText = `${h}:${m}:${s}`;
+    }
+    setInterval(updateLiveClock, 1000);
+    updateLiveClock();
+
+    // Load Stats
+    async function loadStats() {
+      try {
+        const res = await fetch('/api/stats');
+        if (res.ok) {
+          const data = await res.json();
+          document.getElementById('stat-msgs').innerText = data.today_user_messages || 0;
+          document.getElementById('stat-userbot').innerText = data.today_userbot_sends || 0;
+          document.getElementById('stat-kb').innerText = data.knowledge_count || 0;
+          document.getElementById('stat-posts').innerText = data.pending_posts || 0;
+
+          const provider = data.current_provider === 'gemini' ? 'Gemini 3.6 Flash' : (data.current_or_model || 'auto');
+          document.getElementById('agent-active-badge').innerText = `${provider} • ${data.current_role || 'universal'}`;
+
+          let activeModelKey = 'gemini';
+          if (data.current_provider === 'gemini') {
+            activeModelKey = 'gemini';
+          } else if (data.current_provider === 'omniroute') {
+            activeModelKey = 'omniroute';
+          } else {
+            activeModelKey = data.current_or_model || 'auto';
+          }
+          setActivePill('model-group', activeModelKey);
+          const quickSel = document.getElementById('chat-model-quick-select');
+          if (quickSel) quickSel.value = activeModelKey;
+
+          if (data.current_role) {
+            setActivePill('role-group', data.current_role);
+          }
+        }
+      } catch (e) {
+        console.warn('Stat xato', e);
+      }
+    }
+
+    function setActivePill(groupId, val) {
+      const container = document.getElementById(groupId);
+      if (!container) return;
+      container.querySelectorAll('.neon-pill').forEach(el => {
+        const key = el.getAttribute('data-model') || el.getAttribute('data-role');
+        if (key === val) el.classList.add('active');
+        else el.classList.remove('active');
+      });
+    }
+
+    // Model tanlash (Pills)
+    document.querySelectorAll('#model-group .neon-pill').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const m = btn.getAttribute('data-model');
+        try {
+          const res = await fetch('/api/switch_model', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ model: m })
+          });
+          if (res.ok) {
+            setActivePill('model-group', m);
+            const quickSel = document.getElementById('chat-model-quick-select');
+            if (quickSel) quickSel.value = m;
+            showToast(`AI Model tanlandi: ${m}`);
+            loadStats();
+          }
+        } catch (err) {
+          showToast('Model almashtirishda xatolik', true);
+        }
+      });
+    });
+
+    // Model tanlash (Chat Header Dropdown)
+    const chatModelQuickSelect = document.getElementById('chat-model-quick-select');
+    if (chatModelQuickSelect) {
+      chatModelQuickSelect.addEventListener('change', async () => {
+        const m = chatModelQuickSelect.value;
+        try {
+          const res = await fetch('/api/switch_model', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ model: m })
+          });
+          if (res.ok) {
+            setActivePill('model-group', m);
+            showToast(`AI Model tanlandi: ${m}`);
+            loadStats();
+          }
+        } catch (err) {
+          showToast('Model almashtirishda xatolik', true);
+        }
+      });
+    }
+
+    // Rol tanlash
+    document.querySelectorAll('#role-group .neon-pill').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const r = btn.getAttribute('data-role');
+        try {
+          const res = await fetch('/api/switch_role', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ role: r })
+          });
+          if (res.ok) {
+            setActivePill('role-group', r);
+            showToast(`Rol almashtirildi: ${r}`);
+            loadStats();
+          }
+        } catch (err) {
+          showToast('Rol almashtirishda xatolik', true);
+        }
+      });
+    });
+
+    // ─── IN-APP AI AGENT CHAT (XUDDI BOTDAGI KABI) ─────────────
+    const chatBox = document.getElementById('chat-messages-box');
+    const agentInput = document.getElementById('agent-input');
+    const btnSendAgent = document.getElementById('btn-send-agent');
+
+    function appendMessage(text, isUser = false) {
+      const bubble = document.createElement('div');
+      bubble.className = `chat-bubble ${isUser ? 'chat-bubble-user' : 'chat-bubble-agent'}`;
+      
+      if (!isUser) {
+        bubble.innerHTML = `<div class="fw-bold text-primary small mb-1"><i class="bi bi-robot me-1"></i>Super-Agent:</div>${escapeHtml(text).replace(/\n/g, '<br>')}`;
+      } else {
+        bubble.innerText = text;
+      }
+
+      chatBox.appendChild(bubble);
+      chatBox.scrollTop = chatBox.scrollHeight;
+      return bubble;
+    }
+
+    async function sendAgentMessage() {
+      const text = agentInput.value.trim();
+      if (!text) return;
+
+      appendMessage(text, true);
+      agentInput.value = '';
+      haptic('light');
+
+      // Typing indicator
+      const typingBubble = document.createElement('div');
+      typingBubble.className = 'chat-bubble chat-bubble-agent';
+      typingBubble.innerHTML = '<div class="spinner-border spinner-border-sm text-primary me-2"></div>Agent javob tayyorlamoqda...';
+      chatBox.appendChild(typingBubble);
+      chatBox.scrollTop = chatBox.scrollHeight;
+
+      try {
+        const res = await fetch('/api/chat_agent', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ message: text })
+        });
+        const data = await res.json();
+        chatBox.removeChild(typingBubble);
+
+        if (res.ok && data.status === 'ok') {
+          appendMessage(data.response, false);
+          haptic('success');
+          // If a reminder or fact was added, refresh stats
+          if (data.type === 'reminder' || data.type === 'memory') {
+            loadStats();
+          }
+        } else {
+          appendMessage('❌ Xatolik yuz berdi: ' + (data.message || 'Noma\'lum xatolik'), false);
+          haptic('error');
+        }
+      } catch (err) {
+        chatBox.removeChild(typingBubble);
+        appendMessage('❌ Tarmoq xatosi: Server bilan bog\'lanishda uzilish.', false);
+        haptic('error');
+      }
+    }
+
+    btnSendAgent.addEventListener('click', sendAgentMessage);
+    agentInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        sendAgentMessage();
+      }
+    });
+
+    function sendQuickPrompt(promptText) {
+      agentInput.value = promptText;
+      sendAgentMessage();
+    }
+
+    function clearInAppChat() {
+      haptic('medium');
+      chatBox.innerHTML = `
+        <div class="chat-bubble chat-bubble-agent">
+          <div class="fw-bold text-primary small mb-1"><i class="bi bi-robot me-1"></i>Super-Agent:</div>
+          Suhbat tozalandi. Menga xuddi Telegram chatdagidek buyruq yoki savol yozishingiz mumkin!
+        </div>
+      `;
+      showToast('Suhbat tozalandi');
+    }
+
+    // ─── REMINDERS SECTION ───────────────────────────────────
+    async function loadReminders() {
+      const container = document.getElementById('reminders-list');
+      try {
+        const res = await fetch('/api/reminders');
+        if (res.ok) {
+          const data = await res.json();
+          const items = data.reminders || [];
+          document.getElementById('rem-count-badge').innerText = `${items.length} ta`;
+
+          if (items.length === 0) {
+            container.innerHTML = '<div class="text-center text-muted py-3">⏰ Hozircha faol eslatmalar yo\'q.</div>';
+            return;
+          }
+
+          let html = '';
+          items.forEach(r => {
+            html += `
+              <div class="white-list-item">
+                <div class="flex-grow-1 overflow-hidden">
+                  <span class="item-badge-blue"><i class="bi bi-clock me-1"></i>${r.remind_at}</span>
+                  <div class="fw-bold small text-truncate text-dark">${escapeHtml(r.text)}</div>
+                  <div class="text-muted" style="font-size: 11px;">ID: #${r.id} • Holat: ${r.status}</div>
+                </div>
+                <div class="btn-trash" onclick="deleteReminder(${r.id})" title="Bekor qilish"><i class="bi bi-trash3"></i></div>
+              </div>
+            `;
+          });
+          container.innerHTML = html;
+        }
+      } catch (e) {
+        container.innerHTML = '<div class="text-center text-danger py-3">Yuklashda xato yuz berdi.</div>';
+      }
+
+      loadScheduledPosts();
+    }
+
+    async function deleteReminder(id) {
+      haptic('medium');
+      if (!confirm(`Haqiqatan ham #${id} eslatmani bekor qilmoqchimisiz?`)) return;
+
+      try {
+        const res = await fetch('/api/delete_reminder', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ id })
+        });
+        if (res.ok) {
+          showToast('Eslatma bekor qilindi');
+          loadReminders();
+        }
+      } catch(e) {
+        showToast('Xatolik yuz berdi', true);
+      }
+    }
+
+    function setQuickTime(minutes) {
+      haptic('light');
+      const now = new Date();
+      now.setMinutes(now.getMinutes() + minutes);
+      document.getElementById('rem-time-input').value = toLocalISO(now);
+    }
+
+    function setQuickTimeToday(timeStr) {
+      haptic('light');
+      const [h, m] = timeStr.split(':');
+      const now = new Date();
+      now.setHours(parseInt(h), parseInt(m), 0, 0);
+      document.getElementById('rem-time-input').value = toLocalISO(now);
+    }
+
+    function setQuickTimeTomorrow(timeStr) {
+      haptic('light');
+      const [h, m] = timeStr.split(':');
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(parseInt(h), parseInt(m), 0, 0);
+      document.getElementById('rem-time-input').value = toLocalISO(tomorrow);
+    }
+
+    function toLocalISO(date) {
+      const pad = n => String(n).padStart(2, '0');
+      return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    }
+
+    document.getElementById('btn-add-reminder').addEventListener('click', async () => {
+      const timeVal = document.getElementById('rem-time-input').value;
+      const textVal = document.getElementById('rem-text-input').value.trim();
+
+      if (!timeVal || !textVal) {
+        showToast('Iltimos, vaqt va matnni kiriting', true);
+        return;
+      }
+
+      const formattedTime = timeVal.replace('T', ' ') + ':00';
+      try {
+        const res = await fetch('/api/add_reminder', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ remind_at: formattedTime, text: textVal })
+        });
+        if (res.ok) {
+          showToast('Eslatma muvaffaqiyatli saqlandi!');
+          document.getElementById('rem-text-input').value = '';
+          document.getElementById('rem-time-input').value = '';
+          loadReminders();
+        }
+      } catch (e) {
+        showToast('Eslatmani saqlashda xato', true);
+      }
+    });
+
+    async function loadScheduledPosts() {
+      const container = document.getElementById('posts-list');
+      try {
+        const res = await fetch('/api/scheduled_posts');
+        if (res.ok) {
+          const data = await res.json();
+          const posts = data.posts || [];
+          if (posts.length === 0) {
+            container.innerHTML = '<div class="text-center text-muted py-3">Kutilayotgan postlar yo\'q.</div>';
+            return;
+          }
+          let html = '';
+          posts.forEach(p => {
+            html += `
+              <div class="white-list-item">
+                <div class="flex-grow-1 overflow-hidden">
+                  <span class="badge bg-primary-subtle text-primary border border-primary-subtle mb-1"><i class="bi bi-telegram me-1"></i>${p.chat_id}</span>
+                  <div class="fw-bold small text-truncate">${escapeHtml(p.text)}</div>
+                  <div class="text-muted" style="font-size: 11px;">Reja vaqti: ${p.scheduled_time}</div>
+                </div>
+              </div>
+            `;
+          });
+          container.innerHTML = html;
+        }
+      } catch(e) {}
+    }
+
+    // ─── KNOWLEDGE BASE (FACTS) ──────────────────────────────
+    async function loadFacts() {
+      const container = document.getElementById('facts-list');
+      try {
+        const res = await fetch('/api/facts');
+        if (res.ok) {
+          const data = await res.json();
+          allFactsData = data.facts || [];
+          document.getElementById('fact-count-badge').innerText = `${allFactsData.length} ta`;
+          renderFacts(allFactsData);
+        }
+      } catch(e) {
+        container.innerHTML = '<div class="text-center text-danger py-3">Faktlarni yuklab bo\'lmadi.</div>';
+      }
+    }
+
+    function renderFacts(facts) {
+      const container = document.getElementById('facts-list');
+      if (facts.length === 0) {
+        container.innerHTML = '<div class="text-center text-muted py-3">🧠 Saqlangan faktlar mavjud emas.</div>';
+        return;
+      }
+      let html = '';
+      facts.forEach(f => {
+        html += `
+          <div class="white-list-item">
+            <div class="flex-grow-1 overflow-hidden">
+              <span class="item-badge-blue">${escapeHtml(f.key)}</span>
+              <div class="fw-bold small text-truncate text-dark">${escapeHtml(f.content)}</div>
+              <div class="text-muted" style="font-size: 11px;">Kategoriya: ${escapeHtml(f.category || 'oddiy')}</div>
+            </div>
+            <div class="btn-trash" onclick="deleteFact('${escapeHtml(f.key)}')" title="O'chirish"><i class="bi bi-trash3"></i></div>
+          </div>
+        `;
+      });
+      container.innerHTML = html;
+    }
+
+    function filterFacts() {
+      const q = document.getElementById('fact-search').value.toLowerCase();
+      const filtered = allFactsData.filter(f => 
+        (f.key && f.key.toLowerCase().includes(q)) || 
+        (f.content && f.content.toLowerCase().includes(q))
+      );
+      renderFacts(filtered);
+    }
+
+    async function deleteFact(key) {
+      haptic('medium');
+      if (!confirm(`"${key}" kalitini xotiradan o'chirmoqchimisiz?`)) return;
+
+      try {
+        const res = await fetch('/api/delete_fact', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ key })
+        });
+        if (res.ok) {
+          showToast(`"${key}" o'chirildi`);
+          loadFacts();
+          loadStats();
+        }
+      } catch(e) {
+        showToast('O\'chirishda xatolik', true);
+      }
+    }
+
+    document.getElementById('btn-save-fact').addEventListener('click', async () => {
+      const category = document.getElementById('fact-category').value;
+      const key = document.getElementById('fact-key').value.trim();
+      const content = document.getElementById('fact-content').value.trim();
+
+      if (!key || !content) {
+        showToast('Kalit va fakt mazmunini to\'ldiring', true);
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/add_fact', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ key, content, category })
+        });
+        if (res.ok) {
+          showToast('Fakt doimiy xotiraga saqlandi!');
+          document.getElementById('fact-key').value = '';
+          document.getElementById('fact-content').value = '';
+          loadFacts();
+          loadStats();
+        }
+      } catch (e) {
+        showToast('Saqlashda xato', true);
+      }
+    });
+
+    // ─── MANAGED CHATS (CHANNELS & GROUPS) ───────────────────
+    async function loadManagedChats() {
+      const container = document.getElementById('managed-chats-list');
+      try {
+        const res = await fetch('/api/managed_chats');
+        if (res.ok) {
+          const data = await res.json();
+          const chats = data.chats || [];
+          document.getElementById('chats-count-badge').innerText = `${chats.length} ta`;
+
+          if (chats.length === 0) {
+            container.innerHTML = `
+              <div class="text-center text-muted py-3">
+                <i class="bi bi-info-circle fs-4 d-block mb-2 text-primary"></i>
+                Hozircha ulangan kanallar yoki guruhlar yo'q.<br>
+                <small>Botni kanalingizga <b>Admin</b> yoki guruhingizga a'zo qilib qo'shing!</small>
+              </div>
+            `;
+            return;
+          }
+
+          let html = '';
+          chats.forEach(c => {
+            const isChannel = c.chat_type === 'channel';
+            const icon = isChannel ? 'bi-broadcast' : 'bi-people-fill';
+            const badgeClass = isChannel ? 'bg-primary-subtle text-primary border-primary-subtle' : 'bg-success-subtle text-success border-success-subtle';
+            const typeTitle = isChannel ? 'Kanal' : 'Guruh';
+
+            html += `
+              <div class="white-list-item">
+                <div class="flex-grow-1">
+                  <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="badge ${badgeClass} border"><i class="bi ${icon} me-1"></i>${typeTitle}</span>
+                    <span class="fw-bold small text-dark">${escapeHtml(c.title)}</span>
+                  </div>
+                  <div class="text-muted" style="font-size: 11px;">
+                    ID: <code>${c.chat_id}</code> ${c.username ? '• @' + c.username : ''}
+                  </div>
+                </div>
+                <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 small">Faol</span>
+              </div>
+            `;
+          });
+          container.innerHTML = html;
+        }
+      } catch(e) {
+        container.innerHTML = '<div class="text-center text-danger py-3">Yuklashda xato yuz berdi.</div>';
+      }
+    }
+
+    // ─── SYSTEM DIAGNOSTICS ──────────────────────────────────
+    async function loadSystemInfo() {
+      try {
+        const res = await fetch('/api/system_info');
+        if (res.ok) {
+          const data = await res.json();
+          document.getElementById('sys-uptime').innerText = data.uptime_human || '—';
+          document.getElementById('sys-db').innerText = data.database_type || 'SQLite';
+
+          const userbotEl = document.getElementById('sys-userbot');
+          const badgeUserbot = document.getElementById('badge-userbot');
+          if (data.userbot_connected) {
+            userbotEl.innerText = 'Ulangan (Telegram Session Faol)';
+            badgeUserbot.innerText = 'Online';
+            badgeUserbot.className = 'badge bg-success-subtle text-success border border-success-subtle px-3 py-2';
+          } else {
+            userbotEl.innerText = 'Ulanmagan yoki to\'xtatilgan';
+            badgeUserbot.innerText = 'Offline';
+            badgeUserbot.className = 'badge bg-warning-subtle text-warning border border-warning-subtle px-3 py-2';
+          }
+
+          document.getElementById('sys-model-role').innerText = `${data.provider || 'gemini'} • Rol: ${data.role || 'universal'}`;
+        }
+      } catch(e) {}
+    }
+
+    document.getElementById('btn-clear-history').addEventListener('click', async () => {
+      haptic('medium');
+      if (!confirm('AI suhbat xotirasini tozalamoqchimisiz?')) return;
+      try {
+        const res = await fetch('/api/switch_role', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ role: 'universal' })
+        });
+        showToast('AI suhbat tarixi tozalandi!');
+      } catch(e) {
+        showToast('Tozalashda xatolik', true);
+      }
+    });
+
+    document.getElementById('btn-refresh').addEventListener('click', () => {
+      haptic('light');
+      loadStats();
+      showToast('Ma\'lumotlar yangilandi');
+    });
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    // Initial load
+    loadStats();
+    setInterval(loadStats, 15000);
+  </script>
+</body>
+</html>
