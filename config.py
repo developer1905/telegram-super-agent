@@ -51,7 +51,17 @@ OMNIROUTE_MODEL: str = os.getenv("OMNIROUTE_MODEL", "auto")
 MIDJOURNEY_API_KEY: str = os.getenv("MIDJOURNEY_API_KEY", "")
 MIDJOURNEY_API_URL: str = os.getenv("MIDJOURNEY_API_URL", "https://api.goapi.ai/api/v1/task")
 # Bepul 100% cheksiz Midjourney v6 / Flux-Realism dvigateli
-IMAGE_DEFAULT_ENGINE: str = os.getenv("IMAGE_DEFAULT_ENGINE", "flux-midjourney")
+# ─── Text-to-Speech (edge-tts) ───────────────────────────────
+DEFAULT_VOICE: str = os.getenv("DEFAULT_VOICE", "uz-UZ-MadinaNeural")
+VOICE_OPTIONS: dict[str, str] = {
+    "madina":   "uz-UZ-MadinaNeural",    # O'zbekcha (Ayol)
+    "sardor":   "uz-UZ-SardorNeural",    # O'zbekcha (Erkak)
+    "svetlana": "ru-RU-SvetlanaNeural",  # Ruscha (Ayol)
+    "dmitry":   "ru-RU-DmitryNeural",    # Ruscha (Erkak)
+    "jenny":    "en-US-JennyNeural",     # Inglizcha (Ayol)
+    "guy":      "en-US-GuyNeural",       # Inglizcha (Erkak)
+}
+ENABLE_VOICE_REPLIES: bool = os.getenv("ENABLE_VOICE_REPLIES", "true").lower() == "true"
 
 # ─── Watermark ───────────────────────────────────────────────
 WATERMARK_TEXT: str = os.getenv("WATERMARK_TEXT", "© SuperAgent")

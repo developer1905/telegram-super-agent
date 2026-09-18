@@ -101,6 +101,30 @@ async def handle_voice_message(message: Message, bot: Bot, ai: AIManager) -> Non
             parse_mode="Markdown",
         )
 
+        # ─── Realistik Ovozli Javob Qaytarish (edge-tts) ───
+        from config import ENABLE_VOICE_REPLIES
+        if ENABLE_VOICE_REPLIES:
+            try:
+                from core.tts_agent import generate_speech_audio
+                from aiogram.types import BufferedInputFile
+
+                # AI javobidagi eng muhim qismini (tavsiya yoki xulosani) ovozga aylantirish
+                speech_text = ai_response
+                if "💡" in speech_text:
+                    speech_text = speech_text.split("💡")[-1]
+                elif "🎯" in speech_text:
+                    speech_text = speech_text.split("🎯")[-1]
+
+                voice_bytes = await generate_speech_audio(speech_text)
+                if voice_bytes:
+                    voice_file = BufferedInputFile(file=voice_bytes, filename="superagent_reply.mp3")
+                    await message.reply_voice(
+                        voice=voice_file,
+                        caption="🎙 **Ovozli AI Javobi**",
+                    )
+            except Exception as tts_err:
+                logger.debug("Ovozli javob yuborishda xatolik: %s", tts_err)
+
     except Exception as exc:
         logger.error("Ovozli xabarni qayta ishlash xatosi: %s", exc)
         from core.safe_send import safe_edit_text

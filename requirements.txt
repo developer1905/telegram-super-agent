@@ -45,3 +45,9 @@ openpyxl>=3.1.0
 
 # Doimiy Xotira (Supabase Cloud Database & RAG)
 supabase>=2.0.0
+
+# Text-to-Speech (Microsoft Edge AI Ovoz - 100% Bepul)
+edge-tts>=6.1.0
+
+# Universal Hujjatlar Tahlilchisi (Microsoft MarkItDown)
+markitdown>=0.0.1

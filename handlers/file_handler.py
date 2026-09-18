@@ -64,15 +64,16 @@ async def handle_document(message: Message, bot: Bot, ai_manager: AIManager) -> 
     if not file_type:
         ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
         ext_map = {
-            "docx": "docx", "pdf": "pdf", "txt": "txt", "py": "py", "doc": "doc",
-            "xlsx": "xlsx", "xls": "xls", "csv": "csv"
+            "docx": "docx", "pdf": "pdf", "txt": "txt", "py": "py", "doc": "docx",
+            "xlsx": "xlsx", "xls": "xls", "csv": "csv", "pptx": "pptx", "ppt": "pptx",
+            "html": "html", "md": "txt", "json": "txt",
         }
         file_type = ext_map.get(ext)
 
-    if not file_type or file_type == "doc":
+    if not file_type:
         await message.answer(
             f"⚠️ `{filename}` fayl turi qo'llab-quvvatlanmaydi.\n"
-            "Qabul qilinadigan formatlar: **DOCX, PDF, TXT, PY, XLSX, CSV**",
+            "Qabul qilinadigan formatlar: **DOCX, PDF, PPTX, TXT, PY, XLSX, CSV, HTML**",
             parse_mode="Markdown",
         )
         return
@@ -96,7 +97,7 @@ async def handle_document(message: Message, bot: Bot, ai_manager: AIManager) -> 
         return
 
     # ─── EXCEL VA CSV TAHLILI (DATA ANALYTICS) ───────────────
-    if file_type in ("xlsx", "xls", "csv"):
+    if file_type in ("xlsx", "xls", "csv") and not (message.caption and "matn" in message.caption.lower()):
         await wait_msg.edit_text(f"📊 `{filename}` jadvali hisob-kitob qilinmoqda...", parse_mode="Markdown")
         analytics_result = await analyze_spreadsheet(
             file_bytes=file_bytes,
@@ -108,13 +109,21 @@ async def handle_document(message: Message, bot: Bot, ai_manager: AIManager) -> 
         await safe_edit_text(wait_msg, analytics_result, parse_mode="Markdown")
         return
 
-    # Matnni ajratish
-    await wait_msg.edit_text(f"🔍 `{filename}` tahlil qilinmoqda...", parse_mode="Markdown")
-    extracted_text = extract_text_from_bytes(file_bytes, file_type)
+    # ─── MICROSOFT MARKITDOWN ORQALI MATNNI AJRATISH ─────────
+    await wait_msg.edit_text(f"🔍 `{filename}` (Microsoft MarkItDown) tahlil qilinmoqda...", parse_mode="Markdown")
+    try:
+        from core.markitdown_agent import convert_document_to_markdown
+        extracted_text = convert_document_to_markdown(file_bytes, filename=filename)
+    except Exception as md_err:
+        logger.warning("MarkItDown xatosi (%s), zaxira metodga o'tiladi", md_err)
+        extracted_text = extract_text_from_bytes(file_bytes, file_type)
 
-    if extracted_text.startswith("["):
+    if not extracted_text or extracted_text.startswith("["):
+        extracted_text = extract_text_from_bytes(file_bytes, file_type)
+
+    if not extracted_text or extracted_text.startswith("["):
         # Xato yoki bo'sh
-        await wait_msg.edit_text(f"⚠️ {extracted_text}")
+        await wait_msg.edit_text(f"⚠️ {extracted_text or 'Hujjat bo\'sh'}")
         return
 
     # AI tahlili

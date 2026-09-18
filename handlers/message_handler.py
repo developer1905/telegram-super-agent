@@ -45,6 +45,10 @@ from core.search_agent import search_image_url, answer_with_web_search, download
 from core.reminder_manager import parse_reminder_smart
 from core.midjourney_agent import draw_midjourney_image, generate_free_midjourney_image
 from core.hermes_agent import run_hermes_agent
+from core.tts_agent import generate_speech_audio
+from core.crawl_agent import crawl_web_page
+from core.browser_agent import take_website_screenshot
+from core.mem0_agent import auto_extract_user_memories, get_user_profile_report
 from services.scheduler import LogCollector
 from handlers.email_handler import handle_email_text_command
 
@@ -373,6 +377,24 @@ async def cb_midjourney_action(cb: CallbackQuery, ai_manager: AIManager) -> None
         except Exception:
             pass
         await cb.message.answer_photo(photo=input_file, caption=caption, reply_markup=builder.as_markup(), parse_mode="Markdown")
+
+
+# ─── Ovozda O'qish (TTS Callback) ────────────────────────────
+
+@router.callback_query(ADMIN_FILTER, F.data == "read_voice_msg")
+async def cb_read_voice_msg(cb: CallbackQuery) -> None:
+    await cb.answer("🎙 Ovoz tayyorlanmoqda...")
+    text_to_speak = cb.message.text or cb.message.caption or ""
+    if not text_to_speak:
+        await cb.answer("❌ Matn topilmadi", show_alert=True)
+        return
+
+    voice_bytes = await generate_speech_audio(text_to_speak)
+    if voice_bytes:
+        voice_file = BufferedInputFile(file=voice_bytes, filename="superagent_voice.mp3")
+        await cb.message.reply_voice(voice=voice_file, caption="🎙 **Ovozli Talqin**")
+    else:
+        await cb.answer("❌ Ovoz generatsiya qilib bo'lmadi.", show_alert=True)
 
 
 # ─── Eslatmalar Callbacks ──────────────────────────────────────
@@ -720,6 +742,74 @@ async def handle_ai_chat(message: Message, ai_manager: AIManager) -> None:
             )
             return
 
+    # 4.3 Ovoz Sintezi — Text-to-Speech (/voice, ovoz:, gapir:)
+    voice_match = re.match(r"^(?:/voice|ovoz|gapir|ovozga\s+aylantir)[:\s]+(.+)$", user_text, re.IGNORECASE | re.DOTALL)
+    if voice_match:
+        text_to_speak = voice_match.group(1).strip()
+        if text_to_speak:
+            wait_msg = await message.answer("🎙 **Matn inson ovoziga aylantirilmoqda...**")
+            voice_bytes = await generate_speech_audio(text_to_speak)
+            if voice_bytes:
+                await wait_msg.delete()
+                v_file = BufferedInputFile(file=voice_bytes, filename="voice.mp3")
+                await message.reply_voice(voice=v_file, caption=f"🎙 _{text_to_speak[:100]}..._", parse_mode="Markdown")
+                LogCollector().add(action_type="tts_voice", description=f"Ovoz: {text_to_speak[:30]}")
+                return
+            else:
+                await safe_edit_text(wait_msg, "❌ Ovoz generatsiya qilib bo'lmadi.")
+                return
+
+    # 4.4 Crawl4AI — Chuqur Veb Skraping (/crawl, sayt:, saytni oqi:)
+    crawl_match = re.match(r"^(?:/crawl|sayt|saytni\s+oqi|saytni\s+tahlil\s+qil|urlni\s+tekshir)[:\s]+(https?://\S+)(.*)$", user_text, re.IGNORECASE)
+    if crawl_match:
+        target_url = crawl_match.group(1).strip()
+        user_instruct = crawl_match.group(2).strip()
+        wait_msg = await message.answer(f"🕷 `{target_url}` sayti (Crawl4AI) orqali chuqur skraping qilinmoqda...")
+        crawl_data = await crawl_web_page(target_url)
+        if crawl_data.get("status") == "ok":
+            page_text = crawl_data.get("content", "")
+            page_title = crawl_data.get("title", "")
+            crawl_prompt = (
+                f"Veb-sahifa: {target_url}\nSarlavha: {page_title}\n\n"
+                f"Saytning toza matni:\n{page_text[:4000]}\n\n"
+                f"Topshiriq: {user_instruct or 'Saytning mazmuni, xizmatlari va muhim ma\'lumotlarini tahlil qilib, tizimli xulosa ber.'}"
+            )
+            ai_summary = await ai_manager.generate(crawl_prompt, save_history=False)
+            header = f"🌐 **Crawl4AI Tahlili:** [{page_title}]({target_url})\n\n"
+            await safe_edit_text(wait_msg, header + ai_summary, parse_mode="Markdown")
+            LogCollector().add(action_type="crawl", description=f"Crawl: {target_url[:40]}")
+            return
+        else:
+            await safe_edit_text(wait_msg, f"❌ Saytni o'qishda xatolik: {crawl_data.get('error', 'Noma\'lum')}")
+            return
+
+    # 4.5 Browser-Use — Sayt Skrinshotini Olish (/screenshot, skrinshot:)
+    ss_match = re.match(r"^(?:/screenshot|skrinshot|ekran\s+rasmi|screenshot)[:\s]+(https?://\S+)", user_text, re.IGNORECASE)
+    if ss_match:
+        ss_url = ss_match.group(1).strip()
+        wait_msg = await message.answer(f"🌐 `{ss_url}` saytining jonli skrinshoti olinmoqda (Browser-Use)...")
+        await message.bot.send_chat_action(message.chat.id, "upload_photo")
+        ss_bytes = await take_website_screenshot(ss_url)
+        if ss_bytes:
+            await wait_msg.delete()
+            input_ss = BufferedInputFile(file=ss_bytes, filename="screenshot.jpg")
+            await message.answer_photo(
+                photo=input_ss,
+                caption=f"📸 **Veb-sayt Skrinshoti (Browser-Use)**\n🔗 Manzil: `{ss_url}`",
+                parse_mode="Markdown",
+            )
+            LogCollector().add(action_type="screenshot", description=f"Screenshot: {ss_url[:40]}")
+            return
+        else:
+            await safe_edit_text(wait_msg, "❌ Skrinshot olib bo'lmadi. Sayt manzilini tekshiring.")
+            return
+
+    # 4.6 Mem0 — Adaptiv Shaxsiy Profil (/profile, mening profilim)
+    if user_text.lower() in ("/profile", "profil", "mening profilim", "men haqimda", "profilim"):
+        prof_text = await get_user_profile_report()
+        await message.answer(prof_text, parse_mode="Markdown")
+        return
+
     # 5. Rasm qidirish va yuborish ("rasmini top: Toshkent", "rasm: Lamborghini", "Eiffel rasmini tashla")
     if re.search(r"(?:rasmini\s+(?:top|tashla|yukla|korsat|ko'rsat)|rasm[:\s]+)", user_text, re.IGNORECASE):
         query_clean = re.sub(r"^(?:rasmini\s+(?:top|tashla|yukla|korsat|ko'rsat)|rasm)[:\s]+", "", user_text, flags=re.IGNORECASE)
@@ -759,11 +849,22 @@ async def handle_ai_chat(message: Message, ai_manager: AIManager) -> None:
             return
 
     # 7. Oddiy so'rov → AI bilan to'g'ridan-to'g'ri va tezkor suhbat
+    # Mem0 orqa fonda foydalanuvchining shaxsiy odatlarini o'rganadi
+    import asyncio
+    asyncio.create_task(auto_extract_user_memories(user_text, ai_manager))
+
     await message.bot.send_chat_action(message.chat.id, "typing")
     response = await ai_manager.generate(user_text)
 
-    # Bulletproof javob yuborish (Markdown xatolarisiz va uzunlik bo'yicha to'g'ri chunking bilan)
-    await safe_message_answer(message, response, parse_mode="Markdown")
+    # Ovozli eshitish tugmasi
+    voice_btn = InlineKeyboardBuilder()
+    voice_btn.row(InlineKeyboardButton(text="🔊 Ovozda eshitish", callback_data="read_voice_msg"))
+
+    # Javob yuborish
+    try:
+        await message.answer(response, reply_markup=voice_btn.as_markup(), parse_mode="Markdown")
+    except Exception:
+        await safe_message_answer(message, response, parse_mode=None)
 
     # Log yozuv
     provider = ai_manager.current_provider

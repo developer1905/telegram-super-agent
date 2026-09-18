@@ -60,6 +60,10 @@ def build_reply_keyboard_menu() -> ReplyKeyboardMarkup:
             KeyboardButton(text="⚡ Hermes Agent"),
         ],
         [
+            KeyboardButton(text="👤 Shaxsiy Profil (Mem0)"),
+            KeyboardButton(text="🎙 Ovozli Agent (TTS)"),
+        ],
+        [
             KeyboardButton(text="🤖 AI Modellar"),
             KeyboardButton(text="🎭 Tizim Rollari"),
         ],
@@ -111,6 +115,10 @@ def build_main_menu() -> InlineKeyboardMarkup:
     builder.row(
         InlineKeyboardButton(text="🎨 Midjourney AI Rasm", callback_data="menu:midjourney"),
         InlineKeyboardButton(text="⚡ Hermes 3 Agent", callback_data="menu:hermes"),
+    )
+    builder.row(
+        InlineKeyboardButton(text="👤 Profilim (Mem0)", callback_data="menu:mem0_profile"),
+        InlineKeyboardButton(text="🎙 Ovozli Audio (TTS)", callback_data="menu:tts_info"),
     )
     builder.row(
         InlineKeyboardButton(text="🤖 Model Tanlash", callback_data="menu:models"),
@@ -267,6 +275,31 @@ async def rk_hermes(message: Message, ai_manager: AIManager) -> None:
         "• `/hermes Yangi startap loyiha uchun 6 oylik biznes reja, moliyaviy hisob-kitob va marketing strategiyasi tuzib ber`\n"
         "• `hermes: O'zbekiston IT bozoridagi eng istiqbolli 5 ta sohani hisob-kitoblar bilan tahlil qil`\n"
         "• Har qanday matematik yoki mantiqiy masalani bevosita yozishingiz mumkin!"
+    )
+    await message.answer(text, parse_mode="Markdown")
+
+
+@router.message(ADMIN_FILTER, F.text.in_({"👤 Shaxsiy Profil (Mem0)", "Shaxsiy Profil (Mem0)", "profilim", "Profilim", "/profile"}))
+async def rk_profile(message: Message) -> None:
+    from core.mem0_agent import get_user_profile_summary
+    wait_msg = await message.answer("⏳ Mem0 xotirasi tekshirilmoqda...")
+    profile_text = await get_user_profile_summary(message.from_user.id)
+    await wait_msg.edit_text(profile_text, parse_mode="Markdown")
+
+
+@router.message(ADMIN_FILTER, F.text.in_({"🎙 Ovozli Agent (TTS)", "Ovozli Agent (TTS)", "ovozli xabar", "Ovozli xabar", "/voice"}))
+async def rk_tts(message: Message) -> None:
+    text = (
+        "🎙 **Microsoft Edge TTS — Jonli Ovozli Xabarlar**\n\n"
+        "AI javoblarini tabiiy inson ovozida (o'zbek, rus, ingliz) audio qilib eshitishingiz mumkin!\n\n"
+        "**Imkoniyatlar:**\n"
+        "1. **Ixtiyoriy matnni ovozga aylantirish:**\n"
+        "   `/voice Salom, bugun qanday yangiliklar bor?`\n"
+        "   deb yozing, bot darhol Telegram Voice formatida audio qilib yuboradi!\n\n"
+        "2. **Har bir AI javobi ostida '🔊 Ovozda eshitish' tugmasi:**\n"
+        "   Tugmani bir marta bosish orqali matnni ovozli xabar sifatida qabul qilasiz.\n\n"
+        "3. **Ovozli xabar yuborsangiz:**\n"
+        "   Bot sizning ovozingizni tinglaydi va avtomatik ravishda ovoz bilan javob qaytaradi!"
     )
     await message.answer(text, parse_mode="Markdown")
 
@@ -469,34 +502,33 @@ async def rk_mini_app(message: Message) -> None:
 async def cmd_help(message: Message) -> None:
     """Yordam xabari."""
     text = (
-        "📖 **Super-Agent Yordam**\n\n"
-        "**Buyruqlar:**\n"
-        "`/start` — Asosiy menyu\n"
-        "`/help` — Bu yordam\n"
-        "`/email` — Email Agent boshqaruvi\n"
-        "`/status` — Joriy holat\n"
-        "`/clear` — Xotirani tozalash\n"
-        "`/log` — Bugungi faoliyat logi\n"
-        "`/userbot` — Userbot ma'lumoti\n\n"
-        "**Email Buyruqlari:**\n"
+        "📖 **Super-Agent 2.0 Enterprise Qo'llanmasi**\n\n"
+        "**🚀 Agentik & AI Buyruqlari:**\n"
+        "• `/imagine [tasvir]` — Midjourney v6 fotorealistik rasm chizish (100% bepul)\n"
+        "• `/hermes [topshiriq]` — Nous Hermes 3 avtonom rejalashtiruvchi va chuqur fikrlovchi agent\n"
+        "• `/voice [matn]` — Microsoft Edge TTS orqali tabiiy ovozli xabar (o'zbek/rus/ingliz)\n"
+        "• `/profile` — Mem0 shaxsiy adaptiv xotira va profilingiz tahlili\n"
+        "• `/crawl [url]` — Crawl4AI orqali saytni LLM uchun toza Markdown formatida o'qish\n"
+        "• `/screenshot [url]` — Browser-use orqali real-time veb-sayt skrinshotini olish\n"
+        "• `/status` — AI modeli va tizim holati\n"
+        "• `/clear` — Xotirani tozalash\n"
+        "• `/log` — Bugungi faoliyat xulosasi\n"
+        "• `/userbot` — Userbot holati\n\n"
+        "**📁 Hujjatlar (Microsoft MarkItDown):**\n"
+        "Istalgan PDF, Word (DOCX), Excel (XLSX), PowerPoint (PPTX) yoki CSV faylni yuboring — agent uni bir lahzada tahlil qilib, xulosa yoki savollaringizga javob beradi.\n\n"
+        "**🎙 Ovozli Muloqot:**\n"
+        "Botga ovozli xabar (voice note) yuboring — agent ovozingizni tushunib, o'zi ham tabiiy inson ovozida javob qaytaradi!\n\n"
+        "**📧 Email Agent:**\n"
         "• `pochta` yoki `email tekshir` → O'qilmagan xatlar va AI xulosasi\n"
         "• `email ai: user@example.com | vazifa` → AI xat tayyorlash\n"
         "• `email: user@example.com | Mavzu | Matn` → To'g'ridan-to'g'ri xat\n\n"
-        "**Fayllar:**\n"
-        "Istalgan DOCX/PDF/TXT/PY fayl yuboring → tahlil + qayta yozish\n\n"
-        "**Rasmlar:**\n"
-        "Rasm yuboring:\n"
-        "• Caption yo'q → AI multimodal tahlil\n"
-        "• `grayscale` → Kulrang\n"
-        "• `blur` → Xiralashtirish\n"
-        "• `sharpen` → Tiklash\n"
-        "• `watermark [matn]` → Suv belgisi\n"
-        "• `resize [kenglik] [balandlik]` → O'lchashish\n"
-        "• `brightness [1.0-3.0]` → Yorqinlik\n\n"
-        "**Userbot Buyruqlari (matn sifatida):**\n"
-        "`yoz @username: [xabar]` → Foydalanuvchiga xabar\n"
-        "`post: @kanal [matn]` → Kanalga post (tasdiq kerak)\n"
-        "`suhbatlar` → Suhbatlar ro'yxati"
+        "**🎨 Rasmlar va Multimodal:**\n"
+        "Rasm yuborib matn yozing yoki filtr qo'llang:\n"
+        "• `grayscale`, `blur`, `sharpen`, `watermark [matn]`, `resize [W] [H]`\n\n"
+        "**⚡ Userbot Buyruqlari:**\n"
+        "• `yoz @username: [xabar]` → Userbot orqali xabar yuborish\n"
+        "• `post: @kanal [matn]` → Kanalga post tayyorlash\n"
+        "• `suhbatlar` → Oxirgi Telegram suhbatlari"
     )
     await message.answer(text, parse_mode="Markdown")
 
@@ -566,6 +598,35 @@ async def cb_hermes(cb: CallbackQuery, ai_manager: AIManager) -> None:
         "**Siz unga murakkab topshiriqlar berishingiz mumkin:**\n"
         "• `/hermes Yangi startap loyiha uchun 6 oylik biznes reja, moliyaviy hisob-kitob va marketing strategiyasi tuzib ber`\n"
         "• `hermes: O'zbekiston IT bozoridagi eng istiqbolli 5 ta sohani hisob-kitoblar bilan tahlil qil`"
+    )
+    await safe_edit_text(cb, text, reply_markup=builder.as_markup(), parse_mode="Markdown")
+
+
+@router.callback_query(ADMIN_FILTER, F.data == "menu:mem0_profile")
+async def cb_mem0_profile(cb: CallbackQuery) -> None:
+    await cb.answer()
+    from core.mem0_agent import get_user_profile_summary
+    profile_text = await get_user_profile_summary(cb.from_user.id)
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="◀️ Asosiy Menyu", callback_data="menu:main"))
+    await safe_edit_text(cb, profile_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
+
+
+@router.callback_query(ADMIN_FILTER, F.data == "menu:tts_info")
+async def cb_tts_info(cb: CallbackQuery) -> None:
+    await cb.answer()
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="◀️ Asosiy Menyu", callback_data="menu:main"))
+    text = (
+        "🎙 **Microsoft Edge TTS — Jonli Ovozli Xabarlar**\n\n"
+        "AI javoblarini tabiiy inson ovozida (o'zbek, rus, ingliz) audio qilib eshitishingiz mumkin!\n\n"
+        "**Imkoniyatlar:**\n"
+        "1. **Ixtiyoriy matnni ovozga aylantirish:**\n"
+        "   `/voice Salom, bugun qanday yangiliklar bor?`\n\n"
+        "2. **AI javoblari ostida '🔊 Ovozda eshitish' tugmasi:**\n"
+        "   Bir marta bosish orqali javobni audio shaklida tinglang.\n\n"
+        "3. **Ovozli xabar yuborsangiz:**\n"
+        "   Bot sizning ovozingizni tushunib, o'zi ham ovozli xabar bilan javob qaytaradi!"
     )
     await safe_edit_text(cb, text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
