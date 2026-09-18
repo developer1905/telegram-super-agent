@@ -646,15 +646,43 @@ async def start_web_server(ai_manager: AIManager, bot: Optional[Bot] = None) -> 
     port = int(os.getenv("PORT", "8080"))
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, host="0.0.0.0", port=port)
-    await site.start()
-    logger.info("✅ Web App Server faol: http://0.0.0.0:%d/webapp", port)
+
+    candidate_ports = [port]
+    if port != 8080 and 8080 not in candidate_ports:
+        candidate_ports.append(8080)
+    for alt in (8081, 8888, 5000):
+        if alt not in candidate_ports:
+            candidate_ports.append(alt)
+
+    server_started = False
+    for p in candidate_ports:
+        try:
+            site = web.TCPSite(
+                runner,
+                host="0.0.0.0",
+                port=p,
+                reuse_address=True,
+                reuse_port=True if hasattr(os, "SO_REUSEPORT") else False,
+            )
+            await site.start()
+            logger.info("✅ Web App Server faol: http://0.0.0.0:%d/webapp", p)
+            server_started = True
+            break
+        except Exception as port_err:
+            logger.warning("Port %d band yoki xatolik yuz berdi: %s. Boshqa port sinab ko'rilmoqda...", p, port_err)
+
+    if not server_started:
+        logger.error("⚠️ Hech qaysi portda Web App server ulanmadi. Bot serverlarsiz faoliyatini davom ettiradi.")
+
     return runner
 
 
 # ─── Asosiy Asinxron Funksiya ─────────────────────────────────
 
 async def main() -> None:
+    web_runner: Optional[web.AppRunner] = None
+    scheduler = None
+
     # 1. Konfiguratsiyani tekshirish
     missing = validate_config()
     if missing:
@@ -675,8 +703,11 @@ async def main() -> None:
     )
     dp = Dispatcher()
 
-    # 4. Web App va Health Server ni ishga tushirish
-    web_runner = await start_web_server(ai_manager, bot=bot)
+    # 4. Web App va Health Server ni ishga tushirish (xatolikka chidamli)
+    try:
+        web_runner = await start_web_server(ai_manager, bot=bot)
+    except Exception as ws_err:
+        logger.warning("⚠️ Web App server ishga tushirishda xatolik: %s (Bot ishlashda davom etadi)", ws_err)
 
     # 5. Telethon Userbot ni ishga tushirish
     userbot_client = create_userbot_client()
@@ -793,13 +824,37 @@ async def main() -> None:
                 "callback_query",
             ],
         )
+    except Exception as poll_err:
+        err_text = str(poll_err)
+        if "Conflict" in err_text or "terminated by other getUpdates" in err_text:
+            logger.critical(
+                "❌ TELEGRAM TO'QNASHUV (ConflictError): Serverda boshqa bot nusxasi ishlab turibdi! "
+                "Iltimos, eski jarayonni o'chiring: `sudo pkill -9 -f 'python main.py'`"
+            )
+        else:
+            logger.error("⚠️ Pollingda xatolik yuz berdi: %s", poll_err)
+        raise
     finally:
-        # To'xtatishda resurslarni tozalash
-        scheduler.shutdown(wait=False)
+        # To'xtatishda barcha resurslarni xavfsiz tozalash
+        if scheduler:
+            try:
+                scheduler.shutdown(wait=False)
+            except Exception as sch_err:
+                logger.debug("Scheduler to'xtatishda xatolik: %s", sch_err)
         if userbot_module.userbot and userbot_module.userbot.is_connected():
-            await userbot_module.userbot.disconnect()
-        await web_runner.cleanup()
-        await bot.session.close()
+            try:
+                await userbot_module.userbot.disconnect()
+            except Exception as ub_err:
+                logger.debug("Userbot uzishda xatolik: %s", ub_err)
+        if web_runner:
+            try:
+                await web_runner.cleanup()
+            except Exception as wr_err:
+                logger.debug("Web runner tozalashda xatolik: %s", wr_err)
+        try:
+            await bot.session.close()
+        except Exception as bot_err:
+            logger.debug("Bot sessiyasini yopishda xatolik: %s", bot_err)
         logger.info("👋 Bot to'xtatildi. Resurslar tozalandi.")
 
 

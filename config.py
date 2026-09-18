@@ -180,6 +180,23 @@ UPTIME_TIMEOUT: int = int(os.getenv("UPTIME_TIMEOUT", "10"))  # soniya
 # ─── RSS & Yangiliklar ──────────────────────────────────────
 NEWS_MAX_ITEMS: int = int(os.getenv("NEWS_MAX_ITEMS", "5"))
 
+# ─── Ovozli Agent & TTS (Text-to-Speech & Speech-to-Text) ───
+DEFAULT_VOICE: str = os.getenv("DEFAULT_VOICE", "uz-UZ-MadinaNeural")
+VOICE_OPTIONS: dict[str, str] = {
+    "uz-madina": "uz-UZ-MadinaNeural",
+    "uz-sardor": "uz-UZ-SardorNeural",
+    "ru-dmitry": "ru-RU-DmitryNeural",
+    "ru-svetl": "ru-RU-SvetlanaNeural",
+    "en-guy": "en-US-GuyNeural",
+    "en-jenny": "en-US-JennyNeural",
+}
+ENABLE_VOICE_REPLIES: bool = os.getenv("ENABLE_VOICE_REPLIES", "true").strip().lower() in ("true", "1", "yes")
+
+# ─── Rasm Generatsiyasi (Midjourney & Imagen) ───────────────
+MIDJOURNEY_API_KEY: str = os.getenv("MIDJOURNEY_API_KEY", "")
+MIDJOURNEY_API_URL: str = os.getenv("MIDJOURNEY_API_URL", "https://api.midjourneyapi.xyz/v2/imagine")
+WATERMARK_TEXT: str = os.getenv("WATERMARK_TEXT", "@SuperAgentAI")
+
 # ─── Xatoliklarni tekshirish ─────────────────────────────────
 def validate_config() -> list[str]:
     """Majburiy o'zgaruvchilarni tekshirib, yetishmaydiganlarini qaytaradi."""
