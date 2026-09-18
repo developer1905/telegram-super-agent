@@ -580,7 +580,7 @@ async def rk_sync_history(message: Message, ai_manager: AIManager) -> None:
 
 @router.message(ADMIN_FILTER, F.text.in_({"🧹 Xotirani Tozalash", "Xotirani Tozalash", "xotirani tozalash", "Tozalash", "tozalash", "/clear"}))
 async def rk_clear_history(message: Message, ai_manager: AIManager) -> None:
-    res = ai_manager.clear_history()
+    res = ai_manager.clear_history(chat_id=str(message.chat.id))
     await message.answer(res, parse_mode="Markdown")
 
 
@@ -654,12 +654,12 @@ async def cmd_help(message: Message) -> None:
 
 @router.message(ADMIN_FILTER, Command("status"))
 async def cmd_status(message: Message, ai_manager: AIManager) -> None:
-    await message.answer(ai_manager.status(), parse_mode="Markdown")
+    await message.answer(ai_manager.status(chat_id=str(message.chat.id)), parse_mode="Markdown")
 
 
 @router.message(ADMIN_FILTER, Command("clear"))
 async def cmd_clear(message: Message, ai_manager: AIManager) -> None:
-    result = ai_manager.clear_history()
+    result = ai_manager.clear_history(chat_id=str(message.chat.id))
     await message.answer(result, parse_mode="Markdown")
 
 
@@ -1009,8 +1009,9 @@ async def cb_scheduled_posts(cb: CallbackQuery) -> None:
 
 @router.callback_query(ADMIN_FILTER, F.data == "menu:clear")
 async def cb_clear(cb: CallbackQuery, ai_manager: AIManager) -> None:
+    chat_id = str(cb.message.chat.id) if cb.message else "0"
     await cb.answer("✅ Xotira tozalandi")
-    result = ai_manager.clear_history()
+    result = ai_manager.clear_history(chat_id=chat_id)
     builder = InlineKeyboardBuilder()
     builder.row(InlineKeyboardButton(text="◀️ Orqaga", callback_data="menu:main"))
     await safe_edit_text(

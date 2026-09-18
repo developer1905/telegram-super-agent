@@ -21,6 +21,7 @@ Imkoniyatlar:
 
 from __future__ import annotations
 
+import asyncio
 import datetime
 import html
 import io
@@ -199,6 +200,36 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
         or has_media_link
         or (message.reply_to_message and any(w in text_lower for w in ["bot", "tekshir", "tushuntir", "tarjima qil"]))
     )
+
+    # Guruhdagi xabarlarni doimiy xotirada saqlab borish (AI suhbat kontekstini to'liq eslab qolishi uchun)
+    user_full = message.from_user.full_name if message.from_user else "A'zo"
+    user_id_str = str(message.from_user.id) if message.from_user else ""
+    chat_id_str = str(message.chat.id)
+    chat_type_str = message.chat.type
+
+    if not raw_text.startswith("/"):
+        try:
+            asyncio.create_task(
+                db.add_chat_message(
+                    role="user",
+                    content=raw_text,
+                    chat_id=chat_id_str,
+                    user_id=user_id_str,
+                    sender_name=user_full,
+                    chat_type=chat_type_str,
+                )
+            )
+            c_hist = ai_manager.chat_histories.setdefault(chat_id_str, [])
+            c_hist.append({
+                "role": "user",
+                "content": raw_text,
+                "sender_name": user_full,
+                "chat_id": chat_id_str,
+            })
+            if len(c_hist) > 40:
+                ai_manager.chat_histories[chat_id_str] = c_hist[-40:]
+        except Exception:
+            pass
 
     if not should_process:
         return
@@ -520,16 +551,17 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
     group_title = message.chat.title or "Guruh"
     user_full = message.from_user.full_name if message.from_user else "Foydalanuvchi"
 
-    full_prompt = (
-        f"Siz '{group_title}' guruhida eng aqlli va professional Super-Agent AI yordamchisiz.\n"
-        f"Murojaat qiluvchi a'zo: {user_full}.\n"
-        f"{replied_context}"
-        f"Savol / Vazifa: {clean_text or 'Ushbu mavzuni tushuntirib ber.'}\n\n"
-        f"Talab: Guruh a'zolariga o'ta aniq, foydali, do'stona va chiroyli Markdown formatda javob bering."
-    )
+    user_query = f"{replied_context}{clean_text or 'Ushbu mavzuni tushuntirib ber.'}"
 
     try:
-        reply = await ai_manager.generate(full_prompt, save_history=False)
+        reply = await ai_manager.generate(
+            user_message=user_query,
+            save_history=True,
+            chat_id=str(message.chat.id),
+            user_id=str(message.from_user.id) if message.from_user else "",
+            sender_name=user_full,
+            chat_type=message.chat.type,
+        )
         await safe_message_reply(message, reply, parse_mode="Markdown")
         LogCollector().add(
             action_type="group_ai",
@@ -575,6 +607,11 @@ async def handle_group_photo(message: Message, ai_manager: AIManager, bot: Bot) 
             prompt=user_prompt,
             image_bytes=img_bytes,
             mime_type="image/jpeg",
+            save_history=True,
+            chat_id=str(message.chat.id),
+            user_id=str(message.from_user.id) if message.from_user else "",
+            sender_name=message.from_user.full_name if message.from_user else "A'zo",
+            chat_type=message.chat.type,
         )
         await wait_m.delete()
         await message.reply(analysis, parse_mode="Markdown")
@@ -715,7 +752,15 @@ async def handle_channel_post(message: Message, ai_manager: AIManager, bot: Bot)
         header = "🤖 **Super-Agent Tahlili:**\n\n"
 
     try:
-        ai_reply = await ai_manager.generate(prompt, save_history=False)
+        channel_title = message.chat.title or "Kanal"
+        chat_id_str = str(message.chat.id)
+        ai_reply = await ai_manager.generate(
+            prompt,
+            save_history=True,
+            chat_id=chat_id_str,
+            sender_name=channel_title,
+            chat_type="channel",
+        )
         await safe_message_reply(message=message, text=f"{header}{ai_reply}", parse_mode="Markdown")
         LogCollector().add(
             action_type="channel_ai",

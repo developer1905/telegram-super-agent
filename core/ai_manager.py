@@ -64,20 +64,38 @@ class AIManager:
         self.current_provider: str = "gemini"
         self.current_or_model: str = "auto"
         self.current_role: str = DEFAULT_ROLE
-        self.history: list[dict] = []
-        self._history_loaded: bool = False
+        self.chat_histories: dict[str, list[dict]] = {}
+        self._loaded_chats: set[str] = set()
 
-    async def _ensure_history_loaded(self) -> None:
-        """Server qayta yonganda (restart/deploy) avvalgi suhbat tarixini bazadan yuklash."""
-        if not self._history_loaded:
+    @property
+    def history(self) -> list[dict]:
+        """Orqaga muvofiqlik: standart chat xotirasi."""
+        return self.chat_histories.setdefault("0", [])
+
+    @history.setter
+    def history(self, val: list[dict]) -> None:
+        self.chat_histories["0"] = val
+
+    async def get_chat_history(self, chat_id: str = "0", limit: int = 30) -> list[dict]:
+        """Berilgan chat_id bo'yicha suhbat tarixini xotira yoki SQLite dan yuklash."""
+        chat_id_str = str(chat_id or "0")
+        if chat_id_str not in self._loaded_chats:
             try:
-                loaded = await db.get_recent_chat_history(limit=30)
+                loaded = await db.get_recent_chat_history(chat_id=chat_id_str, limit=limit)
                 if loaded:
-                    self.history = loaded
-                    logger.info("AIManager: Bazadan %d ta avvalgi suhbat xabari yuklandi.", len(loaded))
+                    self.chat_histories[chat_id_str] = loaded
+                    logger.info("AIManager: Chat (%s) uchun bazadan %d ta xabar yuklandi.", chat_id_str, len(loaded))
+                else:
+                    self.chat_histories.setdefault(chat_id_str, [])
             except Exception as e:
-                logger.warning("AIManager suhbat tarixini yuklashda xato: %s", e)
-            self._history_loaded = True
+                logger.warning("AIManager chat (%s) tarixini yuklashda xato: %s", chat_id_str, e)
+                self.chat_histories.setdefault(chat_id_str, [])
+            self._loaded_chats.add(chat_id_str)
+        return self.chat_histories.get(chat_id_str, [])
+
+    async def _ensure_history_loaded(self, chat_id: str = "0") -> None:
+        """Server qayta yonganda (restart/deploy) avvalgi suhbat tarixini bazadan yuklash."""
+        await self.get_chat_history(chat_id=chat_id)
 
     # ─── Model / Rol Boshqaruvi ───────────────────────────────
 
@@ -86,7 +104,7 @@ class AIManager:
         if provider not in ("gemini", "openrouter", "omniroute"):
             return f"❌ Noto'g'ri provider: {provider}"
         self.current_provider = provider
-        self.history.clear()
+        # Model o'zgarganda suhbat tarixi o'chirilmaydi!
         name = "OmniRoute (350+ AI Gateway)" if provider == "omniroute" else provider.upper()
         return f"✅ Provider o'zgartirildi: **{name}**"
 
@@ -97,7 +115,7 @@ class AIManager:
             return f"❌ Mavjud modellar: {available}"
         self.current_or_model = model_key
         self.current_provider = "openrouter"
-        self.history.clear()
+        # Tarix o'chirilmaydi
         model_id = OPENROUTER_MODELS[model_key]
         return f"✅ Model o'zgartirildi: `{model_id}`"
 
@@ -107,22 +125,34 @@ class AIManager:
             available = ", ".join(ROLES.keys())
             return f"❌ Mavjud rollar: {available}"
         self.current_role = role_key
-        self.history.clear()
+        # Tarix o'chirilmaydi
         role_name = ROLES[role_key]["name"]
         return f"✅ Rol o'zgartirildi: **{role_name}**"
 
-    def clear_history(self) -> str:
-        """Suhbat tarixini tozalash."""
-        count = len(self.history)
-        self.history.clear()
+    def clear_history(self, chat_id: Optional[str] = None) -> str:
+        """Suhbat tarixini tozalash (aniq chat yoki barcha chatlar bo'yicha)."""
+        if chat_id is not None:
+            c_id = str(chat_id)
+            count = len(self.chat_histories.get(c_id, []))
+            self.chat_histories[c_id] = []
+            try:
+                import asyncio
+                asyncio.create_task(db.clear_chat_history(chat_id=c_id))
+            except Exception:
+                pass
+            return f"🧹 Chat ({c_id}) xotirasi tozalandi. {count} ta xabar o'chirildi."
+
+        count = sum(len(v) for v in self.chat_histories.values())
+        self.chat_histories.clear()
+        self._loaded_chats.clear()
         try:
             import asyncio
             asyncio.create_task(db.clear_chat_history())
         except Exception:
             pass
-        return f"🧹 Xotira tozalandi. {count} ta xabar o'chirildi."
+        return f"🧹 Barcha chatlar xotirasi tozalandi. {count} ta xabar o'chirildi."
 
-    def status(self) -> str:
+    def status(self, chat_id: str = "0") -> str:
         """Joriy holat to'g'risida xabar."""
         role_name = ROLES.get(self.current_role, {}).get("name", self.current_role)
         if self.current_provider == "gemini":
@@ -132,11 +162,12 @@ class AIManager:
         else:
             model_id = OPENROUTER_MODELS.get(self.current_or_model, self.current_or_model)
             model_info = f"OpenRouter ({model_id})"
+        hist_count = len(self.chat_histories.get(str(chat_id), []))
         return (
             f"🤖 **Joriy Holat**\n"
             f"Provider: `{model_info}`\n"
             f"Rol: `{role_name}`\n"
-            f"Tarix: `{len(self.history)} xabar`"
+            f"Tarix: `{hist_count} xabar`"
         )
 
     # ─── Asosiy Generatsiya ───────────────────────────────────
@@ -147,48 +178,123 @@ class AIManager:
         image_bytes: Optional[bytes] = None,
         image_mime: str = "image/jpeg",
         save_history: bool = True,
+        chat_id: str = "0",
+        user_id: str = "",
+        sender_name: str = "Foydalanuvchi",
+        chat_type: str = "private",
     ) -> str:
         """
         Matn (va ixtiyoriy rasm) bo'yicha AI javob generatsiya qiladi.
         Asosiy provayder xato bersa, zaxira bepul provayderga avtomatik o'tadi (Fallback).
-        save_history=False qilinganda foniy vazifalar kontekstni buzmaydi.
+        Guruhlar, kanallar va shaxsiy suhbatlar alohida chat_id bo'yicha mustaqil saqlanadi.
         """
-        await self._ensure_history_loaded()
+        chat_id_str = str(chat_id or "0")
+        await self.get_chat_history(chat_id=chat_id_str)
 
-        # 1. OmniRoute tanlangan bo'lsa (faqat foydalanuvchi atayin OmniRoute ni tanlagan bo'lsa)
+        # 1. OmniRoute tanlangan bo'lsa
         if self.current_provider == "omniroute":
-            result = await self._generate_omniroute(user_message, save_history=save_history)
+            result = await self._generate_omniroute(
+                user_message,
+                save_history=save_history,
+                chat_id=chat_id_str,
+                user_id=user_id,
+                sender_name=sender_name,
+                chat_type=chat_type,
+            )
             if not result.startswith("❌"):
                 return result
             logger.warning("OmniRoute xato berdi, Gemini ga fallback qilinmoqda...")
-            fallback_res = await self._generate_gemini(user_message, image_bytes, image_mime, save_history=save_history)
+            fallback_res = await self._generate_gemini(
+                user_message,
+                image_bytes,
+                image_mime,
+                save_history=save_history,
+                chat_id=chat_id_str,
+                user_id=user_id,
+                sender_name=sender_name,
+                chat_type=chat_type,
+            )
             if not fallback_res.startswith("❌"):
                 return fallback_res
             return result
 
         # 2. Gemini tanlangan bo'lsa (Standart)
         if self.current_provider == "gemini":
-            result = await self._generate_gemini(user_message, image_bytes, image_mime, save_history=save_history)
+            result = await self._generate_gemini(
+                user_message,
+                image_bytes,
+                image_mime,
+                save_history=save_history,
+                chat_id=chat_id_str,
+                user_id=user_id,
+                sender_name=sender_name,
+                chat_type=chat_type,
+            )
             if not result.startswith("❌"):
                 return result
             logger.warning("Gemini barcha modellarida xato bo'ldi, OpenRouter ga fallback qilinmoqda...")
-            fallback_res = await self._generate_openrouter(user_message, save_history=save_history)
+            fallback_res = await self._generate_openrouter(
+                user_message,
+                save_history=save_history,
+                chat_id=chat_id_str,
+                user_id=user_id,
+                sender_name=sender_name,
+                chat_type=chat_type,
+            )
             if not fallback_res.startswith("❌"):
                 return fallback_res
-            # OmniRoute faqat lokalda yoqilgan bo'lsa ishlaydi, shuning uchun zaxira sifatida foydalanuvchiga xatolik chiqarmaymiz
             return "⚠️ Sun'iy intellekt xizmati vaqtincha band. Iltimos, bir ozdan so'ng qayta urinib ko'ring yoki /models buyrug'i orqali boshqa modelni tanlang."
 
         # 3. OpenRouter tanlangan bo'lsa
-        result = await self._generate_openrouter(user_message, save_history=save_history)
+        result = await self._generate_openrouter(
+            user_message,
+            save_history=save_history,
+            chat_id=chat_id_str,
+            user_id=user_id,
+            sender_name=sender_name,
+            chat_type=chat_type,
+        )
         if not result.startswith("❌"):
             return result
 
         logger.warning("OpenRouter xato berdi, Gemini ga fallback qilinmoqda...")
-        fallback_res = await self._generate_gemini(user_message, image_bytes, image_mime, save_history=save_history)
+        fallback_res = await self._generate_gemini(
+            user_message,
+            image_bytes,
+            image_mime,
+            save_history=save_history,
+            chat_id=chat_id_str,
+            user_id=user_id,
+            sender_name=sender_name,
+            chat_type=chat_type,
+        )
         if not fallback_res.startswith("❌"):
             return fallback_res
 
         return "⚠️ Sun'iy intellekt xizmati vaqtincha band. Iltimos, bir ozdan so'ng qayta urinib ko'ring."
+
+    async def generate_with_image(
+        self,
+        prompt: str,
+        image_bytes: bytes,
+        mime_type: str = "image/jpeg",
+        save_history: bool = True,
+        chat_id: str = "0",
+        user_id: str = "",
+        sender_name: str = "Foydalanuvchi",
+        chat_type: str = "private",
+    ) -> str:
+        """Rasm bilan generatsiya qilish uchun qulay yordamchi metod."""
+        return await self.generate(
+            user_message=prompt,
+            image_bytes=image_bytes,
+            image_mime=mime_type,
+            save_history=save_history,
+            chat_id=chat_id,
+            user_id=user_id,
+            sender_name=sender_name,
+            chat_type=chat_type,
+        )
 
     async def generate_with_audio(
         self,
@@ -197,42 +303,43 @@ class AIManager:
         custom_instruction: Optional[str] = None,
     ) -> str:
         """
-        Ovozli xabarni Gemini Multimodal orqali to'g'ridan-to'g'ri tahlil qilish va javob berish.
+        Ovozli xabarni Gemini Multimodal orqali tushunib, matnga aylantirish va javob berish.
         """
-        instruction = custom_instruction or (
-            "Foydalanuvchining ushbu ovozli xabarini diqqat bilan eshiting va tushuning.\n"
-            "Format:\n"
-            "🎙 **Transkripsiya (Aytilgan gaplar):**\n"
-            "<aniq eshitilgan matn>\n\n"
-            "💡 **AI Javobi:**\n"
-            "<foydalanuvchi so'roviga to'liq, aniq va foydali javob>"
-        )
-
-        if GEMINI_API_KEY and self._gemini_client:
-            models_to_try = [GEMINI_MODEL] + list(GEMINI_FALLBACK_MODELS)
-            for m in models_to_try:
-                try:
-                    part = genai_types.Part.from_bytes(data=audio_bytes, mime_type=mime_type)
-                    resp = await asyncio.to_thread(
-                        self._gemini_client.models.generate_content,
-                        model=m,
-                        contents=[part, instruction],
-                    )
-                    if resp and resp.text:
-                        return resp.text.strip()
-                except Exception as exc:
-                    logger.warning("Gemini audio tahlil xatosi (%s): %s", m, exc)
-                    continue
-
-        # Zaxira: matn transkripsiyasi orqali generatsiya
         try:
+            instruction = custom_instruction or (
+                "Siz Super-Agent sun'iy intellektisiz. Foydalanuvchining ovozli xabarini tinglang.\n"
+                "1. Ovozda nima deyilganini to'liq o'zbek tilida yozing (🎙 Transkripsiya).\n"
+                "2. Agar bu aniq topshiriq yoki savol bo'lsa, savolga to'liq, aqlli va foydali javob qaytaring."
+            )
+
+            rag_context = await db.build_rag_context()
+            if rag_context:
+                instruction = f"{rag_context}\n\n{instruction}"
+
+            if GEMINI_API_KEY and self._gemini_client:
+                models_to_try = [GEMINI_MODEL] + list(GEMINI_FALLBACK_MODELS)
+                for m in models_to_try:
+                    try:
+                        part = genai_types.Part.from_bytes(data=audio_bytes, mime_type=mime_type)
+                        resp = await asyncio.to_thread(
+                            self._gemini_client.models.generate_content,
+                            model=m,
+                            contents=[part, instruction],
+                        )
+                        if resp and resp.text:
+                            return resp.text.strip()
+                    except Exception as exc:
+                        logger.warning("Gemini audio tahlil xatosi (%s): %s", m, exc)
+                        continue
+
+            # Zaxira: matn transkripsiyasi orqali generatsiya
             from core.speech_agent import transcribe_audio_bytes
             transcription = await transcribe_audio_bytes(audio_bytes, mime_type, ai_manager=self)
             if transcription:
                 ans = await self.generate(transcription)
                 return f"🎙 **Transkripsiya:** _{transcription}_\n\n💡 **AI Javobi:**\n{ans}"
         except Exception as stt_err:
-            logger.error("Zaxira STT xatosi: %s", stt_err)
+            logger.error("Audio tahlil xatosi: %s", stt_err)
 
         return "❌ Ovozli xabarni tahlil qilishda xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring yoki matn ko'rinishida yozing."
 
@@ -241,27 +348,43 @@ class AIManager:
     async def _generate_gemini(
         self,
         user_message: str,
-        image_bytes: Optional[bytes],
-        image_mime: str,
+        image_bytes: Optional[bytes] = None,
+        image_mime: str = "image/jpeg",
         save_history: bool = True,
+        chat_id: str = "0",
+        user_id: str = "",
+        sender_name: str = "Foydalanuvchi",
+        chat_type: str = "private",
     ) -> str:
-        """Gemini API orqali javob olish (google-genai 2.x, multi-model fallback va doimiy xotira RAG)."""
+        """Gemini API orqali javob olish (google-genai 2.x, multi-model fallback va doimiy multi-chat xotira)."""
         try:
             system_prompt = ROLES[self.current_role]["prompt"]
+            if chat_type in ("group", "supergroup"):
+                system_prompt += "\n\nSiz Telegram guruhidasiz. Suhbatdosh a'zolarga do'stona, aniq va hurmat bilan javob bering."
+            elif chat_type == "channel":
+                system_prompt += "\n\nSiz Telegram kanalidasiz. Postlar uchun jozibali, mazmunli va professional formatda javob bering."
+
             rag_context = await db.build_rag_context()
             if rag_context:
                 system_prompt = f"{rag_context}\n\n{system_prompt}"
 
+            history_list = await self.get_chat_history(chat_id=chat_id, limit=30)
+
             # Gemini Google SDK talabi: rollar ketma-ket takrorlanmasligi kerak va birinchi xabar user bo'lishi lozim
             contents: list = []
             last_role = None
-            for msg in self.history:
-                text = (msg.get("content") or "").strip()
-                if not text:
+            for msg in history_list:
+                raw_c = (msg.get("content") or "").strip()
+                if not raw_c:
                     continue
                 role = "user" if msg.get("role") == "user" else "model"
+                s_name = msg.get("sender_name") or ""
+                if role == "user" and s_name and chat_type in ("group", "supergroup", "channel") and not raw_c.startswith("["):
+                    text = f"[{s_name}]: {raw_c}"
+                else:
+                    text = raw_c
+
                 if role == last_role and contents:
-                    # Ketma-ket kelgan bir xil roldagi xabarni birlashtiramiz
                     contents[-1].parts[0].text += f"\n{text}"
                 else:
                     contents.append(
@@ -272,7 +395,6 @@ class AIManager:
                     )
                     last_role = role
 
-            # Agar birinchi xabar 'model' bo'lib qolgan bo'lsa, uni olib tashlaymiz
             if contents and contents[0].role == "model":
                 contents.pop(0)
 
@@ -287,15 +409,15 @@ class AIManager:
                         )
                     )
                 )
-            current_parts.append(genai_types.Part(text=user_message))
 
-            # Agar oldingi xabar ham user bo'lsa, unga birlashtiramiz (rasmsiz bo'lsa)
+            cur_text = f"[{sender_name}]: {user_message}" if (sender_name and chat_type in ("group", "supergroup", "channel") and not user_message.startswith("[")) else user_message
+            current_parts.append(genai_types.Part(text=cur_text))
+
             if contents and contents[-1].role == "user" and not image_bytes:
-                contents[-1].parts.append(genai_types.Part(text=f"\n{user_message}"))
+                contents[-1].parts.append(genai_types.Part(text=f"\n{cur_text}"))
             else:
                 contents.append(genai_types.Content(role="user", parts=current_parts))
 
-            # Modellar ketma-ketligi (kvota yoki 429 xatosi chiqsa avtomatik keyingisiga o'tadi)
             models_to_try = [GEMINI_MODEL] + [m for m in GEMINI_FALLBACK_MODELS if m != GEMINI_MODEL]
             last_exc = None
 
@@ -314,13 +436,14 @@ class AIManager:
                     answer = response.text or ""
                     if answer.strip():
                         if save_history:
-                            self.history.append({"role": "user", "content": user_message})
-                            self.history.append({"role": "assistant", "content": answer})
-                            if len(self.history) > 40:
-                                self.history = self.history[-40:]
+                            chat_h = self.chat_histories.setdefault(chat_id, [])
+                            chat_h.append({"role": "user", "content": user_message, "sender_name": sender_name, "chat_id": chat_id})
+                            chat_h.append({"role": "assistant", "content": answer, "sender_name": "Super-Agent", "chat_id": chat_id})
+                            if len(chat_h) > 40:
+                                self.chat_histories[chat_id] = chat_h[-40:]
                             try:
-                                await db.add_chat_message("user", user_message)
-                                await db.add_chat_message("assistant", answer)
+                                await db.add_chat_message("user", user_message, chat_id=chat_id, user_id=user_id, sender_name=sender_name, chat_type=chat_type)
+                                await db.add_chat_message("assistant", answer, chat_id=chat_id, user_id="", sender_name="Super-Agent", chat_type=chat_type)
                             except Exception:
                                 pass
                         return answer
@@ -335,89 +458,42 @@ class AIManager:
             logger.error("Gemini umumiy xatosi: %s", exc)
             return f"❌ Gemini xatosi: {exc}"
 
-    # ─── Ovozli Xabarlarni Qayta Ishlash (Voice-to-Task) ─────────
-
-    async def generate_with_audio(
-        self,
-        audio_bytes: bytes,
-        mime_type: str = "audio/ogg",
-        custom_instruction: Optional[str] = None,
-    ) -> str:
-        """
-        Gemini 3.5/3.1 Flash multimodal audiosi orqali ovozli xabarni tushunib,
-        matnga aylantirish va vazifani bajarish/rejalashtirish.
-        """
-        try:
-            system_prompt = custom_instruction or (
-                "Siz Super-Agent sun'iy intellektisiz. Foydalanuvchining ovozli xabarini tinglang.\n"
-                "1. Ovozda nima deyilganini to'liq o'zbek tilida yozing (🎙 Transkripsiya).\n"
-                "2. Agar bu aniq topshiriq yoki buyruq bo'lsa (masalan: biror kishiga xabar yozish, "
-                "eslatma qo'yish, kanalga post chiqarish yoki hisob-kitob qilish):\n"
-                "   - Buyruq turi\n"
-                "   - Qabul qiluvchi (kimga)\n"
-                "   - Matn mazmuni\n"
-                "   - Rejalashtirilgan vaqt (agar aytilgan bo'lsa)\n"
-                "aniq, chiroyli va tartibli ko'rsating.\n"
-                "3. Agar shunchaki savol yoki suhbat bo'lsa, savolga to'liq, aqlli va foydali javob qaytaring."
-            )
-
-            rag_context = await db.build_rag_context()
-            if rag_context:
-                system_prompt = f"{rag_context}\n\n{system_prompt}"
-
-            parts = [
-                genai_types.Part(
-                    inline_data=genai_types.Blob(
-                        mime_type=mime_type,
-                        data=audio_bytes,
-                    )
-                ),
-                genai_types.Part(text=system_prompt)
-            ]
-
-            models_to_try = [GEMINI_MODEL] + [m for m in GEMINI_FALLBACK_MODELS if m != GEMINI_MODEL]
-            for model_name in models_to_try:
-                try:
-                    response = await self._gemini_client.aio.models.generate_content(
-                        model=model_name,
-                        contents=[genai_types.Content(role="user", parts=parts)],
-                        config=genai_types.GenerateContentConfig(
-                            temperature=0.4,
-                            max_output_tokens=2048,
-                        ),
-                    )
-                    answer = response.text or ""
-                    if answer.strip():
-                        return answer
-                except Exception as m_exc:
-                    logger.warning("Gemini audio (%s) xatosi: %s", model_name, m_exc)
-                    continue
-
-            return "❌ Ovozni tahlil qilib bo'lmadi."
-
-        except Exception as exc:
-            logger.error("generate_with_audio xatosi: %s", exc)
-            return f"❌ Ovozli xabarni tahlil qilishda xatolik: {exc}"
-
     # ─── OpenRouter ───────────────────────────────────────────
 
-    async def _generate_openrouter(self, user_message: str, save_history: bool = True) -> str:
-        """OpenRouter API orqali javob olish (bepul modellar fallback va doimiy xotira)."""
+    async def _generate_openrouter(
+        self,
+        user_message: str,
+        save_history: bool = True,
+        chat_id: str = "0",
+        user_id: str = "",
+        sender_name: str = "Foydalanuvchi",
+        chat_type: str = "private",
+    ) -> str:
+        """OpenRouter API orqali javob olish (bepul modellar fallback va doimiy multi-chat xotira)."""
         system_prompt = ROLES[self.current_role]["prompt"]
+        if chat_type in ("group", "supergroup"):
+            system_prompt += "\n\nSiz Telegram guruhidasiz. Do'stona va aniq javob bering."
+        elif chat_type == "channel":
+            system_prompt += "\n\nSiz Telegram kanalidasiz. Mazmunli va professional formatda javob bering."
+
         rag_context = await db.build_rag_context()
         if rag_context:
             system_prompt = f"{rag_context}\n\n{system_prompt}"
 
-        # Xabarlar strukturasini tuzish
+        history_list = await self.get_chat_history(chat_id=chat_id, limit=30)
         messages: list[dict] = [{"role": "system", "content": system_prompt}]
-        for msg in self.history:
-            role = "assistant" if msg.get("role") in ("model", "assistant") else msg.get("role", "user")
+        for msg in history_list:
+            role = "assistant" if msg.get("role") in ("model", "assistant") else "user"
             content = msg.get("content") or ""
+            s_name = msg.get("sender_name") or ""
+            if role == "user" and s_name and chat_type in ("group", "supergroup", "channel") and not content.startswith("["):
+                content = f"[{s_name}]: {content}"
             if content.strip():
                 messages.append({"role": role, "content": content})
-        messages.append({"role": "user", "content": user_message})
 
-        # Zaxira 100% bepul modellar ro'yxati (OpenRouter faol bepul tierlari)
+        cur_text = f"[{sender_name}]: {user_message}" if (sender_name and chat_type in ("group", "supergroup", "channel") and not user_message.startswith("[")) else user_message
+        messages.append({"role": "user", "content": cur_text})
+
         fallback_free_models = [
             "nousresearch/hermes-3-llama-3.1-405b:free",
             "nex-agi/nex-n2.5-mini:free",
@@ -443,13 +519,14 @@ class AIManager:
                 answer = msg_obj.content or getattr(msg_obj, "reasoning", "") or ""
                 if answer and answer.strip():
                     if save_history:
-                        self.history.append({"role": "user", "content": user_message})
-                        self.history.append({"role": "assistant", "content": answer})
-                        if len(self.history) > 40:
-                            self.history = self.history[-40:]
+                        chat_h = self.chat_histories.setdefault(chat_id, [])
+                        chat_h.append({"role": "user", "content": user_message, "sender_name": sender_name, "chat_id": chat_id})
+                        chat_h.append({"role": "assistant", "content": answer, "sender_name": "Super-Agent", "chat_id": chat_id})
+                        if len(chat_h) > 40:
+                            self.chat_histories[chat_id] = chat_h[-40:]
                         try:
-                            await db.add_chat_message("user", user_message)
-                            await db.add_chat_message("assistant", answer)
+                            await db.add_chat_message("user", user_message, chat_id=chat_id, user_id=user_id, sender_name=sender_name, chat_type=chat_type)
+                            await db.add_chat_message("assistant", answer, chat_id=chat_id, user_id="", sender_name="Super-Agent", chat_type=chat_type)
                         except Exception:
                             pass
                     return answer
@@ -465,6 +542,10 @@ class AIManager:
         self,
         user_message: str,
         save_history: bool = True,
+        chat_id: str = "0",
+        user_id: str = "",
+        sender_name: str = "Foydalanuvchi",
+        chat_type: str = "private",
     ) -> str:
         """
         OmniRoute AI Gateway orqali so'rov yuborish.
@@ -472,14 +553,28 @@ class AIManager:
         """
         try:
             system_prompt = ROLES[self.current_role]["prompt"]
+            if chat_type in ("group", "supergroup"):
+                system_prompt += "\n\nSiz Telegram guruhidasiz. Do'stona va aniq javob bering."
+            elif chat_type == "channel":
+                system_prompt += "\n\nSiz Telegram kanalidasiz. Mazmunli va professional formatda javob bering."
+
             rag_context = await db.build_rag_context()
             if rag_context:
                 system_prompt = f"{rag_context}\n\n{system_prompt}"
 
+            history_list = await self.get_chat_history(chat_id=chat_id, limit=30)
             messages = [{"role": "system", "content": system_prompt}]
-            for msg in self.history:
-                messages.append({"role": msg["role"], "content": msg["content"]})
-            messages.append({"role": "user", "content": user_message})
+            for msg in history_list:
+                role = "assistant" if msg.get("role") in ("model", "assistant") else "user"
+                content = msg.get("content") or ""
+                s_name = msg.get("sender_name") or ""
+                if role == "user" and s_name and chat_type in ("group", "supergroup", "channel") and not content.startswith("["):
+                    content = f"[{s_name}]: {content}"
+                if content.strip():
+                    messages.append({"role": role, "content": content})
+
+            cur_text = f"[{sender_name}]: {user_message}" if (sender_name and chat_type in ("group", "supergroup", "channel") and not user_message.startswith("[")) else user_message
+            messages.append({"role": "user", "content": cur_text})
 
             response = await asyncio.wait_for(
                 self._omniroute_client.chat.completions.create(
@@ -492,13 +587,14 @@ class AIManager:
             )
             answer = response.choices[0].message.content or "❌ Bo'sh javob."
             if save_history:
-                self.history.append({"role": "user", "content": user_message})
-                self.history.append({"role": "assistant", "content": answer})
-                if len(self.history) > 40:
-                    self.history = self.history[-40:]
+                chat_h = self.chat_histories.setdefault(chat_id, [])
+                chat_h.append({"role": "user", "content": user_message, "sender_name": sender_name, "chat_id": chat_id})
+                chat_h.append({"role": "assistant", "content": answer, "sender_name": "Super-Agent", "chat_id": chat_id})
+                if len(chat_h) > 40:
+                    self.chat_histories[chat_id] = chat_h[-40:]
                 try:
-                    await db.add_chat_message("user", user_message)
-                    await db.add_chat_message("assistant", answer)
+                    await db.add_chat_message("user", user_message, chat_id=chat_id, user_id=user_id, sender_name=sender_name, chat_type=chat_type)
+                    await db.add_chat_message("assistant", answer, chat_id=chat_id, user_id="", sender_name="Super-Agent", chat_type=chat_type)
                 except Exception:
                     pass
             return answer

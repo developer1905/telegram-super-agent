@@ -1319,7 +1319,15 @@ async def handle_ai_chat(message: Message, ai_manager: AIManager) -> None:
     asyncio.create_task(auto_extract_user_memories(user_text, ai_manager))
 
     await message.bot.send_chat_action(message.chat.id, "typing")
-    response = await ai_manager.generate(user_text)
+    user_name = message.from_user.full_name if message.from_user else "Foydalanuvchi"
+    response = await ai_manager.generate(
+        user_message=user_text,
+        save_history=True,
+        chat_id=str(message.chat.id),
+        user_id=str(message.from_user.id) if message.from_user else "",
+        sender_name=user_name,
+        chat_type="private",
+    )
 
     # Ovozli eshitish tugmasi
     voice_btn = InlineKeyboardBuilder()
