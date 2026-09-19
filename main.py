@@ -710,6 +710,114 @@ async def api_tts_voice_handler(request: web.Request) -> web.Response:
         return web.json_response({"status": "error", "message": str(exc)}, status=500)
 
 
+async def api_astrology_calculate_handler(request: web.Request) -> web.Response:
+    """Mini App: Natal Karta hisoblash va saqlash API."""
+    try:
+        data = await request.json()
+        birth_date = data.get("birth_date", "").strip()
+        birth_time = data.get("birth_time", "12:00").strip()
+        city = data.get("city", "Toshkent").strip()
+        user_id = str(data.get("user_id", "default_user"))
+
+        if not birth_date:
+            return web.json_response({"status": "error", "message": "Tug'ilgan sana kiritilmadi"}, status=400)
+
+        from core.astrology_agent import calculate_full_natal_chart, calculate_transits, calculate_solar_return_summary
+        chart = calculate_full_natal_chart(birth_date, birth_time, city)
+        transits = calculate_transits(chart.get("planets", {}))
+        solar = calculate_solar_return_summary(chart.get("planets", {}).get("Quyosh", {}).get("longitude", 0.0), 2026)
+
+        await db.save_astrology_profile(
+            user_id=user_id,
+            birth_date=birth_date,
+            birth_time=birth_time,
+            city=city,
+            chart_data=chart,
+        )
+
+        return web.json_response({
+            "status": "ok",
+            "chart": chart,
+            "transits": transits,
+            "solar": solar,
+        })
+    except Exception as exc:
+        logger.error("api_astrology_calculate xatosi: %s", exc)
+        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+
+
+async def api_astrology_profile_handler(request: web.Request) -> web.Response:
+    """Mini App: Mavjud Astrologiya profilini olish."""
+    try:
+        user_id = request.query.get("user_id", "default_user")
+        profile = await db.get_astrology_profile(user_id)
+        if profile and profile.get("chart"):
+            from core.astrology_agent import calculate_transits, calculate_solar_return_summary
+            chart = profile["chart"]
+            transits = calculate_transits(chart.get("planets", {}))
+            solar = calculate_solar_return_summary(chart.get("planets", {}).get("Quyosh", {}).get("longitude", 0.0), 2026)
+            return web.json_response({
+                "status": "ok",
+                "profile": {
+                    "birth_date": profile.get("birth_date"),
+                    "birth_time": profile.get("birth_time"),
+                    "city": profile.get("city"),
+                    "chart": chart,
+                    "transits": transits,
+                    "solar": solar,
+                }
+            })
+        return web.json_response({"status": "not_found", "message": "Profil mavjud emas"})
+    except Exception as exc:
+        logger.error("api_astrology_profile xatosi: %s", exc)
+        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+
+
+async def api_astrology_interpret_handler(request: web.Request) -> web.Response:
+    """Mini App: AI orqali professional astrologik prognoz generatsiya qilish."""
+    try:
+        ai_manager: AIManager = request.app["ai_manager"]
+        data = await request.json()
+        question = data.get("question", "").strip()
+        user_id = str(data.get("user_id", "default_user"))
+
+        profile = await db.get_astrology_profile(user_id)
+        if not profile or not profile.get("chart"):
+            return web.json_response({"status": "error", "message": "Avval natal kartangizni hisoblang"}, status=400)
+
+        chart = profile["chart"]
+        from core.astrology_agent import calculate_transits
+        transits = calculate_transits(chart.get("planets", {}))
+
+        prompt = (
+            f"Siz professional munajjim va shaxsiyat tahlilchisisiz.\n"
+            f"Mijozning tug'ilgan ma'lumotlari: {profile.get('birth_date')} {profile.get('birth_time')}, {profile.get('city')}.\n"
+            f"Asosiy ko'rsatkichlar:\n"
+            f"- Ufq (ASC): {chart.get('ascendant', {}).get('formatted')}\n"
+            f"- Quyosh: {chart.get('planets', {}).get('Quyosh', {}).get('formatted')} ({chart.get('planets', {}).get('Quyosh', {}).get('house')})\n"
+            f"- Oy: {chart.get('planets', {}).get('Oy', {}).get('formatted')} ({chart.get('planets', {}).get('Oy', {}).get('house')})\n"
+            f"- Pars Fortuna: {chart.get('arabic_parts', {}).get('Pars Fortuna (Omad va Boylik)', {}).get('formatted')}\n"
+            f"- Part of Spirit: {chart.get('arabic_parts', {}).get('Part of Spirit (Ruh va Iroda)', {}).get('formatted')}\n\n"
+        )
+        if question:
+            prompt += f"Mijozning maxsus savoli / maqsadi: {question}\n\n"
+
+        prompt += (
+            "Vazifa: O'zbek tilida estetik, tushunarli va professional tahlil bering:\n"
+            "1. 👤 Shaxsiy xarakter kuchi va yashirin qobiliyatlar;\n"
+            "2. 💰 Moliya, Boylik nuqtasi (Pars Fortuna) va Karyera strategiyasi;\n"
+            "3. 💖 Munosabatlar va sevgi uyg'unligi;\n"
+            "4. 🎯 Bugungi tranzitlar va 2026-yil uchun asosiy strategik tavsiya.\n"
+            "Amaliy, konstruktiv va ilhomlantiruvchi tilda yozing."
+        )
+
+        report = await ai_manager.generate(prompt)
+        return web.json_response({"status": "ok", "report": report})
+    except Exception as exc:
+        logger.error("api_astrology_interpret xatosi: %s", exc)
+        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+
+
 async def start_web_server(ai_manager: AIManager, bot: Optional[Bot] = None) -> web.AppRunner:
     """aiohttp web server va Mini App endpointlarini ishga tushiradi."""
     app = web.Application()
@@ -757,6 +865,11 @@ async def start_web_server(ai_manager: AIManager, bot: Optional[Bot] = None) -> 
     app.router.add_post("/api/agent/code_review", api_agent_code_review_handler)
     app.router.add_post("/api/agent/inspect_doc", api_agent_inspect_doc_handler)
     app.router.add_post("/api/agent/smm_creator", api_agent_smm_creator_handler)
+
+    # Astrologiya & Natal Karta API
+    app.router.add_post("/api/astrology/calculate", api_astrology_calculate_handler)
+    app.router.add_get("/api/astrology/profile", api_astrology_profile_handler)
+    app.router.add_post("/api/astrology/interpret", api_astrology_interpret_handler)
 
     port = int(os.getenv("PORT", "8080"))
     runner = web.AppRunner(app)
