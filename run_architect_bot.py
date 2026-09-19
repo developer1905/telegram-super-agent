@@ -11,7 +11,7 @@ import sys
 
 from aiogram import Bot, Dispatcher
 from config import SECOND_BOT_TOKEN
-from core.mistral_agent_bot import second_bot_router, get_second_bot
+from core.mistral_agent_bot import second_bot_router, get_second_bot, setup_architect_bot
 
 # Chiqish kodirovkasini to'g'rilash
 try:
@@ -48,6 +48,7 @@ async def main():
     try:
         await bot.delete_webhook(drop_pending_updates=True)
         logger.info("✅ Webhook tozalandi, jonli polling boshlandi...")
+        await setup_architect_bot(bot)
         await dp.start_polling(
             bot,
             allowed_updates=[
