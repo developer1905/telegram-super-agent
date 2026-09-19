@@ -1102,7 +1102,7 @@ async def main() -> None:
         while True:
             try:
                 await dp.start_polling(
-                    *bots_to_poll,
+                    bot,
                     allowed_updates=[
                         "message",
                         "edited_message",
@@ -1155,6 +1155,11 @@ async def main() -> None:
             await bot.session.close()
         except Exception as bot_err:
             logger.debug("Bot sessiyasini yopishda xatolik: %s", bot_err)
+        if second_bot:
+            try:
+                await second_bot.session.close()
+            except Exception as s_err:
+                logger.debug("2-Bot sessiyasini yopishda xatolik: %s", s_err)
         logger.info("👋 Bot to'xtatildi. Resurslar tozalandi.")
 
 
