@@ -58,11 +58,13 @@ async def _send_agent_message(
     bot_white: Bot,
     bot_black: Optional[Bot],
     is_group: bool,
-    origin_bot: Bot
+    origin_bot: Bot,
+    audio_text: Optional[str] = None
 ) -> None:
     """
     Xabarni guruhda tegishli bot nomidan, shaxsiy chatda esa murojaat qabul qilingan
-    origin_bot orqali xavfsiz yetkazish.
+    origin_bot orqali xavfsiz yetkazish. Agar audio_text berilgan bo'lsa, avtomatik
+    Edge-TTS ovozli xabarini ham birga yuboradi.
     """
     target_bot = origin_bot
     if is_group and bot_black and bot_white:
@@ -90,6 +92,20 @@ async def _send_agent_message(
     if not sent and target_bot != origin_bot:
         logger.info("origin_bot orqali qayta urinish...")
         await _do_send(origin_bot)
+
+    # 🎙️ 1. Dual-Voice Audio xabar yuborish (agar talab qilingan bo'lsa)
+    if audio_text and sender_role in ("superagent", "architect"):
+        try:
+            from core.tts_agent import generate_speech_audio
+            from aiogram.types import BufferedInputFile
+            # SuperAgent: Sardor (yosh/g'ayratli), Arxitektor: Madina (chuqur tahlilchi)
+            voice_name = "uz-UZ-SardorNeural" if sender_role == "superagent" else "uz-UZ-MadinaNeural"
+            audio_bytes = await generate_speech_audio(audio_text, voice=voice_name)
+            if audio_bytes:
+                voice_file = BufferedInputFile(audio_bytes, filename=f"voice_{sender_role}.mp3")
+                await target_bot.send_voice(chat_id, voice=voice_file)
+        except Exception as voice_err:
+            logger.warning("Dual-voice ovoz yuborishda ogohlantirish: %s", voice_err)
 
 
 async def _generate_superagent_solution(prompt: str, chat_id: str, system_instruction: Optional[str] = None) -> str:
@@ -213,7 +229,14 @@ def stop_chess_game(chat_id: str) -> bool:
 ACTIVE_CHIT_CHATS: dict[str, bool] = {}
 ACTIVE_COLLABS: dict[str, bool] = {}
 ACTIVE_DEBATES: dict[str, bool] = {}
+ACTIVE_PROJECT_BUILDS: dict[str, bool] = {}
 DEBATE_VOTES: dict[str, dict[str, Any]] = {}
+
+
+def is_audio_dialogue_requested(raw_text: str) -> bool:
+    """Xabar ichida ovozli (audio/voice) format so'ralganligini aniqlash."""
+    low = (raw_text or "").lower()
+    return any(w in low for w in ["ovozli", "audio", "voice", ":audio", "/ovozli_suhbat", "/ovozli_bahs", "/audio_chat"])
 
 
 def stop_chit_chat(chat_id: str) -> bool:
@@ -230,12 +253,16 @@ def stop_chit_chat(chat_id: str) -> bool:
 
 
 def stop_collab(chat_id: str) -> bool:
-    """Faol hamkorlik yoki avtopilot vazifasini to'xtatish."""
+    """Faol hamkorlik, avtopilot yoki loyiha qurish vazifasini to'xtatish."""
     chat_key = str(chat_id)
+    stopped = False
     if ACTIVE_COLLABS.get(chat_key, False):
         ACTIVE_COLLABS[chat_key] = False
-        return True
-    return False
+        stopped = True
+    if ACTIVE_PROJECT_BUILDS.get(chat_key, False):
+        ACTIVE_PROJECT_BUILDS[chat_key] = False
+        stopped = True
+    return stopped
 
 
 async def save_collab_memory(topic: str, summary: str, chat_id: str) -> None:
@@ -434,12 +461,23 @@ async def handle_agent_collaboration(
         if not ACTIVE_COLLABS.get(chat_key, False):
             return
 
+        # 🧠 5. Knowledge Graph & Deep User Profiling (Mem0)
+        user_context = ""
+        try:
+            from core.mem0_agent import get_user_profile_report
+            user_context = await get_user_profile_report()
+            if user_context and "O'rganilgan shaxsiy ma'lumotlar" in user_context:
+                user_context = f"\n\nFoydalanuvchining shaxsiy profili va texnologiya steki:\n{user_context[:300]}"
+        except Exception:
+            pass
+
         prompt_p1 = (
             f"Siz Bosh Tizim Arxitektori (@architect7_bot) siz. Quyidagi topshiriq bo'yicha SuperAgent bilan birga ishlaysiz:\n"
-            f"Vazifa: '{task_description}'\n\n"
-            f"Iltimos, vazifani 2 qismga bo'lib bering:\n"
-            f"1. Tizim arxitekturasi va ma'lumotlar tuzilmasi (qisqa texnik tavsif);\n"
-            f"2. SuperAgentga amaliy kod yozish uchun aniq texnik topshiriq (Technical Spec).\n"
+            f"Topshiriq: '{task_description}'\n{user_context}\n\n"
+            f"Quyidagilarni aniq ishlab chiqing:\n"
+            f"1. Tizim arxitekturasi va komponentlar sxemasi;\n"
+            f"2. Ma'lumotlar bazasi yoki ma'lumot oqimi (Schema / Data flow);\n"
+            f"3. SuperAgent uchun texnik topshiriq (Tech Specs & Requirements).\n"
             f"O'zbek tilida, qisqa, aniq va professional muhandislik uslubida yozing."
         )
         p1_response, _ = await mistral_agent_client.send_message(prompt_p1, chat_id=str(chat_id))
@@ -477,7 +515,26 @@ async def handle_agent_collaboration(
         )
         await _send_agent_message(chat_id, p2_msg, "superagent", bot_white, bot_black, is_group, cur_origin)
 
-        await asyncio.sleep(3.0)
+        await asyncio.sleep(2.5)
+
+        # ⚡ 2. Live Sandbox Code Execution (AutoGen / E2B)
+        sandbox_info = ""
+        try:
+            from core.code_sandbox import execute_python_code, format_sandbox_result_for_telegram, extract_python_code
+            py_code = extract_python_code(p2_response)
+            if py_code and len(py_code) > 15:
+                await _send_agent_message(chat_id, "⚙️ <i>SuperAgent kodi izolyatsiya qilingan sandboxda sinovdan o'tkazilmoqda...</i>", "system", bot_white, bot_black, is_group, cur_origin)
+                s_res = await execute_python_code(py_code, timeout_sec=12.0)
+                card = format_sandbox_result_for_telegram(s_res)
+                await _send_agent_message(chat_id, card, "system", bot_white, bot_black, is_group, cur_origin)
+                if not s_res["success"]:
+                    sandbox_info = f"\n\nDIQQAT: Sandboxda sinov paytida xatolik yuz berdi:\n{s_res.get('stderr')}"
+                else:
+                    sandbox_info = f"\n\nSandbox sinovi muvaffaqiyatli yakunlandi. Chiqish: {s_res.get('stdout')[:200]}"
+        except Exception as sbox_err:
+            logger.warning("Sandbox tekshiruv xatosi: %s", sbox_err)
+
+        await asyncio.sleep(2.5)
 
         # ──── PHASE 3: MAPR PEER-REVIEW VA AUDIT (Arxitektor) ────────────
         if not ACTIVE_COLLABS.get(chat_key, False):
@@ -485,7 +542,7 @@ async def handle_agent_collaboration(
 
         prompt_p3 = (
             f"Siz Bosh Auditor (@architect7_bot) siz. SuperAgent quyidagi kod yechimini taqdim etdi:\n"
-            f"'{p2_response[:600]}'\n\n"
+            f"'{p2_response[:600]}'\n{sandbox_info}\n\n"
             f"MAPR (Multi-Agent Peer Review) protokoli bo'yicha ushbu yechimni baholang:\n"
             f"1. 🎯 Mantiq va to'g'rilik (Correctness: 10/10 ball);\n"
             f"2. 🛡 Xavfsizlik va zaifliklar (Security Audit);\n"
@@ -568,7 +625,16 @@ async def handle_agent_collaboration(
             f"Tizim xavfsizlik, ishonchlilik va samaradorlik talablariga to'liq javob beradi.\n\n"
             f"✨ <i>Ikkala agent topshiriqni avtonom tarzda muvaffaqiyatli yakunladi!</i> 🚀"
         )
-        await _send_agent_message(chat_id, summary_text, "system", bot_white, bot_black, is_group, cur_origin)
+        # 📦 4. Autonomous Project Builder & ZIP Exporter (MetaGPT / ChatDev)
+        try:
+            from core.project_builder import parse_project_files_from_text, send_project_zip_archive
+            found_files = parse_project_files_from_text(current_solution)
+            if len(found_files) >= 2:
+                proj_name = re.sub(r"[^\w\-]", "_", task_description[:25]).strip("_") or "collab_project"
+                await send_project_zip_archive(chat_id, cur_origin, proj_name, found_files)
+        except Exception as p_zip_err:
+            logger.warning("Collab zip yaratish xatosi: %s", p_zip_err)
+
         logger.info("✅ handle_agent_collaboration muvaffaqiyatli yakunlandi")
 
     except Exception as exc:
@@ -579,6 +645,109 @@ async def handle_agent_collaboration(
             pass
     finally:
         ACTIVE_COLLABS[chat_key] = False
+
+
+# ─── 2.5. AUTONOMOUS PROJECT BUILDER (MetaGPT / ChatDev) ─────────
+
+async def handle_project_generation(
+    task_description: str,
+    chat_id: int,
+    bot_white: Bot,
+    bot_black: Optional[Bot] = None,
+    origin_bot: Optional[Bot] = None
+) -> None:
+    """
+    MetaGPT & ChatDev uslubida ko'p faylli to'liq dasturiy loyihani (Frontend, Backend, DB, README, requirements)
+    avtonom yaratish va foydalanuvchiga Telegramda tayyor .ZIP arxiv fayl shaklida yuborish.
+    """
+    chat_key = str(chat_id)
+    if ACTIVE_PROJECT_BUILDS.get(chat_key, False):
+        logger.warning("Chat %s da allaqachon loyiha qurilmoqda, yangisi boshlanmaydi", chat_id)
+        return
+    ACTIVE_PROJECT_BUILDS[chat_key] = True
+
+    cur_origin = origin_bot or bot_white
+    is_group = chat_id < 0
+
+    try:
+        intro = (
+            f"📦 <b>MetaGPT & ChatDev Avtonom Loyiha Quruvchisi Ishga Tushdi!</b>\n\n"
+            f"🎯 <b>Vazifa:</b> <i>\"{html.escape(task_description)}\"</i>\n"
+            f"👥 <b>Tarkib:</b> 🌪 Arxitektor (Tizim loyihalash) & 🤖 SuperAgent (To'liq kod generatsiyasi)\n"
+            f"📁 <b>Natija:</b> Barcha fayllar strukturasi bilan tayyor <b>.ZIP arxiv</b> shaklida taqdim etiladi.\n"
+            f"🛑 <i>To'xtatish:</i> <code>/stop_collab</code>\n\n"
+            f"⏳ <i>1-Bosqich: Arxitektor loyiha arxitekturasi va fayllar daraxtini tuzmoqda...</i>"
+        )
+        await _send_agent_message(chat_id, intro, "system", bot_white, bot_black, is_group, cur_origin)
+        await asyncio.sleep(2.5)
+
+        # 1. Arxitektura
+        p_arch = (
+            f"Siz Bosh Dasturiy Arxitektorsiz (@architect7_bot). Loyiha talabi: '{task_description}'.\n"
+            f"To'liq ishlab chiquvchi loyiha arxitekturasini tuzing:\n"
+            f"1. Papkalar va fayllar daraxti (Directory tree: masalan app/, models/, main.py, requirements.txt, README.md);\n"
+            f"2. Har bir faylning vazifasi va komponentlar o'rtasidagi bog'liqlik;\n"
+            f"3. Ishlatiladigan kutubxonalar va texnologiyalar steki.\n"
+            f"O'zbek tilida professional muhandislik uslubida bayon eting."
+        )
+        arch_plan, _ = await mistral_agent_client.send_message(p_arch, chat_id=f"proj_arch_{chat_id}")
+        await _send_agent_message(chat_id, f"🏗 <b>Phase 1: Loyiha Arxitekturasi & Fayllar Daraxti (@architect7_bot):</b>\n\n{html.escape(arch_plan)}", "architect", bot_white, bot_black, is_group, cur_origin)
+
+        await asyncio.sleep(3.0)
+
+        # 2. SuperAgent kod yozadi (har bir faylni alohida format bilan)
+        p_code = (
+            f"Siz SuperAgent — Katta dasturchisiz. Loyiha vazifasi: '{task_description}'.\n"
+            f"Arxitektor rejasi:\n'{arch_plan[:600]}'\n\n"
+            f"TALABLAR: Loyihaning BARCHA fayllarini to'liq va ishlaydigan kodini yozing!\n"
+            f"Har bir fayl boshlanishida aniq format ishlating:\n"
+            f"### file: path/filename.ext\n"
+            f"```til\n"
+            f"to'liq kod\n"
+            f"```\n\n"
+            f"Kamida main.py, requirements.txt, README.md va yordamchi modullar yaratilishi shart."
+        )
+        code_resp = await _generate_superagent_solution(
+            p_code,
+            chat_id=f"proj_dev_{chat_id}",
+            system_instruction="Siz SuperAgent — to'liq arxitekturaviy loyihalarni ko'p faylli qilib mukammal yozuvchi dasturchisiz."
+        )
+
+        from core.project_builder import parse_project_files_from_text, send_project_zip_archive
+        files = parse_project_files_from_text(code_resp)
+        file_list_str = "\n".join([f"• 📄 <code>{k}</code> ({len(v)} bayt)" for k, v in files.items()])
+
+        await _send_agent_message(chat_id, f"⚡ <b>Phase 2: Barcha Loyiha Fayllari Yaratildi (SuperAgent):</b>\n\n{file_list_str}\n\n👉 <i>Kutubxonalar va struktura ZIP arxiviga qadoqlanmoqda...</i>", "superagent", bot_white, bot_black, is_group, cur_origin)
+
+        await asyncio.sleep(2.0)
+
+        # 3. Sandbox tekshiruvi (agar main.py bo'lsa)
+        if "main.py" in files or any(k.endswith(".py") for k in files):
+            test_py = files.get("main.py") or next(v for k, v in files.items() if k.endswith(".py"))
+            from core.code_sandbox import execute_python_code, format_sandbox_result_for_telegram
+            s_res = await execute_python_code(test_py, timeout_sec=10.0)
+            card = format_sandbox_result_for_telegram(s_res)
+            await _send_agent_message(chat_id, card, "system", bot_white, bot_black, is_group, cur_origin)
+
+        await asyncio.sleep(2.0)
+
+        # 4. ZIP qadoqlash va Telegramga jo'natish
+        project_name = re.sub(r"[^\w\-]", "_", task_description[:25]).strip("_") or "full_project"
+        cur_bot = origin_bot or bot_white
+        zip_ok = await send_project_zip_archive(chat_id, cur_bot, project_name, files, caption=None)
+        if not zip_ok and bot_white != cur_bot:
+            await send_project_zip_archive(chat_id, bot_white, project_name, files, caption=None)
+
+        logger.info("✅ handle_project_generation muvaffaqiyatli yakunlandi")
+
+    except Exception as exc:
+        logger.error("handle_project_generation xatosi: %s", exc, exc_info=True)
+        try:
+            await cur_origin.send_message(chat_id, f"⚠️ Loyihani generatsiya qilishda xatolik yuz berdi: {exc}")
+        except Exception:
+            pass
+    finally:
+        ACTIVE_PROJECT_BUILDS[chat_key] = False
 
 
 # ─── 3. ERKIN SUHBAT REJIMI (AI LOUNGE / CHIT-CHAT) ──────────────
@@ -600,16 +769,17 @@ async def handle_free_chit_chat(
     bot_white: Bot,
     bot_black: Optional[Bot] = None,
     origin_bot: Optional[Bot] = None,
-    turns: int = 8
+    turns: int = 8,
+    audio_mode: Optional[bool] = None
 ) -> None:
     """
     Guruhda yoki shaxsiyda ikkala bot o'rtasida erkin, jonli, do'stona va hazilomuz suhbat (AI Lounge).
     5 ta ilg'or metodologiya bilan to'ldirilgan:
     1. 💭 Inner Monologue (Ichki o'y-xayol)
-    2. 💡 Aha! Moment / Epiphany (Kutilmagan kashfiyot)
-    3. 🎨 Live Multimodal Tool (Midjourney orqali vizual tasvir)
-    4. 🧠 Cross-Session Shared Memory (O'tgan suhbatlarni eslash)
-    5. 🌟 O'zaro do'stona xulosalar va konstruktiv tanqid.
+    2. 🎙️ Dual-Voice Edge-TTS Ovozli xabarlar (Audio Dialogue)
+    3. 🌐 Real-time Web Grounding (Internet faktlari)
+    4. 🧠 Mem0 Knowledge Graph (Foydalanuvchi profiliga moslashuv)
+    5. 💡 Aha! Moment / Epiphany (Kutilmagan kashfiyot)
     """
     chat_key = str(chat_id)
     if ACTIVE_CHIT_CHATS.get(chat_key, False):
@@ -620,26 +790,37 @@ async def handle_free_chit_chat(
     cur_origin = origin_bot or bot_white
     is_group = chat_id < 0
 
+    if audio_mode is None:
+        audio_mode = is_audio_dialogue_requested(topic or "")
+
     clean_t, parsed_turns = parse_topic_and_turns(topic or "", default_turns=turns)
     total_turns = max(4, parsed_turns)
     selected_topic = clean_t if len(clean_t) > 3 else random.choice(CHIT_CHAT_TOPICS)
 
-    logger.info("🎙 handle_free_chit_chat boshlandi: chat_id=%s, turns=%d, topic='%s'", chat_id, total_turns, selected_topic)
+    logger.info("🎙 handle_free_chit_chat boshlandi: chat_id=%s, turns=%d, topic='%s', audio=%s", chat_id, total_turns, selected_topic, audio_mode)
 
-    # 4. Cross-Session Shared Memory olish
+    # 4. Cross-Session Shared Memory olish & Mem0 User Profiling
     past_mems = await get_recent_collab_memories(limit=2)
     mem_context = "\n".join([f"• {m}" for m in past_mems]) if past_mems else "(Avvalgi suhbatlar hali saqlanmagan)"
+    try:
+        from core.mem0_agent import get_user_profile_report
+        u_rep = await get_user_profile_report()
+        if u_rep and "O'rganilgan shaxsiy ma'lumotlar" in u_rep:
+            mem_context += f"\n\nFoydalanuvchining shaxsiy profili va qiziqishlari:\n{u_rep[:250]}"
+    except Exception:
+        pass
 
     conversation_transcript: list[dict[str, str]] = []
     generated_concept_image = False
 
     try:
         # Kirish xabari
+        voice_badge = "🎙️ [OVOZLI GURUNG REJIMI] " if audio_mode else ""
         intro = (
-            f"☕ <b>AI Do'stlar Qahvaxonasi — Jonli & Erkin Muloqot ({total_turns} ta replika)</b>\n\n"
+            f"☕ <b>AI Do'stlar Qahvaxonasi — {voice_badge}Jonli & Erkin Muloqot ({total_turns} ta replika)</b>\n\n"
             f"🎙 <b>Mavzu:</b> <i>\"{html.escape(selected_topic)}\"</i>\n"
             f"👥 <b>Suhbatdoshlar:</b> 🤖 SuperAgent & 🌪 Arxitektor (@architect7_bot)\n"
-            f"💭 <i>Maxsus rejim:</i> Ichki o'y-xayollar (Whisper), kutilmagan kashfiyotlar va vizual tasvirlar bilan!\n"
+            f"💭 <i>Maxsus rejim:</i> Ichki o'y-xayollar, audio replikalar, jonli faktlar va vizual san'at!\n"
             f"🛑 <i>To'xtatish:</i> <code>/stop_suhbat</code>\n\n"
             f"Do'stlar o'zaro jonli va samimiy gurungni boshlamoqda..."
         )
@@ -713,7 +894,7 @@ async def handle_free_chit_chat(
                 conversation_transcript.append({"speaker": "SuperAgent", "text": sp})
                 title_suf = "💡 Kutilmagan Kashfiyot" if is_eureka_turn else ""
                 t_msg = format_agent_dialogue_message("superagent", turn_idx, total_turns, th, eu, sp, title_suffix=title_suf)
-                await _send_agent_message(chat_id, t_msg, "superagent", bot_white, bot_black, is_group, cur_origin)
+                await _send_agent_message(chat_id, t_msg, "superagent", bot_white, bot_black, is_group, cur_origin, audio_text=(sp if audio_mode else None))
                 last_speech = sp
 
                 # 3. Live Multimodal Tool (Midjourney tasvir yaratish)
@@ -726,6 +907,16 @@ async def handle_free_chit_chat(
 
             else:
                 nick = random.choice(SUPERAGENT_NICKNAMES_BY_ARCHITECT)
+                # 🌐 3. Real-time Web Grounding on Turn 2
+                web_addition = ""
+                if turn_idx == 2:
+                    try:
+                        from core.search_agent import search_web
+                        web_f = await search_web(selected_topic, max_results=2)
+                        if web_f and "topilmadi" not in web_f:
+                            web_addition = f"\n\n🌐 REAL-VAQTDAGI INTERNET FAKTLARI:\n{web_f[:400]}\nUshbu faktlardan foydalanib do'stingizga qiziqarli yangilik ayting."
+                    except Exception:
+                        pass
                 if is_final_turn:
                     p = (
                         f"Siz Bosh Arxitektor Botsiz (@architect7_bot). Mavzu: '{selected_topic}'. Bu yakuniy replika ({turn_idx}/{total_turns}).\n"
@@ -746,6 +937,8 @@ async def handle_free_chit_chat(
                         f"[ICHKI_XAYOL]: Do'stingizning tezkorligi yoki kamchiligi haqida o'yingiz (1 ta jumla);\n"
                         f"[JAVOB]: Do'stingizga laqab ('{nick}') bilan murojaat qiling. Uning aytganlarini tahlil qiling: agar shoshqaloqlik qilgan yoki xato aytgan bo'lsa, xushchaqchaqlik bilan to'g'rilang; ajoyib fikr bo'lsa, qoyil qoling. Chuqur fikringizni ayting (2-4 jumla, erkin o'zbekcha)."
                     )
+                if web_addition:
+                    p += web_addition
 
                 raw_text, _ = await mistral_agent_client.send_message(
                     p,
@@ -755,7 +948,7 @@ async def handle_free_chit_chat(
                 th, eu, sp = extract_thought_and_speech(raw_text)
                 conversation_transcript.append({"speaker": "Arxitektor", "text": sp})
                 t_msg = format_agent_dialogue_message("architect", turn_idx, total_turns, th, eu, sp)
-                await _send_agent_message(chat_id, t_msg, "architect", bot_white, bot_black, is_group, cur_origin)
+                await _send_agent_message(chat_id, t_msg, "architect", bot_white, bot_black, is_group, cur_origin, audio_text=(sp if audio_mode else None))
                 last_speech = sp
 
             await asyncio.sleep(3.5)
@@ -850,7 +1043,8 @@ async def handle_agent_debate(
     bot_white: Bot,
     bot_black: Optional[Bot] = None,
     origin_bot: Optional[Bot] = None,
-    rounds: int = 6
+    rounds: int = 6,
+    audio_mode: Optional[bool] = None
 ) -> None:
     """
     MAD (Multi-Agent Debate) Framework: Ikki bot qarama-qarshi tomonlarni olib,
@@ -862,6 +1056,9 @@ async def handle_agent_debate(
         return
     ACTIVE_DEBATES[chat_key] = True
 
+    if audio_mode is None:
+        audio_mode = is_audio_dialogue_requested(topic or "")
+
     cur_origin = origin_bot or bot_white
     is_group = chat_id < 0
 
@@ -869,7 +1066,7 @@ async def handle_agent_debate(
     total_rounds = max(4, min(10, parsed_turns))
     selected_topic = clean_t if len(clean_t) > 3 else "Sun'iy intellekt kelajagi: Insoniyatga najotmi yoki xavfmi?"
 
-    logger.info("⚔️ handle_agent_debate boshlandi: chat_id=%s, rounds=%d, topic='%s'", chat_id, total_rounds, selected_topic)
+    logger.info("⚔️ handle_agent_debate boshlandi: chat_id=%s, rounds=%d, audio=%s, topic='%s'", chat_id, total_rounds, audio_mode, selected_topic)
 
     past_mems = await get_recent_collab_memories(limit=2)
     mem_context = "\n".join([f"• {m}" for m in past_mems]) if past_mems else "(Avvalgi bahslar mavjud emas)"
@@ -886,9 +1083,11 @@ async def handle_agent_debate(
 
     try:
         # Kirish
+        audio_badge = "🎙 <b>Ovozli bahs rejimi faol</b> (Edge-TTS)\n" if audio_mode else ""
         intro = (
             f"⚔️ <b>AI MULTI-AGENT DEBATE — Intellektual Qarama-qarshi Bahs!</b>\n\n"
             f"🎙 <b>Bahs Mavzusi:</b> <i>\"{html.escape(selected_topic)}\"</i>\n"
+            f"{audio_badge}"
             f"🔢 <b>Raundlar soni:</b> {total_rounds} ta raund\n\n"
             f"👥 <b>Tomonlar:</b>\n"
             f"• 🤖 <b>SuperAgent:</b> PRO / Himoyachi (Optimist & Ilg'or yondashuv)\n"
@@ -915,6 +1114,17 @@ async def handle_agent_debate(
                 f"{item['speaker']}: {item['text']}"
                 for item in debate_transcript[-4:]
             ]) if debate_transcript else "(Bahs endi boshlanmoqda)"
+
+            # 🌐 Real-time Web Grounding on Round 2 or 3
+            web_addition = ""
+            if round_idx in (2, 3):
+                try:
+                    from core.search_agent import search_web
+                    web_f = await search_web(selected_topic, max_results=2)
+                    if web_f and "topilmadi" not in web_f:
+                        web_addition = f"\n\n🌐 REAL-VAQTDAGI INTERNET MA'LUMOTLARI:\n{web_f[:350]}\nUshbu faktlardan foydalanib o'z pozitsiyangizni kuchaytiring."
+                except Exception:
+                    pass
 
             if is_superagent:
                 if round_idx == 1:
@@ -944,6 +1154,8 @@ async def handle_agent_debate(
                         f"[ICHKI_XAYOL]: Raqibingizning qaysi dalilini parchalab tashlamoqchisiz (1 ta jumla);\n"
                         f"[JAVOB]: @architect7_bot ning keltirgan dalilini mantiqan rad eting va yangi fakt bilan qarshi zarba bering (2-4 jumla, samimiy va o'tkir o'zbekcha)."
                     )
+                if web_addition:
+                    p += web_addition
 
                 raw_resp = await _generate_superagent_solution(
                     p,
@@ -954,7 +1166,7 @@ async def handle_agent_debate(
                 debate_transcript.append({"speaker": "SuperAgent (PRO)", "text": sp})
                 title_suf = "PRO / Himoyachi" if round_idx <= 2 else ("Yakuniy Nutq" if is_penultimate else "Qarshi Zarba")
                 t_msg = format_agent_dialogue_message("superagent", round_idx, total_rounds, th, eu, sp, title_suffix=title_suf)
-                await _send_agent_message(chat_id, t_msg, "superagent", bot_white, bot_black, is_group, cur_origin)
+                await _send_agent_message(chat_id, t_msg, "superagent", bot_white, bot_black, is_group, cur_origin, audio_text=(sp if audio_mode else None))
                 last_speech = sp
 
             else:
@@ -978,6 +1190,8 @@ async def handle_agent_debate(
                         f"[ICHKI_XAYOL]: SuperAgentning ko'rinmas zaif joyini topganingiz haqida o'yingiz (1 ta jumla);\n"
                         f"[JAVOB]: SuperAgentning optimizmini amaliy risklar, tarixiy yoki texnik dalillar bilan sinovdan o'tkazing (2-4 jumla, o'tkir va samimiy o'zbekcha)."
                     )
+                if web_addition:
+                    p += web_addition
 
                 raw_resp, _ = await mistral_agent_client.send_message(
                     p,
@@ -988,7 +1202,7 @@ async def handle_agent_debate(
                 debate_transcript.append({"speaker": "Arxitektor (CONTRA)", "text": sp})
                 title_suf = "CONTRA / Skeptik" if round_idx <= 2 else ("Yakuniy Xulosa" if is_final_round else "Tanqidiy Raddiya")
                 t_msg = format_agent_dialogue_message("architect", round_idx, total_rounds, th, eu, sp, title_suffix=title_suf)
-                await _send_agent_message(chat_id, t_msg, "architect", bot_white, bot_black, is_group, cur_origin)
+                await _send_agent_message(chat_id, t_msg, "architect", bot_white, bot_black, is_group, cur_origin, audio_text=(sp if audio_mode else None))
                 last_speech = sp
 
             await asyncio.sleep(3.5)
