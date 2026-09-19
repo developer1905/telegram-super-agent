@@ -49,6 +49,12 @@ def get_main_bot_instance() -> Optional[Bot]:
     return _main_bot_instance
 
 
+def set_main_bot_instance(bot: Bot) -> None:
+    """Asosiy bot obyektini biriktiradi."""
+    global _main_bot_instance
+    _main_bot_instance = bot
+
+
 def get_architect_keyboard() -> ReplyKeyboardMarkup:
     """Arxitektor Mistral Botining shaxsiy maxsus klaviaturasi."""
     kb = [
@@ -280,10 +286,11 @@ async def handle_second_bot_text(message: Message, bot: Bot) -> None:
     # Agar guruhda bo'lsa, botga murojaat qilinganligini tekshiramiz
     if is_group:
         is_mentioned = "@architect7_bot" in text.lower() or "arxitektor" in text.lower()
+        bot_tg_id = int(bot.token.split(":")[0]) if ":" in bot.token else 0
         is_reply_to_bot = (
             message.reply_to_message
             and message.reply_to_message.from_user
-            and message.reply_to_message.from_user.id == bot.id
+            and message.reply_to_message.from_user.id == bot_tg_id
         )
         if not (is_mentioned or is_reply_to_bot):
             return  # Begona guruh xabarlariga aralashmaydi
