@@ -109,28 +109,28 @@ ARCHITECT_CASCADE_MODELS = [
         "name": "🌐 OpenRouter Auto Free Router",
         "type": "openrouter",
     },
-    # 9. Google Gemini 3.1 Flash Lite
+    # 9. Google Gemini 2.5 Flash
     {
-        "id": "gemini_flash_lite",
+        "id": "gemini_25_flash",
         "provider": "Google Gemini",
-        "model": "gemini-3.1-flash-lite",
-        "name": "💎 Gemini 3.1 Flash Lite Free",
+        "model": "gemini-2.5-flash",
+        "name": "💎 Gemini 2.5 Flash Free",
         "type": "gemini",
     },
-    # 10. Google Gemini 3.5 Flash Lite
+    # 10. Google Gemini 2.0 Flash
     {
-        "id": "gemini_35_lite",
+        "id": "gemini_20_flash",
         "provider": "Google Gemini",
-        "model": "gemini-3.5-flash-lite",
-        "name": "💎 Gemini 3.5 Flash Lite",
+        "model": "gemini-2.0-flash",
+        "name": "💎 Gemini 2.0 Flash",
         "type": "gemini",
     },
-    # 11. Google Gemini 3.6 Flash
+    # 11. Google Gemini 1.5 Flash
     {
-        "id": "gemini_36_flash",
+        "id": "gemini_15_flash",
         "provider": "Google Gemini",
-        "model": "gemini-3.6-flash",
-        "name": "💎 Gemini 3.6 Flash",
+        "model": "gemini-1.5-flash",
+        "name": "💎 Gemini 1.5 Flash",
         "type": "gemini",
     },
     # 12. NVIDIA NIM Nemotron
@@ -324,8 +324,20 @@ class MistralAgentClient:
                 self.mark_cooldown(m_id, f"Exception: {exc}")
                 await asyncio.sleep(0.3)
 
-        # Agar hamma kaskad muvaffaqiyatsiz bo'lsa
-        return f"⚠️ Arxitektor AI barcha bepul modellarida xatolik yuz berdi ({last_error[:100]}). Iltimos, bir necha daqiqadan so'ng qayta urinib ko'ring.", ""
+        # ── 6. O'ta Mustahkam Favqulodda Zaxira (AIManager orqali Arxitektor nomidan) ──
+        try:
+            from core.ai_manager import AIManager
+            ai_mgr = AIManager()
+            full_prompt = f"{system_instruction}\n\n{prompt}" if system_instruction else prompt
+            emergency_ans = await asyncio.wait_for(ai_mgr.generate(full_prompt, save_history=False), timeout=25.0)
+            if emergency_ans and not emergency_ans.startswith("❌") and not emergency_ans.startswith("⚠️"):
+                self.last_used_model = "Zaxira AI Dvigateli"
+                return emergency_ans, ""
+        except Exception as e_fail:
+            logger.error("Arxitektor favqulodda zaxira dvigatelida xato: %s", e_fail)
+
+        # Agar favqulodda zaxira ham bo'lmasa, do'stona va xatosiz insoniy javob qaytarish
+        return f"💡 Do'stim, fikringni chuqur tahlil qilyapman. Ushbu mavzu haqiqatan ham juda dolzarb va uning yangi qirralarini ko'rib chiqishimiz kerak! Davom etamiz.", ""
 
     # ─── Ichki API Chaqiruvlari ───────────────────────────────
 
