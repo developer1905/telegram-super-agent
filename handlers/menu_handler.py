@@ -572,7 +572,63 @@ async def cmd_main_collab(message: Message, command: CommandObject, bot: Bot) ->
     from core.bot_collab import handle_agent_collaboration
     from core.mistral_agent_bot import get_second_bot
     sec_bot = get_second_bot()
-    await handle_agent_collaboration(task, message.chat.id, bot_white=bot, bot_black=sec_bot)
+    import asyncio
+    asyncio.create_task(handle_agent_collaboration(task, message.chat.id, bot_white=bot, bot_black=sec_bot, origin_bot=bot))
+
+
+@router.message(ADMIN_FILTER, Command("avtopilot", "kechki_vazifa", "night"))
+async def cmd_main_autopilot(message: Message, command: CommandObject, bot: Bot) -> None:
+    """Tungi to'liq rejim: vazifa bitmaguncha suhbatlashib ishlayveradi."""
+    task = (command.args or "").strip()
+    if not task:
+        await message.answer(
+            "🌙 <b>Tungi Avtopilot Rejimi:</b>\n\n"
+            "SuperAgent va Arxitektor (@architect7_bot) siz uxlaganingizda ham topshiriq ustida to'xtovsiz bahslashib, kod yozib, xatolarini tuzatib boraveradi.\n\n"
+            "💡 <b>Foydalanish:</b> <code>/avtopilot [topshiriq matni]</code>\n"
+            "🛑 <i>To'xtatish uchun:</i> <code>/stop_collab</code>",
+            parse_mode="HTML"
+        )
+        return
+
+    from core.bot_collab import handle_agent_collaboration
+    from core.mistral_agent_bot import get_second_bot
+    sec_bot = get_second_bot()
+    import asyncio
+    asyncio.create_task(handle_agent_collaboration(task, message.chat.id, bot_white=bot, bot_black=sec_bot, origin_bot=bot, deep_mode=True, max_rounds=6))
+
+
+@router.message(ADMIN_FILTER, Command("suhbat", "chat", "gaplash"))
+async def cmd_main_suhbat(message: Message, bot: Bot) -> None:
+    """Ikki AI o'rtasida erkin jonli suhbat: /suhbat [N] [mavzu]."""
+    raw_text = message.text or ""
+    from core.bot_collab import handle_free_chit_chat, parse_topic_and_turns
+    topic, turns = parse_topic_and_turns(raw_text, default_turns=8)
+    from core.mistral_agent_bot import get_second_bot
+    sec_bot = get_second_bot()
+    import asyncio
+    asyncio.create_task(handle_free_chit_chat(topic, message.chat.id, bot_white=bot, bot_black=sec_bot, origin_bot=bot, turns=turns))
+
+
+@router.message(ADMIN_FILTER, Command("stop_collab", "stop_task", "toxtat_vazifa"))
+async def cmd_main_stop_collab(message: Message) -> None:
+    """Hamkorlik yoki avtopilotni to'xtatish."""
+    from core.bot_collab import stop_collab
+    stopped = stop_collab(str(message.chat.id))
+    if stopped:
+        await message.answer("🛑 <b>Hamkorlik / Avtopilot vazifasi to'xtatildi.</b>", parse_mode="HTML")
+    else:
+        await message.answer("⚠️ Hozirda faol vazifa mavjud emas.", parse_mode="HTML")
+
+
+@router.message(ADMIN_FILTER, Command("stop_suhbat", "stop_chat", "toxtat_suhbat"))
+async def cmd_main_stop_suhbat(message: Message) -> None:
+    """Erkin suhbatni to'xtatish."""
+    from core.bot_collab import stop_chit_chat
+    stopped = stop_chit_chat(str(message.chat.id))
+    if stopped:
+        await message.answer("🛑 <b>Erkin suhbat to'xtatildi.</b>", parse_mode="HTML")
+    else:
+        await message.answer("⚠️ Hozirda faol suhbat mavjud emas.", parse_mode="HTML")
 
 
 @router.callback_query(ADMIN_FILTER, F.data == "game:chess_start")
