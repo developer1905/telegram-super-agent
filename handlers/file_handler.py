@@ -126,6 +126,26 @@ async def handle_document(message: Message, bot: Bot, ai_manager: AIManager) -> 
         await wait_msg.edit_text(f"⚠️ {extracted_text or 'Hujjat bo\'sh'}")
         return
 
+    # Arab Lotlari (Arabic Parts) fayli ekanligini avtomatik aniqlash
+    lower_txt = extracted_text.lower()
+    if ("part of " in lower_txt or "lot of " in lower_txt or "pars fortuna" in lower_txt or "arabic parts" in lower_txt) and ("gemini" in lower_txt or "leo" in lower_txt or "aries" in lower_txt or "°" in lower_txt or "uy" in lower_txt or "house" in lower_txt):
+        from core.astrology_agent import parse_custom_arabic_lots
+        parsed_lots = parse_custom_arabic_lots(extracted_text)
+        if len(parsed_lots) >= 3:
+            await db.save_custom_lots(str(message.from_user.id), parsed_lots)
+            from core.safe_send import safe_edit_text
+            res_msg = (
+                f"☪️ **ARAB LOTLARI (ARABIC PARTS) MUVAFFAQIYATLI YUKLANDI!**\n\n"
+                f"📊 Fayldan aniqlangan va tizimga saqlangan Lotlar: **{len(parsed_lots)} ta**.\n"
+                f"✅ Ushbu lotlar sizning shaxsiy astrologik profilingizga bog'landi!\n\n"
+                f"Endi **Nous Hermes 3** va **20 yillik tajribali munajjim-olim** ushbu lotlar asosida voqeaviy chuqur tahlil bera oladi.\n\n"
+                f"Tahlil olish uchun: /lots yoki Web App dagi 'Voqealar Prognozi' tugmasini bosing!"
+            )
+            builder = InlineKeyboardBuilder()
+            builder.row(InlineKeyboardButton(text="🧠 20 Yillik Olim Tahlili (Hermes 3)", callback_data="astro:ai_report"))
+            await safe_edit_text(wait_msg, res_msg, reply_markup=builder.as_markup(), parse_mode="Markdown")
+            return
+
     # AI tahlili
     prompt = build_analysis_prompt(extracted_text, filename, file_type)
 
