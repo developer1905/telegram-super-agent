@@ -1476,8 +1476,8 @@
             <div class="row g-2 align-items-center mb-2">
               <div class="col-7">
                 <select class="form-select form-select-sm" id="astro-ai-model-select">
-                  <option value="nousresearch/hermes-3-llama-3.1-405b:free" selected>🧠 Nous Hermes 3 (405B Agent)</option>
-                  <option value="gemini-2.5-flash">⚡ Gemini 2.5 Flash</option>
+                  <option value="gemini-2.5-flash" selected>⚡ Gemini 2.5 Flash (100% O'zbekcha)</option>
+                  <option value="nousresearch/hermes-3-llama-3.1-405b:free">🧠 Nous Hermes 3 (405B Olim)</option>
                   <option value="deepseek/deepseek-r1:free">🔬 DeepSeek R1 Reasoning</option>
                 </select>
               </div>
@@ -3265,7 +3265,7 @@
       const qInput = document.getElementById('astro-ai-question');
       const modelSelect = document.getElementById('astro-ai-model-select');
       const question = qInput ? qInput.value.trim() : '';
-      const model = modelSelect ? modelSelect.value : 'nousresearch/hermes-3-llama-3.1-405b:free';
+      const model = modelSelect ? modelSelect.value : 'gemini-2.5-flash';
       const btn = document.getElementById('btn-run-astro-ai');
       const box = document.getElementById('astro-ai-report-box');
       const content = document.getElementById('astro-ai-report-content');
