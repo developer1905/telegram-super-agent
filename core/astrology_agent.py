@@ -553,3 +553,266 @@ def format_astrology_rag_context(chart_data: Dict[str, Any], transits: Optional[
     lines.append("--- ASTROLOGIK XARITA TUGADI ---\n")
 
     return "\n".join(lines)
+
+
+# ══════════════════════════════════════════════════════════════
+# 513 ARAB LOTLARI (ARABIC PARTS / LOTS) VA GRANDMASTER OLIM DVIGATELI
+# ══════════════════════════════════════════════════════════════
+
+LOT_CATEGORIES = {
+    "Moliya & Boylik": ["wealth", "fortune", "money", "commerce", "debt", "gain", "treasure", "possession", "gold", "silver", "moliya", "boylik", "daromad", "savdo", "oltin"],
+    "Mansab & Zafar": ["career", "victory", "fame", "honor", "king", "nobility", "authority", "profession", "action", "dignity", "glory", "mansab", "zafar", "shuhrat", "karyera"],
+    "Muhabbat & Nikoh": ["love", "eros", "marriage", "wedding", "passion", "union", "beauty", "concord", "desire", "wife", "husband", "sevgi", "muhabbat", "nikoh", "oila"],
+    "Salomatlik & Sinovlar": ["illness", "sickness", "health", "death", "danger", "surgery", "poison", "necessity", "pain", "kasallik", "salomatlik", "o'lim", "xavf", "saboq"],
+    "Aql & Ma'naviyat": ["spirit", "soul", "wisdom", "understanding", "intelligence", "faith", "religion", "divination", "art", "ruh", "aql", "donolik", "ilm", "e'tiqod"],
+    "Oila & Ko'chmas Mulk": ["father", "mother", "ancestor", "land", "estate", "house", "inheritance", "property", "ota", "ona", "mulk", "yer", "meros", "uy"],
+    "Do'stlar & Dushmanlar": ["friend", "alliance", "enemy", "enemies", "treachery", "captivity", "prison", "deceit", "do'st", "dushman", "xiyonat", "qamoq", "aldov"],
+    "Sayohat & Chet El": ["journey", "travel", "water", "foreign", "pilgrimage", "sea", "exile", "sayohat", "safari", "chet el", "hijrat"],
+}
+
+ZODIAC_RULERS = {
+    "Qo'y": "Mars", "Aries": "Mars",
+    "Buzoq": "Venera", "Taurus": "Venera",
+    "Egizaklar": "Merkuriy", "Gemini": "Merkuriy",
+    "Qisqichbaqa": "Oy", "Cancer": "Oy",
+    "Arslon": "Quyosh", "Leo": "Quyosh",
+    "Parizod": "Merkuriy", "Virgo": "Merkuriy",
+    "Tarozi": "Venera", "Libra": "Venera",
+    "Chayon": "Mars / Pluton", "Scorpio": "Mars / Pluton",
+    "O'qotar": "Yupiter", "Sagittarius": "Yupiter",
+    "Tog'echkisi": "Saturn", "Capricorn": "Saturn",
+    "Qovg'a": "Saturn / Uran", "Aquarius": "Saturn / Uran",
+    "Baliq": "Yupiter / Neptun", "Pisces": "Yupiter / Neptun",
+}
+
+
+def parse_custom_arabic_lots(raw_input: Any) -> List[Dict[str, Any]]:
+    """
+    Foydalanuvchi tashlagan 513 tagacha Arab Lotlarini (JSON, CSV yoki matn)
+    aniq strukturalangan ro'yxatga aylantirish.
+    """
+    lots: List[Dict[str, Any]] = []
+
+    # 1. Agar allaqachon ro'yxat yoki lug'at bo'lsa
+    if isinstance(raw_input, list):
+        for item in raw_input:
+            if isinstance(item, dict):
+                lots.append(_normalize_lot_dict(item))
+            elif isinstance(item, str):
+                parsed = _parse_single_lot_line(item)
+                if parsed:
+                    lots.append(parsed)
+        return lots
+
+    if isinstance(raw_input, dict):
+        for k, v in raw_input.items():
+            if isinstance(v, dict):
+                v["name"] = v.get("name", k)
+                lots.append(_normalize_lot_dict(v))
+            elif isinstance(v, (str, int, float)):
+                parsed = _parse_single_lot_line(f"{k}: {v}")
+                if parsed:
+                    lots.append(parsed)
+        return lots
+
+    # 2. Agar xom matn (string) bo'lsa
+    text = str(raw_input).strip()
+    import json
+    try:
+        data = json.loads(text)
+        return parse_custom_arabic_lots(data)
+    except Exception:
+        pass
+
+    # Satrma-satr o'qish (CSV yoki oddiy ro'yxat)
+    lines = text.split("\n")
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith("#") or line.startswith("//"):
+            continue
+        parsed = _parse_single_lot_line(line)
+        if parsed:
+            lots.append(parsed)
+
+    return lots
+
+
+def _parse_single_lot_line(line: str) -> Optional[Dict[str, Any]]:
+    """Satrdan lot nomi, burji, darajasi va uyini ajratib olish."""
+    import re
+    # Masalan: "Part of Commerce: 14°22' Gemini (2nd House)" yoki "Fortune, 15 Leo, 10-uy"
+    clean_line = line.replace('"', '').replace("'", " min ").replace("°", " deg ")
+    
+    # Ismni ajratish
+    name = clean_line
+    rest = ""
+    for sep in [":", "-", "=", "➔", "\t", ","]:
+        if sep in clean_line:
+            parts = clean_line.split(sep, 1)
+            name = parts[0].strip()
+            rest = parts[1].strip()
+            break
+
+    sign_found = "Noma'lum"
+    for z in ZODIAC_SIGNS:
+        if z["name"].lower() in clean_line.lower() or z["en"].lower() in clean_line.lower():
+            sign_found = z["name"]
+            break
+
+    # Darajani qidirish
+    deg_match = re.search(r"(\d{1,2}(?:\.\d+)?)\s*(?:deg|\°)?", clean_line)
+    degree = float(deg_match.group(1)) if deg_match else 0.0
+
+    # Uyni qidirish
+    house_match = re.search(r"(\d{1,2})\s*-(?:uy|house|dom)", clean_line, re.IGNORECASE)
+    house = f"{house_match.group(1)}-Uy" if house_match else "Noma'lum"
+
+    # Toifani aniqlash
+    category = "Boshqa muhim nuqtalar"
+    name_lower = name.lower()
+    for cat_name, keywords in LOT_CATEGORIES.items():
+        if any(kw in name_lower for kw in keywords):
+            category = cat_name
+            break
+
+    ruler = ZODIAC_RULERS.get(sign_found, "Noma'lum")
+
+    return {
+        "name": name,
+        "sign": sign_found,
+        "degree": round(degree, 2),
+        "house": house,
+        "category": category,
+        "ruler": ruler,
+        "raw": line,
+    }
+
+
+def _normalize_lot_dict(item: Dict[str, Any]) -> Dict[str, Any]:
+    name = str(item.get("name") or item.get("title") or "Nomsiz Lot")
+    sign = str(item.get("sign") or item.get("burj") or "Noma'lum")
+    deg = float(item.get("degree") or item.get("daraja") or 0.0)
+    house = str(item.get("house") or item.get("uy") or "Noma'lum")
+    
+    category = item.get("category")
+    if not category:
+        category = "Boshqa muhim nuqtalar"
+        name_lower = name.lower()
+        for cat_name, keywords in LOT_CATEGORIES.items():
+            if any(kw in name_lower for kw in keywords):
+                category = cat_name
+                break
+
+    ruler = ZODIAC_RULERS.get(sign, "Noma'lum")
+
+    return {
+        "name": name,
+        "sign": sign,
+        "degree": deg,
+        "house": house,
+        "category": category,
+        "ruler": ruler,
+    }
+
+
+def build_grandmaster_lots_rag_context(
+    chart_data: Dict[str, Any],
+    custom_lots: Optional[List[Dict[str, Any]]] = None,
+    focus_topic: str = "",
+) -> str:
+    """
+    513 tagacha bo'lgan barcha Arab lotlarini ixchamlashtirilgan,
+    kuchli toifalangan va boshqaruvchilari bilan boyitilgan RAG matniga aylantirish.
+    """
+    lines = [
+        "═══════════════════════════════════════════════════════════════",
+        "🔮 QADIMIY ARAB LOTLARI VA ILMIY MUNAJJIM-OLIM MATEMATIKASI",
+        "═══════════════════════════════════════════════════════════════",
+    ]
+
+    all_lots = custom_lots or []
+    lines.append(f"📊 Ro'yxatdagi jami Arab Lotlari: {len(all_lots)} ta.")
+
+    if not all_lots:
+        lines.append("Foydalanuvchi hozircha shaxsiy qo'shimcha lotlar faylini kiritmagan. Klassik 5 ta asosiy lot tahlili ishlatiladi.")
+        return "\n".join(lines)
+
+    # Toifalar bo'yicha guruhlash
+    grouped: Dict[str, List[Dict[str, Any]]] = {}
+    for lot in all_lots:
+        cat = lot.get("category", "Boshqa muhim nuqtalar")
+        grouped.setdefault(cat, []).append(lot)
+
+    for cat_name, cat_lots in grouped.items():
+        lines.append(f"\n📂 [{cat_name.upper()}] — {len(cat_lots)} ta Lot:")
+        for l in cat_lots[:15]:  # Har bir toifadan eng asosiy 15 tasini batafsil joylaymiz
+            h_info = f" ({l.get('house')})" if l.get('house') and l.get('house') != "Noma'lum" else ""
+            r_info = f" [Boshqaruvchi: {l.get('ruler')}]" if l.get('ruler') and l.get('ruler') != "Noma'lum" else ""
+            lines.append(f"  • {l.get('name')}: {l.get('degree')}° {l.get('sign')}{h_info}{r_info}")
+        if len(cat_lots) > 15:
+            lines.append(f"    ... va yana {len(cat_lots) - 15} ta ixtisoslashgan lotlar.")
+
+    return "\n".join(lines)
+
+
+def build_grandmaster_astrology_prompt(
+    profile: Dict[str, Any],
+    custom_lots: Optional[List[Dict[str, Any]]] = None,
+    question: str = "",
+    target_year: int = 2026,
+) -> str:
+    """
+    20 yillik tajribali munajjim-olim (Al-Biruniy / Abu Ma'shar / Hermes Trismegistus an'anasi)
+    darajasidagi chuqur voqeaviy bashorat prompti.
+    """
+    chart = profile.get("chart", {})
+    planets = chart.get("planets", {})
+    asc = chart.get("ascendant", {}).get("formatted", "Noma'lum")
+    mc = chart.get("mc", {}).get("formatted", "Noma'lum")
+    birth_date = profile.get("birth_date", "")
+    birth_time = profile.get("birth_time", "")
+    city = profile.get("city", "")
+
+    lots_rag = build_grandmaster_lots_rag_context(chart, custom_lots, focus_topic=question)
+
+    prompt = f"""Siz — 20 yillik chuqur tajribaga ega bo'lgan buyuk munajjim-olim, Abu Rayhon Beruniy, Abu Ma'shar al-Balxiy va Ellinistik an'anaviy astrologiya (Hermes Trismegistus, Vettius Valens) ustasisiz.
+
+Sizning vazifangiz: Mijozning tug'ilgan kartasi va uning {len(custom_lots or [])} ta Arab Lotlarini (Lots / Sahms) o'zaro bog'lab, ANIQ VOQEAVIY PROGNOZ (Concrete Event Forecasting) berish.
+
+MIJOZ SHAXSIY NATAL KOORDINATALARI:
+- Tug'ilgan vaqt va shahar: {birth_date} {birth_time}, {city}
+- Ufq (Ascendant): {asc}
+- Cho'qqi (Midheaven / MC): {mc}
+- Sayyoralar:
+"""
+    for p_name, p_data in planets.items():
+        prompt += f"  • {p_name}: {p_data.get('formatted')} ({p_data.get('house', '1-Uy')})\n"
+
+    prompt += f"\n{lots_rag}\n"
+
+    if question:
+        prompt += f"\n❓ MIJOZNING ANIQ SAVOLI / TALABI:\n\"{question}\"\n\n"
+
+    prompt += f"""TALABLAR VA TAHLIL TUZILISHI (Xuddi 20 yillik buyuk olim uslubida, o'ta jiddiy, ilmiy, amaliy va voqelikka yo'naltirilgan):
+
+1. 🏛️ LOTLAR VA SAYYORALAR SINTERI (Al-Biruniy qoidasi):
+- Pars Fortuna (Boylik loti) va uning Boshqaruvchi sayyorasi (Lord of the Lot) holatini tahlil qiling.
+- Part of Spirit (Iroda loti) va Part of Career (Zafar loti) orqali insonning bu hayotdagi mutlaq ustunligi va qaysi sohalar uni millionlarga yetaklashini yoritib bering.
+
+2. 📅 ANIQ VOQEAVIY PROGNOZ ({target_year}-YIL VA KEYINGI DAVRLAR):
+- Qaysi oylarda / davrlarda moddiy yuksalish, yirik bitimlar yoki kutilmagan daromadlar kutiladi?
+- Mansab, rahbarlik va jamiyatda tanilish bo'yicha qachon taqdiriy imkoniyatlar eshigi ochiladi?
+- Qaysi oylarda moliyaviy xavf-xatarlar, dushmanlar fitnasi yoki noto'g'ri shartnomalar xavfi bor (Part of Necessity & Treachery asosida)?
+
+3. ❤️ MUHABBAT, NIKOH VA SHAXSIY HAYOT:
+- Part of Love (Eros), Part of Marriage va Venera/7-uy asosida juftlik taqdiri, munosabatlar inqirozi yoki baxtli davrlari.
+
+4. 🛡️ SOG'LIQ VA YASHIRIN XAVF-XATARLARDAN HIMOYA:
+- Qaysi a'zolar zaif, qaysi davrlarda ortiqcha stress va qaltis ishlardan saqlanish kerak?
+
+5. 🧭 20 YILLIK MUNAJJIMNING STRATEGIK XULOSASI:
+- Mijozga hoziroq amal qilish kerak bo'lgan 3 ta aniq amaliy harakat qadami.
+
+Uslub: Oliy darajadagi estetik o'zbek tilida, professional terminlar (ammo har birini tushunarli qilib), emojilar bilan formatlangan, qat'iy va ishonchli olim tili bilan yozing."""
+
+    return prompt
