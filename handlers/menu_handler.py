@@ -622,13 +622,71 @@ async def cmd_main_stop_collab(message: Message) -> None:
 
 @router.message(Command("stop_suhbat", "stop_chat", "toxtat_suhbat"))
 async def cmd_main_stop_suhbat(message: Message) -> None:
-    """Erkin suhbatni to'xtatish."""
+    """Erkin suhbat yoki bahsni to'xtatish."""
     from core.bot_collab import stop_chit_chat
     stopped = stop_chit_chat(str(message.chat.id))
     if stopped:
-        await message.answer("🛑 <b>Erkin suhbat to'xtatildi.</b>", parse_mode="HTML")
+        await message.answer("🛑 <b>Erkin suhbat / Bahs to'xtatildi.</b>", parse_mode="HTML")
     else:
-        await message.answer("⚠️ Hozirda faol suhbat mavjud emas.", parse_mode="HTML")
+        await message.answer("⚠️ Hozirda faol suhbat yoki bahs mavjud emas.", parse_mode="HTML")
+
+
+@router.message(Command("bahs", "debate", "tortishuv"))
+async def cmd_main_debate(message: Message, bot: Bot) -> None:
+    """Ikki AI o'rtasida qarama-qarshi intellektual bahs va hakamlik: /bahs [mavzu]."""
+    raw_text = message.text or ""
+    from core.bot_collab import handle_agent_debate, parse_topic_and_turns
+    topic, turns = parse_topic_and_turns(raw_text, default_turns=6)
+    from core.mistral_agent_bot import get_second_bot
+    sec_bot = get_second_bot()
+    import asyncio
+    asyncio.create_task(handle_agent_debate(topic, message.chat.id, bot_white=bot, bot_black=sec_bot, origin_bot=bot, rounds=turns))
+
+
+@router.callback_query(F.data.startswith("collab_vote:"))
+async def cb_main_collab_vote(callback: CallbackQuery) -> None:
+    """Multi-Agent Debate hakamlik ovozlarini hisoblash va natijalarni jonli yangilash."""
+    parts = callback.data.split(":")
+    if len(parts) != 3:
+        await callback.answer("⚠️ Noto'g'ri ovoz berish formati.", show_alert=True)
+        return
+
+    _, debate_id, choice = parts
+    from core.bot_collab import DEBATE_VOTES
+    debate = DEBATE_VOTES.get(debate_id)
+    if not debate:
+        await callback.answer("⏳ Ushbu bahs uchun ovoz berish yakunlangan yoki mavjud emas.", show_alert=True)
+        return
+
+    user_id = callback.from_user.id
+    for k in ["superagent", "architect", "draw"]:
+        debate[k].discard(user_id)
+
+    debate[choice].add(user_id)
+
+    s_count = len(debate["superagent"])
+    a_count = len(debate["architect"])
+    d_count = len(debate["draw"])
+    total = s_count + a_count + d_count
+
+    s_pct = int((s_count / total) * 100) if total > 0 else 0
+    a_pct = int((a_count / total) * 100) if total > 0 else 0
+    d_pct = int((d_count / total) * 100) if total > 0 else 0
+
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    b = InlineKeyboardBuilder()
+    b.button(text=f"🤖 SuperAgent ({s_count} ta • {s_pct}%)", callback_data=f"collab_vote:{debate_id}:superagent")
+    b.button(text=f"🌪 Arxitektor ({a_count} ta • {a_pct}%)", callback_data=f"collab_vote:{debate_id}:architect")
+    b.button(text=f"🤝 Durang ({d_count} ta • {d_pct}%)", callback_data=f"collab_vote:{debate_id}:draw")
+    b.adjust(2, 1)
+
+    try:
+        await callback.message.edit_reply_markup(reply_markup=b.as_markup())
+    except Exception:
+        pass
+
+    target_name = "SuperAgent" if choice == "superagent" else ("Arxitektor" if choice == "architect" else "Durang")
+    await callback.answer(f"✅ Ovozingiz qabul qilindi: {target_name} ({total} ta ovoz berildi)!", show_alert=False)
 
 
 @router.callback_query(ADMIN_FILTER, F.data == "game:chess_start")
