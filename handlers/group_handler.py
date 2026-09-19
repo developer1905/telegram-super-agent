@@ -32,6 +32,7 @@ import uuid
 from typing import Optional
 
 from aiogram import Router, F, Bot
+from aiogram.filters import Command
 from aiogram.types import (
     Message,
     ChatMemberUpdated,
@@ -42,6 +43,11 @@ from aiogram.types import (
 
 from config import ADMIN_ID
 from core.ai_manager import AIManager
+from core.bot_collab import (
+    handle_group_dual_opinion,
+    set_group_dual_opinion,
+    is_group_dual_opinion_enabled,
+)
 from core.database import db
 from core.expert_agents import (
     DeepResearchAgent,
@@ -233,6 +239,9 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
             pass
 
     if not should_process:
+        # Hech qanday '/' buyrug'isiz yozilgan guruh xabarlariga ikkala bot ham erkin fikr bildiradi
+        if message.from_user and not message.from_user.is_bot and len(raw_text.strip()) >= 3:
+            asyncio.create_task(handle_group_dual_opinion(message, bot, ai_manager))
         return
 
     # Agar buyruq aniq boshqa bot nomiga yuborilgan bo'lsa (masalan, /suhbat@architect7_bot), bu bot aralashmaydi
@@ -960,3 +969,39 @@ async def cb_group_architect_select_model(callback: CallbackQuery) -> None:
             pass
     else:
         await callback.answer("⚠️ Model topilmadi.", show_alert=True)
+
+
+@router.message(F.chat.type.in_({"group", "supergroup"}), Command("fikr", "dual_opinion", "fikrlar"))
+async def cmd_toggle_group_dual_opinion(message: Message) -> None:
+    """Guruhda buyruqlarsiz ikkala bot fikr bildirishini boshqarish."""
+    chat_id = message.chat.id
+    raw_text = (message.text or "").strip().lower()
+    args = raw_text.split()[1:] if len(raw_text.split()) > 1 else []
+
+    if any(w in args for w in ["off", "o'chir", "ochir", "stop", "to'xtat"]):
+        set_group_dual_opinion(chat_id, False)
+        await safe_message_reply(
+            message,
+            "🔇 <b>Erkin fikr bildirish o'chirildi.</b>\n"
+            "Endi botlar faqat o'ziga murojaat qilinganda yoki /suhbat, /bahs buyruqlarida javob beradi.",
+            parse_mode="HTML"
+        )
+    elif any(w in args for w in ["on", "yoq", "ishlat", "start", "boshla"]):
+        set_group_dual_opinion(chat_id, True)
+        await safe_message_reply(
+            message,
+            "🎙 <b>Erkin fikr bildirish yoqildi!</b>\n"
+            "Guruhda yozilgan har qanday mavzu va xabarga SuperAgent hamda Arxitektor navbati bilan o'z fikrini bildiradi.",
+            parse_mode="HTML"
+        )
+    else:
+        status = "Yoqilgan ✅" if is_group_dual_opinion_enabled(chat_id) else "O'chirilgan ❌"
+        await safe_message_reply(
+            message,
+            f"🎙 <b>Guruhda erkin fikr bildirish holati:</b> {status}\n\n"
+            f"💡 <i>Ikkala bot ham hech qanday buyruqlarsiz guruh xabarlariga fikr bildirishi uchun:</i>\n"
+            f"• <code>/fikr on</code> — Yoqish\n"
+            f"• <code>/fikr off</code> — O'chirish",
+            parse_mode="HTML"
+        )
+
