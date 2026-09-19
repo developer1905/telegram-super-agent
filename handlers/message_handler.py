@@ -31,7 +31,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from config import ADMIN_ID, GEMINI_MODEL
 from core.ai_manager import AIManager
 from core.database import db
-from core.safe_send import safe_send_message, safe_message_answer, safe_edit_text
+from core.safe_send import safe_send_message, safe_message_answer, safe_edit_text, safe_edit_or_send_long_message
 from core.inbox_triage import send_draft_reply, remove_pending_draft
 from core.web_scraper import analyze_url_and_generate_post
 from core.userbot import (
@@ -716,7 +716,7 @@ async def handle_ai_chat(message: Message, ai_manager: AIManager) -> None:
         target_url = url_match.group(0)
         wait_msg = await message.answer(f"🌐 `{target_url}` sahifasi yuklanib, 3 ta asosiy tezis va kanal posti tayyorlanmoqda...", parse_mode="Markdown")
         analysis = await analyze_url_and_generate_post(target_url, ai_manager)
-        await wait_msg.edit_text(analysis[:4000], parse_mode="Markdown")
+        await safe_edit_or_send_long_message(wait_msg, analysis, parse_mode="Markdown")
         return
 
     # 2.1 Eslatmalar Ro'yxati va Boshqaruvi
