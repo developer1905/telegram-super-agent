@@ -20,6 +20,7 @@ from aiogram.types import (
     KeyboardButton,
     BotCommand,
     MenuButtonCommands,
+    CallbackQuery,
 )
 from aiogram.filters import Command
 
@@ -67,7 +68,10 @@ def get_architect_keyboard() -> ReplyKeyboardMarkup:
             KeyboardButton(text="🗣️ Erkin Suhbat"),
         ],
         [
+            KeyboardButton(text="⚔️ Intellektual Bahs"),
             KeyboardButton(text="♟️ AI Shaxmat Bahsi"),
+        ],
+        [
             KeyboardButton(text="ℹ️ Arxitektor Haqida"),
         ],
     ]
@@ -96,7 +100,8 @@ async def setup_architect_bot(bot: Bot) -> None:
             BotCommand(command="collab", description="SuperAgent bilan vazifa bajarish (CAMEL/MAPR)"),
             BotCommand(command="avtopilot", description="Tungi chuqur vazifa (bitmaguncha ishlash)"),
             BotCommand(command="suhbat", description="SuperAgent bilan erkin muloqot (AI Lounge)"),
-            BotCommand(command="stop_suhbat", description="Suhbatni to'xtatish"),
+            BotCommand(command="bahs", description="SuperAgent bilan rasmiy bahs & hakam ovozi"),
+            BotCommand(command="stop_suhbat", description="Suhbat yoki bahsni to'xtatish"),
             BotCommand(command="stop_collab", description="Vazifani to'xtatish"),
             BotCommand(command="chess", description="SuperAgent bilan shaxmat o'ynash"),
             BotCommand(command="code", description="Kod tahlili va audit"),
@@ -219,15 +224,82 @@ async def cmd_free_chat_trigger(message: Message, bot: Bot) -> None:
     asyncio.create_task(handle_free_chit_chat(topic_text, message.chat.id, bot_white=main_bot, bot_black=sec_bot, origin_bot=bot, turns=parsed_turns))
 
 
+@second_bot_router.message(Command("bahs", "debate", "tortishuv"))
+@second_bot_router.message(F.text.lower().startswith(("/bahs", "/debate", "/tortishuv", "⚔️ intellektual bahs")))
+async def cmd_debate_trigger(message: Message, bot: Bot) -> None:
+    """SuperAgent bilan qarama-qarshi intellektual bahs va jonli hakamlik ovoz berish."""
+    raw_text = (message.text or "").strip()
+    if message.chat.id < 0:
+        cmd_mention = re.match(r"^/\w+@(\w+)", raw_text)
+        if cmd_mention:
+            bot_info = await bot.get_me()
+            target_uname = (bot_info.username or "architect7_bot").lower()
+            if cmd_mention.group(1).lower() != target_uname:
+                return
+
+    from core.bot_collab import handle_agent_debate, parse_topic_and_turns
+    topic_text, parsed_turns = parse_topic_and_turns(raw_text, default_turns=6)
+
+    main_bot = get_main_bot_instance() or bot
+    sec_bot = bot
+    asyncio.create_task(handle_agent_debate(topic_text, message.chat.id, bot_white=main_bot, bot_black=sec_bot, origin_bot=bot, rounds=parsed_turns))
+
+
+@second_bot_router.callback_query(F.data.startswith("collab_vote:"))
+async def cb_architect_collab_vote(callback: CallbackQuery) -> None:
+    """Multi-Agent Debate hakamlik ovozlarini hisoblash va natijalarni jonli yangilash."""
+    parts = callback.data.split(":")
+    if len(parts) != 3:
+        await callback.answer("⚠️ Noto'g'ri ovoz berish formati.", show_alert=True)
+        return
+
+    _, debate_id, choice = parts
+    from core.bot_collab import DEBATE_VOTES
+    debate = DEBATE_VOTES.get(debate_id)
+    if not debate:
+        await callback.answer("⏳ Ushbu bahs uchun ovoz berish yakunlangan yoki mavjud emas.", show_alert=True)
+        return
+
+    user_id = callback.from_user.id
+    for k in ["superagent", "architect", "draw"]:
+        debate[k].discard(user_id)
+
+    debate[choice].add(user_id)
+
+    s_count = len(debate["superagent"])
+    a_count = len(debate["architect"])
+    d_count = len(debate["draw"])
+    total = s_count + a_count + d_count
+
+    s_pct = int((s_count / total) * 100) if total > 0 else 0
+    a_pct = int((a_count / total) * 100) if total > 0 else 0
+    d_pct = int((d_count / total) * 100) if total > 0 else 0
+
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    b = InlineKeyboardBuilder()
+    b.button(text=f"🤖 SuperAgent ({s_count} ta • {s_pct}%)", callback_data=f"collab_vote:{debate_id}:superagent")
+    b.button(text=f"🌪 Arxitektor ({a_count} ta • {a_pct}%)", callback_data=f"collab_vote:{debate_id}:architect")
+    b.button(text=f"🤝 Durang ({d_count} ta • {d_pct}%)", callback_data=f"collab_vote:{debate_id}:draw")
+    b.adjust(2, 1)
+
+    try:
+        await callback.message.edit_reply_markup(reply_markup=b.as_markup())
+    except Exception:
+        pass
+
+    target_name = "SuperAgent" if choice == "superagent" else ("Arxitektor" if choice == "architect" else "Durang")
+    await callback.answer(f"✅ Ovozingiz qabul qilindi: {target_name} ({total} ta ovoz berildi)!", show_alert=False)
+
+
 @second_bot_router.message(Command("stop_suhbat", "stop_chat", "toxtat_suhbat"))
 async def cmd_stop_suhbat_trigger(message: Message) -> None:
-    """Erkin suhbatni to'xtatish."""
+    """Erkin suhbat yoki bahsni to'xtatish."""
     from core.bot_collab import stop_chit_chat
     stopped = stop_chit_chat(str(message.chat.id))
     if stopped:
-        await safe_reply(message, "🛑 <b>Erkin suhbat to'xtatildi.</b>", reply_markup=get_architect_keyboard())
+        await safe_reply(message, "🛑 <b>Erkin suhbat / Bahs to'xtatildi.</b>", reply_markup=get_architect_keyboard())
     else:
-        await safe_reply(message, "⚠️ Hozirda faol suhbat mavjud emas.", reply_markup=get_architect_keyboard())
+        await safe_reply(message, "⚠️ Hozirda faol suhbat yoki bahs mavjud emas.", reply_markup=get_architect_keyboard())
 
 
 @second_bot_router.message(Command("chess", "shaxmat"))
