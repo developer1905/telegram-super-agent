@@ -1202,35 +1202,29 @@ async def cb_astro_view_arabic(cb: CallbackQuery) -> None:
 
 @router.callback_query(ADMIN_FILTER, F.data == "astro:ai_report")
 async def cb_astro_ai_report(cb: CallbackQuery, ai_manager: AIManager) -> None:
-    """AI orqali to'liq tahliliy astrologik hisobot generatsiya qilish."""
-    await cb.answer("AI hisobot tayyorlamoqda...")
+    """20 Yillik tajribali munajjim-olim (Nous Hermes 3 / Gemini) orqali to'liq voqeaviy prognoz."""
+    await cb.answer("20 yillik munajjim-olim hisobot tayyorlamoqda...")
     profile = await db.get_astrology_profile(str(cb.from_user.id))
     if not profile or not profile.get("chart"):
         await cb.answer("Avval kartangizni kiriting", show_alert=True)
         return
 
-    chart = profile["chart"]
-    wait_msg = await cb.message.answer("🔮 **Professional munajjim (Nous Hermes 3 / Gemini) shaxsiy kartangizni chuqur tahlil qilmoqda...**", parse_mode="Markdown")
-
-    prompt = (
-        f"Siz professional munajjim va shaxsiyat psixologiyasining buyuk tahlilchisisiz.\n"
-        f"Mening tug'ilgan ma'lumotlarim: {profile.get('birth_date')} {profile.get('birth_time')}, {profile.get('city')}.\n"
-        f"Quyidagi xaritani professional tahlil qiling:\n"
-        f"- Ufq (Ascendant): {chart.get('ascendant', {}).get('formatted')}\n"
-        f"- Quyosh: {chart.get('planets', {}).get('Quyosh', {}).get('formatted')} ({chart.get('planets', {}).get('Quyosh', {}).get('house')})\n"
-        f"- Oy: {chart.get('planets', {}).get('Oy', {}).get('formatted')} ({chart.get('planets', {}).get('Oy', {}).get('house')})\n"
-        f"- Pars Fortuna (Omad/Boylik nuqtasi): {chart.get('arabic_parts', {}).get('Pars Fortuna (Omad va Boylik)', {}).get('formatted')}\n"
-        f"- Part of Spirit: {chart.get('arabic_parts', {}).get('Part of Spirit (Ruh va Iroda)', {}).get('formatted')}\n\n"
-        f"Tahlil tarkibi (O'zbek tilida, estetik va aniq):\n"
-        f"1) 👤 **Shaxsiyat kuchi va yashirin talant** (Quyosh, Oy, Ascendant sintezi);\n"
-        f"2) 💰 **Moliya, Boylik va Karyera** (Pars Fortuna, 2-uy va 10-uy MC bo'yicha);\n"
-        f"3) 💖 **Munosabatlar va sevgi** (Venera va 7-uy);\n"
-        f"4) 🎯 **2026-yil uchun asosiy strategik tavsiya**.\n"
-        f"Qisqa, lo'nda va amaliy hayotda qo'llash mumkin bo'lgan uslubda yozing."
+    custom_lots = profile.get("custom_lots", [])
+    wait_msg = await cb.message.answer(
+        f"🔮 **20 yillik tajribali munajjim-olim (Nous Hermes 3 / Al-Biruniy) kartangiz va {len(custom_lots)} ta Arab Lotingizni tahlil qilmoqda...**",
+        parse_mode="Markdown"
     )
 
+    from core.astrology_agent import build_grandmaster_astrology_prompt
+    prompt = build_grandmaster_astrology_prompt(profile, custom_lots, target_year=2026)
+
+    # Nous Hermes 3 ga o'tish
+    prev_provider = ai_manager.current_provider
+    prev_model = ai_manager.current_or_model
+    ai_manager.switch_openrouter_model("hermes")
+
     try:
-        report = await ai_manager.generate(prompt)
+        report = await ai_manager.generate(prompt, save_history=False, chat_id=f"astro_{cb.from_user.id}")
         back_btn = InlineKeyboardBuilder()
         back_btn.row(InlineKeyboardButton(text="◀️ Astrologiya Menyusiga Qaytish", callback_data="menu:astrology"))
         await safe_edit_or_send_long_message(wait_msg, report, reply_markup=back_btn.as_markup(), parse_mode="Markdown")
@@ -1240,6 +1234,42 @@ async def cb_astro_ai_report(cb: CallbackQuery, ai_manager: AIManager) -> None:
             await wait_msg.edit_text(f"❌ AI hisobot generatsiyasida xatolik: {e}", parse_mode=None)
         except Exception:
             pass
+    finally:
+        ai_manager.current_provider = prev_provider
+        ai_manager.current_or_model = prev_model
+
+
+@router.message(ADMIN_FILTER, Command("lots"))
+async def cmd_lots_management(message: Message) -> None:
+    """Foydalanuvchining 513 ta Arab Lotlarini ko'rish yoki yangi lotlar qo'shish."""
+    profile = await db.get_astrology_profile(str(message.from_user.id))
+    custom_lots = profile.get("custom_lots", []) if profile else []
+    
+    lines = [
+        "☪️ **513 TA QADIMIY ARAB LOTLARI (ARABIC PARTS / LOTS)**\n",
+        f"📊 Sizning bazangizda faol Lotlar soni: **{len(custom_lots)} ta**.\n",
+    ]
+    if custom_lots:
+        lines.append("📋 **Saqlangan asosiy lotlar namunalari:**")
+        for l in custom_lots[:8]:
+            lines.append(f"• **{l.get('name')}:** `{l.get('degree')}° {l.get('sign')}` ({l.get('house', 'Noma\'lum')})")
+        if len(custom_lots) > 8:
+            lines.append(f"... va yana {len(custom_lots) - 8} ta faol lotlar.")
+    else:
+        lines.append(
+            "Hozircha faqat 5 ta asosiy klassik lot hisoblangan (Pars Fortuna, Ruh, Eros, Karyera, Saboq).\n\n"
+            "💡 **513 ta lotni yuklash uchun:**\n"
+            "Lotlar ro'yxatini matn ko'rinishida chatga yuboring yoki `.txt` / `.json` fayl sifatida botga tashlang!\n"
+            "Masalan:\n"
+            "`Lot of Commerce: 14 Gemini`\n"
+            "`Lot of Victory: 22 Leo`\n"
+            "`Lot of Marriage: 5 Libra`"
+        )
+    
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="🧠 20 Yillik Olim Tahlili (Nous Hermes)", callback_data="astro:ai_report"))
+    builder.row(InlineKeyboardButton(text="◀️ Astrologiya Menyusi", callback_data="menu:astrology"))
+    await safe_send_message(message.bot, message.chat.id, "\n".join(lines), reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
 @router.callback_query(ADMIN_FILTER, F.data == "astro:setup")
