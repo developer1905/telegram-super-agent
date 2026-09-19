@@ -64,6 +64,10 @@ def get_architect_keyboard() -> ReplyKeyboardMarkup:
             KeyboardButton(text="💻 Kod Tahlili & Audit"),
         ],
         [
+            KeyboardButton(text="📦 Loyiha Yaratish (ZIP)"),
+            KeyboardButton(text="🎙️ Ovozli Suhbat"),
+        ],
+        [
             KeyboardButton(text="🤝 CAMEL Hamkorlik"),
             KeyboardButton(text="🗣️ Erkin Suhbat"),
         ],
@@ -97,10 +101,13 @@ async def setup_architect_bot(bot: Bot) -> None:
         await bot.set_my_commands([
             BotCommand(command="start", description="Arxitektor botni ishga tushirish"),
             BotCommand(command="menu", description="Arxitektor bosh menyusi"),
+            BotCommand(command="project", description="To'liq dastur loyihasi & ZIP arxiv (/loyiha)"),
+            BotCommand(command="ovozli_suhbat", description="SuperAgent bilan jonli ovozli suhbat"),
             BotCommand(command="collab", description="SuperAgent bilan vazifa bajarish (CAMEL/MAPR)"),
             BotCommand(command="avtopilot", description="Tungi chuqur vazifa (bitmaguncha ishlash)"),
             BotCommand(command="suhbat", description="SuperAgent bilan erkin muloqot (AI Lounge)"),
             BotCommand(command="bahs", description="SuperAgent bilan rasmiy bahs & hakam ovozi"),
+            BotCommand(command="profile", description="Shaxsiy foydalanuvchi bilimlari profili (Mem0)"),
             BotCommand(command="stop_suhbat", description="Suhbat yoki bahsni to'xtatish"),
             BotCommand(command="stop_collab", description="Vazifani to'xtatish"),
             BotCommand(command="chess", description="SuperAgent bilan shaxmat o'ynash"),
@@ -122,11 +129,13 @@ async def cmd_start_second_bot(message: Message) -> None:
         "Men <b>Mistral AI</b> platformasidagi maxsus o'qitilgan sun'iy intellekt agenti tomonidan boshqarilaman.\n\n"
         "✨ <b>Mening ixtisoslashgan sohalarim:</b>\n"
         "• 🏗 <b>Dasturiy arxitektura va tizim dizayni</b> (Microservices, DB schema, API design);\n"
-        "• 💻 <b>Kod tahlili, refaktoring va xavfsizlik auditi</b>;\n"
+        "• 📦 <b>MetaGPT/ChatDev to'liq loyihalar yaratish</b> (<code>/project [loyiha]</code> — tayyor ZIP arxiv);\n"
+        "• 🎙 <b>SuperAgent bilan jonli ovozli suhbat</b> (<code>/ovozli_suhbat [mavzu]</code>);\n"
+        "• 💻 <b>Xavfsiz sandboxda kod ijro etish & xatolarni o'zi tuzatish</b>;\n"
         "• 🤝 <b>SuperAgent bilan CAMEL & ChatDev hamkorligi</b> (<code>/collab [vazifa]</code>);\n"
         "• 🌙 <b>Tungi avtonom avtopilot</b> (<code>/avtopilot [vazifa]</code> — tugamaguncha ishlaydi);\n"
         "• 🗣️ <b>SuperAgent bilan erkin suhbat</b> (<code>/suhbat 10 [mavzu]</code>);\n"
-        "• ♟️ <b>SuperAgent bilan jonli shaxmat bahsi</b> (<code>/chess</code>).\n\n"
+        "• 🧠 <b>Shaxsiy foydalanuvchi xotirasi</b> (<code>/profile</code>).\n\n"
         "Quyidagi shaxsiy menyudan kerakli bo'limni tanlang yoki to'g'ridan-to'g'ri topshiriq bering!"
     )
     await safe_reply(message, welcome_text, reply_markup=get_architect_keyboard(), parse_mode="HTML")
@@ -138,13 +147,16 @@ async def cmd_help_second_bot(message: Message) -> None:
     help_text = (
         "💡 <b>Arxitektor Agent Buyruqlari:</b>\n\n"
         "• <code>/start</code> yoki <code>/menu</code> — Arxitektor shaxsiy menyusini ochish\n"
-        "• <code>/collab [vazifa]</code> — SuperAgent bilan ko'p agentli hamkorlik\n"
-        "• <code>/avtopilot [vazifa]</code> — Tungi vazifa (loyiha to'liq bitmaguncha suhbatlashib yaxshilayveradi)\n"
-        "• <code>/suhbat [N] [mavzu]</code> — Erkin muloqot (masalan: <code>/suhbat 12 Kvant fizikasi</code>)\n"
-        "• <code>/stop_suhbat</code> — Erkin suhbatni to'xtatish\n"
+        "• <code>/project [loyiha]</code> — To'liq dastur yaratib ZIP arxiv sifatida yuborish\n"
+        "• <code>/ovozli_suhbat [N] [mavzu]</code> — SuperAgent bilan ikki ovozli muloqot (Edge-TTS)\n"
+        "• <code>/collab [vazifa]</code> — SuperAgent bilan ko'p agentli hamkorlik & kod ijrosi\n"
+        "• <code>/avtopilot [vazifa]</code> — Tungi vazifa (loyiha to'liq bitmaguncha ishlaydi)\n"
+        "• <code>/suhbat [N] [mavzu]</code> — Erkin matnli muloqot\n"
+        "• <code>/bahs [mavzu]</code> — Rasmiy intellektual bahs & hakam ovozi\n"
+        "• <code>/profile</code> — Shaxsiy qiziqishlaringiz va AI bilimlari profili\n"
+        "• <code>/stop_suhbat</code> — Erkin suhbat/bahsni to'xtatish\n"
         "• <code>/stop_collab</code> — Avtopilot/Hamkorlikni to'xtatish\n"
-        "• <code>/chess</code> yoki <code>/shaxmat</code> — Shaxmat bahsini boshlash\n"
-        "• <code>/stop_chess</code> — Shaxmat o'yinini to'xtatish\n"
+        "• <code>/chess</code> — Shaxmat bahsini boshlash\n"
         "• <code>/code</code> — Kod tahlili va xavfsizlik auditi"
     )
     await safe_reply(message, help_text, reply_markup=get_architect_keyboard(), parse_mode="HTML")
@@ -200,6 +212,65 @@ async def cmd_stop_collab_trigger(message: Message) -> None:
         await safe_reply(message, "🛑 <b>Hamkorlik / Avtopilot vazifasi to'xtatildi.</b>", reply_markup=get_architect_keyboard())
     else:
         await safe_reply(message, "⚠️ Hozirda faol hamkorlik vazifasi mavjud emas.", reply_markup=get_architect_keyboard())
+
+
+@second_bot_router.message(Command("project", "loyiha"))
+@second_bot_router.message(F.text.lower().startswith(("/project", "/loyiha", "📦 loyiha yaratish")))
+async def cmd_project_trigger(message: Message, bot: Bot) -> None:
+    """MetaGPT/ChatDev to'liq loyiha arxitekturasi va in-memory ZIP eksport."""
+    raw_text = (message.text or "").strip()
+    if message.chat.id < 0:
+        cmd_mention = re.match(r"^/\w+@(\w+)", raw_text)
+        bot_info = await bot.get_me()
+        target_uname = (bot_info.username or "architect7_bot").lower()
+        if not cmd_mention or cmd_mention.group(1).lower() != target_uname:
+            return
+
+    clean_task = re.sub(r"^(?:/project|/loyiha|📦 Loyiha Yaratish \(ZIP\))[:\s]*", "", raw_text, flags=re.IGNORECASE).strip()
+    if not clean_task:
+        await safe_reply(
+            message,
+            "📦 <b>MetaGPT / ChatDev Avtonom Loyiha Quruvchi:</b>\n\n"
+            "SuperAgent va Arxitektor birgalikda to'liq arxitektura va barcha fayllar kodini yozadi hamda sizga tayyor <b>.zip</b> arxiv qilib jo'natadi!\n\n"
+            "💡 <b>Foydalanish:</b> <code>/project [loyiha g'oyasi]</code>\n"
+            "Masalan: <code>/project Telegram ob-havo boti va aiogram 3 SQLite bazasi bilan</code>",
+            reply_markup=get_architect_keyboard()
+        )
+        return
+
+    from core.bot_collab import handle_project_generation
+    main_bot = get_main_bot_instance() or bot
+    asyncio.create_task(handle_project_generation(clean_task, message.chat.id, bot_white=main_bot, bot_black=bot, origin_bot=bot))
+
+
+@second_bot_router.message(Command("ovozli_suhbat", "audio_suhbat", "voice_chat"))
+@second_bot_router.message(F.text.lower().startswith(("/ovozli_suhbat", "/audio_suhbat", "🎙️ ovozli suhbat")))
+async def cmd_audio_chat_trigger(message: Message, bot: Bot) -> None:
+    """SuperAgent va Arxitektor o'rtasida jonli ovozli suhbat (Edge-TTS)."""
+    raw_text = (message.text or "").strip()
+    if message.chat.id < 0:
+        cmd_mention = re.match(r"^/\w+@(\w+)", raw_text)
+        bot_info = await bot.get_me()
+        target_uname = (bot_info.username or "architect7_bot").lower()
+        if not cmd_mention or cmd_mention.group(1).lower() != target_uname:
+            return
+
+    from core.bot_collab import handle_free_chit_chat, parse_topic_and_turns
+    topic_text, parsed_turns = parse_topic_and_turns(raw_text, default_turns=6)
+
+    main_bot = get_main_bot_instance() or bot
+    sec_bot = bot
+    asyncio.create_task(handle_free_chit_chat(topic_text, message.chat.id, bot_white=main_bot, bot_black=sec_bot, origin_bot=bot, turns=parsed_turns, audio_mode=True))
+
+
+@second_bot_router.message(Command("profile", "profil", "memory"))
+@second_bot_router.message(F.text.lower().in_(("/profile", "/profil", "🧠 profil", "profilim")))
+async def cmd_profile_trigger(message: Message) -> None:
+    """Foydalanuvchi bilimlari profili (Mem0)."""
+    from core.mem0_agent import get_user_profile_report
+    user_id = str(message.from_user.id)
+    report = await get_user_profile_report(user_id)
+    await safe_reply(message, report, reply_markup=get_architect_keyboard())
 
 
 @second_bot_router.message(Command("suhbat", "chat", "gaplash"))
@@ -408,6 +479,30 @@ async def handle_second_bot_text(message: Message, bot: Bot) -> None:
     except Exception:
         pass
 
+    # Loyiha yaratish tekshiruvi (MetaGPT / ChatDev)
+    if clean_text.lower().startswith(("/project", "/loyiha")):
+        from core.bot_collab import handle_project_generation
+        proj_task = re.sub(r"^(?:/project|/loyiha)[:\s]*", "", clean_text, flags=re.IGNORECASE).strip()
+        main_bot = get_main_bot_instance() or bot
+        asyncio.create_task(handle_project_generation(proj_task or clean_text, message.chat.id, bot_white=main_bot, bot_black=bot, origin_bot=bot))
+        return
+
+    # Ovozli suhbat tekshiruvi (Edge-TTS)
+    if clean_text.lower().startswith(("/ovozli_suhbat", "/audio_suhbat")):
+        from core.bot_collab import handle_free_chit_chat, parse_topic_and_turns
+        topic_text, parsed_turns = parse_topic_and_turns(clean_text, default_turns=6)
+        main_bot = get_main_bot_instance() or bot
+        asyncio.create_task(handle_free_chit_chat(topic_text, message.chat.id, bot_white=main_bot, bot_black=bot, origin_bot=bot, turns=parsed_turns, audio_mode=True))
+        return
+
+    # Foydalanuvchi bilimlari profili (Mem0)
+    if clean_text.lower() in ("/profile", "/profil", "profilim"):
+        from core.mem0_agent import get_user_profile_report
+        user_id = str(message.from_user.id)
+        report = await get_user_profile_report(user_id)
+        await safe_reply(message, report, reply_markup=get_architect_keyboard())
+        return
+
     # Hamkorlik buyruqlari tekshiruvi
     if clean_text.lower().startswith(("/collab", "/hamkorlik")):
         from core.bot_collab import handle_agent_collaboration
@@ -418,10 +513,10 @@ async def handle_second_bot_text(message: Message, bot: Bot) -> None:
 
     # Erkin suhbat tekshiruvi
     if clean_text.lower().startswith(("/suhbat", "/chat", "gaplashing", "birga gaplashing")):
-        from core.bot_collab import handle_free_chit_chat
-        topic = re.sub(r"^(?:/suhbat|/chat|gaplashing|birga gaplashing)[:\s]*", "", clean_text, flags=re.IGNORECASE).strip()
+        from core.bot_collab import handle_free_chit_chat, parse_topic_and_turns
+        topic_text, parsed_turns = parse_topic_and_turns(clean_text, default_turns=8)
         main_bot = get_main_bot_instance() or bot
-        asyncio.create_task(handle_free_chit_chat(topic, message.chat.id, bot_white=main_bot, bot_black=bot, origin_bot=bot))
+        asyncio.create_task(handle_free_chit_chat(topic_text, message.chat.id, bot_white=main_bot, bot_black=bot, origin_bot=bot, turns=parsed_turns))
         return
 
     # Shaxmat buyrug'i tekshiruvi
