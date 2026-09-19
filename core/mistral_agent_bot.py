@@ -159,11 +159,10 @@ async def cmd_collab_trigger(message: Message, bot: Bot) -> None:
     raw_text = (message.text or "").strip()
     if message.chat.id < 0:
         cmd_mention = re.match(r"^/\w+@(\w+)", raw_text)
-        if cmd_mention:
-            bot_info = await bot.get_me()
-            target_uname = (bot_info.username or "architect7_bot").lower()
-            if cmd_mention.group(1).lower() != target_uname:
-                return
+        bot_info = await bot.get_me()
+        target_uname = (bot_info.username or "architect7_bot").lower()
+        if not cmd_mention or cmd_mention.group(1).lower() != target_uname:
+            return
 
     is_night_autopilot = any(w in raw_text.lower() for w in ["/avtopilot", "/kechki_vazifa", "/night", "🌙 avtopilot"])
     task_text = re.sub(r"^(?:/collab|/hamkorlik|/avtopilot|/kechki_vazifa|/night|🤝 CAMEL Hamkorlik|🌙 Avtopilot)(?:@\w+)?[:\s]*", "", raw_text, flags=re.IGNORECASE).strip()
@@ -210,11 +209,10 @@ async def cmd_free_chat_trigger(message: Message, bot: Bot) -> None:
     raw_text = (message.text or "").strip()
     if message.chat.id < 0:
         cmd_mention = re.match(r"^/\w+@(\w+)", raw_text)
-        if cmd_mention:
-            bot_info = await bot.get_me()
-            target_uname = (bot_info.username or "architect7_bot").lower()
-            if cmd_mention.group(1).lower() != target_uname:
-                return
+        bot_info = await bot.get_me()
+        target_uname = (bot_info.username or "architect7_bot").lower()
+        if not cmd_mention or cmd_mention.group(1).lower() != target_uname:
+            return
 
     from core.bot_collab import handle_free_chit_chat, parse_topic_and_turns
     topic_text, parsed_turns = parse_topic_and_turns(raw_text, default_turns=8)
@@ -231,11 +229,10 @@ async def cmd_debate_trigger(message: Message, bot: Bot) -> None:
     raw_text = (message.text or "").strip()
     if message.chat.id < 0:
         cmd_mention = re.match(r"^/\w+@(\w+)", raw_text)
-        if cmd_mention:
-            bot_info = await bot.get_me()
-            target_uname = (bot_info.username or "architect7_bot").lower()
-            if cmd_mention.group(1).lower() != target_uname:
-                return
+        bot_info = await bot.get_me()
+        target_uname = (bot_info.username or "architect7_bot").lower()
+        if not cmd_mention or cmd_mention.group(1).lower() != target_uname:
+            return
 
     from core.bot_collab import handle_agent_debate, parse_topic_and_turns
     topic_text, parsed_turns = parse_topic_and_turns(raw_text, default_turns=6)
@@ -309,11 +306,10 @@ async def cmd_chess_trigger(message: Message, bot: Bot) -> None:
     raw_text = (message.text or "").strip()
     if message.chat.id < 0:
         cmd_mention = re.match(r"^/\w+@(\w+)", raw_text)
-        if cmd_mention:
-            bot_info = await bot.get_me()
-            target_uname = (bot_info.username or "architect7_bot").lower()
-            if cmd_mention.group(1).lower() != target_uname:
-                return
+        bot_info = await bot.get_me()
+        target_uname = (bot_info.username or "architect7_bot").lower()
+        if not cmd_mention or cmd_mention.group(1).lower() != target_uname:
+            return
 
     from core.bot_collab import handle_start_chess
     main_bot = get_main_bot_instance() or bot
