@@ -31,7 +31,7 @@ from config import BOT_TOKEN, ADMIN_ID, validate_config, WEBAPP_URL, get_clean_w
 from core.ai_manager import AIManager
 from core.database import db
 from core.inbox_triage import init_inbox_triage
-from core.mistral_agent_bot import get_second_bot, second_bot_router
+from core.mistral_agent_bot import get_second_bot, second_bot_router, setup_architect_bot
 from core.userbot import create_userbot_client
 import core.userbot as userbot_module
 from services.scheduler import setup_scheduler
@@ -1045,6 +1045,7 @@ async def main() -> None:
                 await second_bot.delete_webhook(drop_pending_updates=False)
                 sec_me = await second_bot.get_me()
                 logger.info("🚀 2-Bot (@%s - %s) mustaqil dispatcher bilan ishga tushdi!", sec_me.username, sec_me.first_name)
+                await setup_architect_bot(second_bot)
                 await dp_second.start_polling(
                     second_bot,
                     allowed_updates=[
