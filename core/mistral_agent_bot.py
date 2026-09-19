@@ -76,6 +76,7 @@ def get_architect_keyboard() -> ReplyKeyboardMarkup:
             KeyboardButton(text="♟️ AI Shaxmat Bahsi"),
         ],
         [
+            KeyboardButton(text="🤖 AI Modellar"),
             KeyboardButton(text="ℹ️ Arxitektor Haqida"),
         ],
     ]
@@ -101,6 +102,7 @@ async def setup_architect_bot(bot: Bot) -> None:
         await bot.set_my_commands([
             BotCommand(command="start", description="Arxitektor botni ishga tushirish"),
             BotCommand(command="menu", description="Arxitektor bosh menyusi"),
+            BotCommand(command="models", description="Mavjud bepul AI modellar & failover holati"),
             BotCommand(command="project", description="To'liq dastur loyihasi & ZIP arxiv (/loyiha)"),
             BotCommand(command="ovozli_suhbat", description="SuperAgent bilan jonli ovozli suhbat"),
             BotCommand(command="collab", description="SuperAgent bilan vazifa bajarish (CAMEL/MAPR)"),
@@ -271,6 +273,68 @@ async def cmd_profile_trigger(message: Message) -> None:
     user_id = str(message.from_user.id)
     report = await get_user_profile_report(user_id)
     await safe_reply(message, report, reply_markup=get_architect_keyboard())
+
+
+def build_architect_models_keyboard() -> InlineKeyboardMarkup:
+    """Arxitektor AI bepul modellar menyusi uchun inline klaviatura."""
+    from core.mistral_conversations import mistral_agent_client
+    models = mistral_agent_client.get_model_status_list()
+    b = InlineKeyboardBuilder()
+
+    is_auto = (mistral_agent_client.forced_model_id is None)
+    auto_text = "🔄 Avtomatik Kaskad (Tavsiya) ✅" if is_auto else "🔄 Avtomatik Kaskadga o'tish"
+    b.button(text=auto_text, callback_data="arch_model:auto")
+
+    for m in models:
+        prefix = "✅ " if m["is_forced"] else (m["badge"] + " ")
+        b.button(text=f"{prefix}{m['name']}", callback_data=f"arch_model:{m['id']}")
+
+    b.adjust(1)
+    return b.as_markup()
+
+
+@second_bot_router.message(Command("models", "model", "modellar"))
+@second_bot_router.message(F.text == "🤖 AI Modellar")
+async def cmd_architect_models(message: Message) -> None:
+    """Arxitektor AI bepul modellar menyusi va kaskad holati."""
+    from core.mistral_conversations import mistral_agent_client
+    mode_desc = "Avtomatik Kaskad (Bittasi limitga uchrasa, darhol keyingisiga o'tadi)" if not mistral_agent_client.forced_model_id else f"Qo'lda tanlangan: <b>{mistral_agent_client.forced_model_id}</b>"
+    text = (
+        "🤖 <b>Arxitektor AI Bepul Modellari & Avto-Failover Tizimi</b>\n\n"
+        f"🎯 <b>Joriy Faol Model:</b> <code>{mistral_agent_client.last_used_model}</code>\n"
+        f"⚙️ <b>Tanlangan Rejim:</b> <i>{mode_desc}</i>\n\n"
+        "💡 <b>Qanday ishlaydi?</b>\n"
+        "• Arxitektor doimiy ravishda 12 ta eng kuchli bepul AI modellar kaskadiga ulangan:\n"
+        "  — 🌪 Mistral Agent & Codestral (Dasturchi/Arxitektor);\n"
+        "  — 🧠 DeepSeek V4 Flash Free (1M kontekst);\n"
+        "  — 🌊 Poolside Laguna S 2.1 (Arxitektor modeli);\n"
+        "  — 🔬 NVIDIA Nemotron Super 120B;\n"
+        "  — 💎 Google Gemini 3.1 & 3.5 Flash Lite;\n"
+        "  — 🔥 Nex-AGI N2.5 Pro;\n"
+        "• Agar bitta model limiti tugasa (429/quota), tizim to'xtab qolmasdan <b>avtomatik ravishda keyingi modelga o'tadi</b>!\n\n"
+        "Kerakli modelni tanlang yoki avtomatik kaskad rejimida qoldiring:"
+    )
+    await safe_reply(message, text, reply_markup=build_architect_models_keyboard())
+
+
+@second_bot_router.callback_query(F.data.startswith("arch_model:"))
+async def cb_architect_select_model(callback: CallbackQuery) -> None:
+    """Arxitektor AI modelini almashtirish callbacki."""
+    selected_id = callback.data.split(":", 1)[1]
+    from core.mistral_conversations import mistral_agent_client
+    ok = mistral_agent_client.set_forced_model(selected_id)
+    if ok:
+        if selected_id == "auto":
+            alert_text = "🔄 Avtomatik kaskad yoqildi! Bepul modellar o'zaro navbatlashadi."
+        else:
+            alert_text = f"✅ Model muvaffaqiyatli tanlandi: {selected_id}"
+        await callback.answer(alert_text, show_alert=True)
+        try:
+            await callback.message.edit_reply_markup(reply_markup=build_architect_models_keyboard())
+        except Exception:
+            pass
+    else:
+        await callback.answer("⚠️ Model topilmadi.", show_alert=True)
 
 
 @second_bot_router.message(Command("suhbat", "chat", "gaplash"))
@@ -495,6 +559,11 @@ async def handle_second_bot_text(message: Message, bot: Bot) -> None:
         asyncio.create_task(handle_free_chit_chat(topic_text, message.chat.id, bot_white=main_bot, bot_black=bot, origin_bot=bot, turns=parsed_turns, audio_mode=True))
         return
 
+    # Modellar kaskadi menyusi
+    if clean_text.lower() in ("/models", "/model", "modellar", "ai modellar", "🤖 ai modellar"):
+        await cmd_architect_models(message)
+        return
+
     # Foydalanuvchi bilimlari profili (Mem0)
     if clean_text.lower() in ("/profile", "/profil", "profilim"):
         from core.mem0_agent import get_user_profile_report
@@ -526,8 +595,8 @@ async def handle_second_bot_text(message: Message, bot: Bot) -> None:
         await handle_start_chess(message, bot_white=main_bot, bot_black=bot)
         return
 
-    # Mistral Agentdan javob olish
-    wait_msg = await safe_reply(message, "🧠 <i>Mistral Arxitektor Agent o'ylamoqda...</i>", parse_mode="HTML")
+    # Arxitektor Agentdan javob olish (Multi-Model Failover kaskadi bilan)
+    wait_msg = await safe_reply(message, "🧠 <i>Arxitektor Agent o'ylamoqda...</i>", parse_mode="HTML")
     try:
         ans, thinking = await mistral_agent_client.send_message(
             clean_text,
