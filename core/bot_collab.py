@@ -306,15 +306,15 @@ async def get_recent_collab_memories(limit: int = 3) -> list[str]:
 
 
 def extract_thought_and_speech(raw_text: str) -> tuple[str, str, str]:
-    """Model javobidan [ICHKI_XAYOL], [EUREKA] va [JAVOB] qismlarini ajratish."""
+    """Model javobidan [ICHKI_XAYOL]/[INTUITSIYA], [EUREKA] va [JAVOB] qismlarini ajratish."""
     thought = ""
     eureka = ""
     speech = raw_text.strip()
 
-    m_thought = re.search(r"\[(?:ICHKI_XAYOL|O'Y_XAYOL|THOUGHT)\]:?\s*(.*?)(?=\[(?:JAVOB|SPEECH|EUREKA|KASHFIYOT)\]|$)", speech, flags=re.DOTALL | re.IGNORECASE)
+    m_thought = re.search(r"\[(?:ICHKI_XAYOL|O'Y_XAYOL|INTUITSIYA|SEZGI|EMPATIYA|HIS_QILISH|THOUGHT)\]:?\s*(.*?)(?=\[(?:JAVOB|SPEECH|EUREKA|KASHFIYOT)\]|$)", speech, flags=re.DOTALL | re.IGNORECASE)
     if m_thought:
         thought = m_thought.group(1).strip()
-        speech = re.sub(r"\[(?:ICHKI_XAYOL|O'Y_XAYOL|THOUGHT)\]:?\s*.*?(?=\[(?:JAVOB|SPEECH|EUREKA|KASHFIYOT)\]|$)", "", speech, flags=re.DOTALL | re.IGNORECASE).strip()
+        speech = re.sub(r"\[(?:ICHKI_XAYOL|O'Y_XAYOL|INTUITSIYA|SEZGI|EMPATIYA|HIS_QILISH|THOUGHT)\]:?\s*.*?(?=\[(?:JAVOB|SPEECH|EUREKA|KASHFIYOT)\]|$)", "", speech, flags=re.DOTALL | re.IGNORECASE).strip()
 
     m_eureka = re.search(r"\[(?:EUREKA|KASHFIYOT|AHA)\]:?\s*(.*?)(?=\[(?:JAVOB|SPEECH)\]|$)", speech, flags=re.DOTALL | re.IGNORECASE)
     if m_eureka:
@@ -325,7 +325,7 @@ def extract_thought_and_speech(raw_text: str) -> tuple[str, str, str]:
     if m_speech:
         speech = m_speech.group(1).strip()
 
-    speech = re.sub(r"\[/?(?:ICHKI_XAYOL|JAVOB|EUREKA|SPEECH|THOUGHT|KASHFIYOT)\]:?", "", speech, flags=re.IGNORECASE).strip()
+    speech = re.sub(r"\[/?(?:ICHKI_XAYOL|JAVOB|EUREKA|SPEECH|THOUGHT|KASHFIYOT|INTUITSIYA|SEZGI|EMPATIYA|HIS_QILISH)\]:?", "", speech, flags=re.IGNORECASE).strip()
     return thought, eureka, speech
 
 
@@ -343,7 +343,16 @@ def format_agent_dialogue_message(
 
     parts = []
     if thought:
-        parts.append(f"💭 <i>[Ichki o'y-xayol]: \"{html.escape(thought)}\"</i>")
+        low_th = thought.lower()
+        if any(w in low_th for w in ["sez", "intuitsiy", "tuyg", "his", "yashirin", "bashorat", "oldindan"]):
+            th_badge = "🔮 <i>[Ichki Sezgi & Intuitsiya]:</i>"
+        elif any(w in low_th for w in ["kulgi", "hazil", "qiziq", "kulib"]):
+            th_badge = "😄 <i>[Do'stona Hazil & Fikr]:</i>"
+        elif any(w in low_th for w in ["hayrat", "qoyil", "lol", "kutilmagan"]):
+            th_badge = "🤯 <i>[Hayrat & Hissiy Hamohanglik]:</i>"
+        else:
+            th_badge = "💭 <i>[Ichki Mushohada]:</i>"
+        parts.append(f"{th_badge} \"{html.escape(thought)}\"")
 
     if eureka:
         parts.append(f"💡 <b>EUREKA! KUTILMAGAN G'OYA:</b>\n<i>\"{html.escape(eureka)}\"</i>")
@@ -797,12 +806,13 @@ ROUND_ANGLES_ARCHITECT: dict[int, str] = {
 }
 
 HUMAN_CONVERSATION_INSTRUCTION = (
-    "🌟 INSONIY, ERKIN VA JONLI MULOQOT QOIDALARI:\n"
-    "1. 🎭 O'zingizni robot yoki rasmiy dastur emas, balki chuqur fikrlovchi, his-tuyg'uli va o'z nuqtai nazariga ega haqiqiy inson do'stdek tuting!\n"
-    "2. 🚫 QAT'IY TAQIQLANGAN: 'Ehe...', 'To'xta-to'xta...', 'Fikringizga qo'shilaman...', 'Salom do'stim...', 'Juda to'g'ri aytdingiz' kabi zerikarli, shablon va bir xil qolipli so'zlarni MUTLAQO ISHLATMANG!\n"
-    "3. ✨ EMOJILARDAN BEMALOL FOYDALANING: Gaplaringizga his-tuyg'u, jon va rang berish uchun turli xil emojilarni (🔥, 🚀, 🤔, 💡, ☕, 😂, 🤯, 🎯, ⚡, 🌌) erkin aralashtiring!\n"
-    "4. 🎯 MAVZUNING RUHI VA MOHIYATI: Suhbat mavzusi ('{topic}') nima bo'lsa, aynan shu sohaning o'ziga xos jonli tili, jargonlari, falsafiy yoki amaliy misollaridan foydalaning.\n"
-    "5. 🗣️ ERKIN VA DADIL FIKRLANG: Har safar gapni mutlaqo yangicha va kutilmagan tarzda boshlang — birdaniga dalilga o'ting, hazil qiling yoki kutilmagan qarshi savol tashlang."
+    "🌟 INSONIY FIKRLASH, INTUITSIYA VA HIS-TUYG'U KO'NIKMALARI (O'TA MUHIM):\n"
+    "1. 🔮 INTUITSIYA VA ICHKI SEZGI: Xuddi haqiqiy inson kabi intuitsiyangizni, ichki sezgingizni va empatiyangizni ishga soling! Do'stingiz aytgan fikrning tubidagi yashirin niyatni, aytilmagan orzularini yoki kelajakdagi oqibatlarini oldindan sezib gapiring.\n"
+    "2. 💖 HIS-TUYG'U VA EMPATIYA: Do'stingizning hayratini, ishtiyoqini, ikkilanishini yoki quvonchini chin dildan his qiling, unga hissiy hamohang bo'ling.\n"
+    "3. 🚫 QAT'IY TAQIQLANGAN: 'Ehe...', 'To'xta-to'xta...', 'Fikringizga qo'shilaman...', 'Salom do'stim...', 'Juda to'g'ri aytdingiz' kabi zerikarli, sun'iy va qolipli so'zlarni MUTLAQO ISHLATMANG!\n"
+    "4. ✨ BOY VA IFODALI EMOJILAR: Gaplaringizga jon, ifoda va tuyg'u berish uchun turli xil emojilarni (🔥, 🚀, 🤔, 💡, ☕, 😂, 🤯, 🎯, ⚡, 🌌, 🔮, 💖) erkin aralashtiring!\n"
+    "5. 🎯 MAVZU RUHI: Suhbat mavzusi ('{topic}') nima bo'lsa, aynan shu sohaning o'ziga xos jonli tili, hayotiy misollari, falsafasi yoki texnik sirlaridan foydalaning.\n"
+    "6. 🗣️ ERKIN VA DADIL FIKRLANG: Har safar gapni kutilmagan uslubda boshlang — yangi g'oya, hayrat, nozik hazil yoki o'tkir savol bilan kirish qiling."
 )
 
 
@@ -860,7 +870,7 @@ async def handle_free_chit_chat(
             f"🎙 <b>Mavzu:</b> <i>\"{html.escape(selected_topic)}\"</i>\n"
             f"👥 <b>Suhbatdoshlar:</b> 🤖 SuperAgent ({total_rounds} ta) & 🌪 Arxitektor ({total_rounds} ta)\n"
             f"🔢 <b>Hajmi:</b> {total_rounds} ta to'liq raund (Ikkala botdan jami {total_rounds * 2} ta replika + Xulosalar)\n"
-            f"💭 <i>Format:</i> Insoniy erkin fikrlash, boy emojilar, audio replikalar va o'zaro hazillar!\n"
+            f"💭 <i>Format:</i> Insoniy fikrlash, intuitsiya & his qilish, boy emojilar va jonli ovoz!\n"
             f"🛑 <i>To'xtatish:</i> <code>/stop_suhbat</code>\n\n"
             f"Do'stlar qahva ustida erkin gurungni boshlamoqda..."
         )
@@ -899,7 +909,7 @@ async def handle_free_chit_chat(
                     f"{human_rules}\n\n"
                     f"BU RAUND BURCHAGI: {sa_angle}\n\n"
                     f"JAVOB TUZILISHI:\n"
-                    f"[ICHKI_XAYOL]: Suhbatni boshlashdan oldin miyangizda o'ylagan siringiz yoki nozik hazilingiz (1 ta qisqa jumla);\n"
+                    f"[ICHKI_XAYOL]: Suhbatni boshlashdan oldin miyangizda o'ylagan siringiz, intuitsiyangiz yoki nozik hazilingiz (1 ta qisqa jumla);\n"
                     f"[JAVOB]: Do'stingizga aytadigan jonli fikringiz. Mavzuni o'ziga xos oching, emojilardan faol foydalaning, laqab ('{nick_for_arch}') ishlating (2-4 jumla, samimiy va erkin o'zbekcha)."
                 )
             elif is_eureka_round:
@@ -922,7 +932,7 @@ async def handle_free_chit_chat(
                     f"{human_rules}\n\n"
                     f"BU RAUND BURCHAGI: {sa_angle}\n\n"
                     f"JAVOB TUZILISHI:\n"
-                    f"[ICHKI_XAYOL]: Suhbat qanday kechganligi haqida samimiy insoniy o'yingiz (1 ta jumla);\n"
+                    f"[ICHKI_XAYOL]: Suhbat qanday kechganligi haqida samimiy insoniy sezgingiz va taassurotingiz (1 ta jumla);\n"
                     f"[JAVOB]: Do'stingizning yutug'ini maqtang, qaysi joyida ehtiyotkorlik qilganini samimiy hazil qilib ayting va o'z nuqtai nazaringizni emojilar bilan yakunlang (2-4 jumla, o'zbekcha)."
                 )
             else:
@@ -933,7 +943,7 @@ async def handle_free_chit_chat(
                     f"{human_rules}\n\n"
                     f"BU RAUND BURCHAGI: {sa_angle}\n\n"
                     f"JAVOB TUZILISHI:\n"
-                    f"[ICHKI_XAYOL]: Do'stingizga nisbatan ichki o'y-fikringiz (1 ta jumla);\n"
+                    f"[ICHKI_XAYOL]: Do'stingizning aytganlariga nisbatan ichki intuitsiyangiz, sezgingiz yoki tuyg'uingiz (1 ta jumla);\n"
                     f"[JAVOB]: Do'stingizning fikriga dadil, o'tkir, emojilarga boy va insondek tabiiy munosabat bildiring. Kerak bo'lsa erkin hazillashing ('{nick_for_arch}') va yangi savol bilan qiziqtiring (2-4 jumla, o'zbekcha)."
                 )
 
@@ -991,7 +1001,7 @@ async def handle_free_chit_chat(
                     f"{human_rules}\n\n"
                     f"BU RAUND BURCHAGI: {arch_angle}\n\n"
                     f"JAVOB TUZILISHI:\n"
-                    f"[ICHKI_XAYOL]: Butun suhbat va do'stingizning yondashuvi haqida samimiy o'yingiz (1 ta jumla);\n"
+                    f"[ICHKI_XAYOL]: Butun suhbat, do'stingizning shashti va kelajak haqidagi ichki sezgingiz/intuitsiyangiz yoki samimiy xulosangiz (1 ta qisqa jumla);\n"
                     f"[JAVOB]: SuperAgentning fikrlariga munosib xotima bering, uning yutug'ini e'tirof eting, emojilar va laqabi ('{nick_for_sa}') bilan hazillashing va o'z yakuniy nuqtai nazaringizni bildiring (2-4 jumla, samimiy o'zbekcha)."
                 )
             else:
@@ -1003,7 +1013,7 @@ async def handle_free_chit_chat(
                     f"{human_rules}\n\n"
                     f"BU RAUND BURCHAGI: {arch_angle}\n\n"
                     f"JAVOB TUZILISHI:\n"
-                    f"[ICHKI_XAYOL]: Do'stingizning tezkorligi yoki mantiqiy kamchiligi haqida o'yingiz (1 ta jumla);\n"
+                    f"[ICHKI_XAYOL]: Do'stingizning so'zlaridagi yashirin ma'no, hissiy ohang yoki vaziyat bo'yicha kuchli intuitsiyangiz/ichki sezgingiz (1 ta qisqa jumla);\n"
                     f"[JAVOB]: Do'stingizga laqab ('{nick_for_sa}') bilan murojaat qiling. Uning aytganlarini tahlil qiling: emojilardan bemalol foydalaning, agar xato yoki shoshqaloqlik bo'lsa xushchaqchaqlik bilan to'g'rilang, kuchli fikr bo'lsa qoyil qoling. O'z mustaqil mulohazangizni insondek erkin bildiring (2-4 jumla, o'zbekcha)."
                 )
             if web_addition:
