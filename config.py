@@ -41,6 +41,11 @@ USERBOT_PHONE: str = os.getenv("USERBOT_PHONE", "")
 GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
 OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
 
+# ─── NVIDIA NIM / Nemotron API (https://build.nvidia.com) ─────
+NVIDIA_API_KEY: str = os.getenv("NVIDIA_API_KEY", "") or os.getenv("NEMOTRON_API_KEY", "")
+NVIDIA_BASE_URL: str = os.getenv("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1")
+NVIDIA_MODEL: str = os.getenv("NVIDIA_MODEL", "nvidia/llama-3.1-nemotron-70b-instruct")
+
 # ─── OmniRoute AI Gateway (https://github.com/diegosouzapw/OmniRoute) ────
 # 350+ provayder, 150+ bepul tier va 1200+ modellarni birlashtiruvchi shlyuz
 OMNIROUTE_BASE_URL: str = os.getenv("OMNIROUTE_BASE_URL", "http://localhost:20128/v1")
