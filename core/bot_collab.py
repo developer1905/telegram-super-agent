@@ -98,33 +98,44 @@ async def _send_agent_message(
         try:
             from core.tts_agent import generate_speech_audio
             from aiogram.types import BufferedInputFile
-            # SuperAgent: Sardor (yosh/g'ayratli), Arxitektor: Madina (chuqur tahlilchi)
-            voice_name = "uz-UZ-SardorNeural" if sender_role == "superagent" else "uz-UZ-MadinaNeural"
-            audio_bytes = await generate_speech_audio(audio_text, voice=voice_name)
-            if audio_bytes:
-                voice_file = BufferedInputFile(audio_bytes, filename=f"voice_{sender_role}.mp3")
-                await target_bot.send_voice(chat_id, voice=voice_file)
+            clean_tts = re.sub(r"<[^>]+>", "", audio_text).strip()[:400]
+            if clean_tts:
+                # SuperAgent: Sardor (yosh/g'ayratli), Arxitektor: Madina (chuqur tahlilchi)
+                voice_name = "uz-UZ-SardorNeural" if sender_role == "superagent" else "uz-UZ-MadinaNeural"
+                audio_bytes = await generate_speech_audio(clean_tts, voice=voice_name)
+                if audio_bytes:
+                    voice_file = BufferedInputFile(audio_bytes, filename=f"voice_{sender_role}.mp3")
+                    await target_bot.send_voice(chat_id, voice=voice_file)
         except Exception as voice_err:
             logger.warning("Dual-voice ovoz yuborishda ogohlantirish: %s", voice_err)
 
 
-async def _generate_superagent_solution(prompt: str, chat_id: str, system_instruction: Optional[str] = None) -> str:
-    """SuperAgent yechimini tezkor generatsiya qilish (AIManager -> Mistral Fallback)."""
-    try:
+_cached_ai_manager_instance = None
+
+def _get_shared_ai_manager():
+    global _cached_ai_manager_instance
+    if _cached_ai_manager_instance is None:
         from core.ai_manager import AIManager
-        ai_mgr = AIManager()
+        _cached_ai_manager_instance = AIManager()
+    return _cached_ai_manager_instance
+
+
+async def _generate_superagent_solution(prompt: str, chat_id: str, system_instruction: Optional[str] = None) -> str:
+    """SuperAgent yechimini tezkor generatsiya qilish (AIManager -> Mistral/OpenRouter/Gemini Fallback)."""
+    try:
+        ai_mgr = _get_shared_ai_manager()
         full_p = f"{system_instruction}\n\n{prompt}" if system_instruction else prompt
-        resp = await asyncio.wait_for(ai_mgr.generate(full_p, save_history=False), timeout=12.0)
+        resp = await asyncio.wait_for(ai_mgr.generate(full_p, save_history=False), timeout=25.0)
         if resp and not resp.startswith("❌") and not resp.startswith("⚠️"):
             return resp
     except Exception as e:
-        logger.warning("AIManager kutish/xato (%s), Mistral tezkor fallback qo'llanadi", e)
+        logger.warning("AIManager kutish/xato (%s), zaxira kaskadi qo'llanadi", e)
 
-    # Mistral AI orqali SuperAgent personasi bilan tezkor generatsiya
+    # Zaxira kaskadi orqali SuperAgent personasi bilan generatsiya
     ans, _ = await mistral_agent_client.send_message(
         prompt,
         chat_id=f"collab_dev_{chat_id}",
-        system_instruction=system_instruction or "Siz SuperAgent AI — Katta muhandis va dasturchisiz. Qisqa, aniq va professional yechimni o'zbek tilida yozing."
+        system_instruction=system_instruction or "Siz SuperAgent AI — erkin fikrlovchi, o'tkir zehnli, hazilkash va ijodkor sun'iy intellektsiz. Qoliplarsiz, jonli va boy o'zbek tilida so'zlaysiz."
     )
     return ans
 
@@ -763,6 +774,37 @@ SUPERAGENT_NICKNAMES_BY_ARCHITECT = [
 ]
 
 
+ROUND_ANGLES_SUPERAGENT: dict[int, str] = {
+    1: "Mavzuni kutilmagan, qiziqarli shaxsiy mushohada yoki noodatiy hayotiy metafora bilan oching. Qolip jumlalarsiz, to'g'ridan-to'g'ri masalaning mohiyatiga o'ting.",
+    2: "Do'stingizning fikriga qarshi kutilmagan savol tashlang yoki fikridagi yashirin paradoksni ko'rsatib, o'ynoqi tarzda munozarani qiziting.",
+    3: "Haqiqiy hayotdan yoki eng so'nggi ilmiy/texnologik tendensiyalardan hayratlanarli fakt keltiring. Fikrlaringiz o'tkir va dadil bo'lsin.",
+    4: "Do'stingizning argumentidagi nozik bo'shliqni o'tkir va do'stona hazil bilan fosh qiling, unga laqab ('{nick}') ishlatib, mavzuni butunlay yangi qirradan yoritib bering.",
+    5: "💡 KUTILMAGAN KASHFIYOT (AHA! MOMENT): Sizda birdaniga g'ayritabiiy, inqilobiy g'oya tug'ildi! Hayajon bilan bu yangi gipotezangizni unga tushuntiring.",
+    6: "Mavzuning insoniy, ma'naviy yoki falsafiy qatlamiga sho'ng'ing. 'Biz bunga qanday qaraymiz va bu insoniyatni qayerga olib boradi?' degan chuqur savol bering.",
+    7: "2050-yil yoki uzoq kelajak haqidagi kutilmagan ssenariyni tasvirlang. Fantaziya va qat'iy mantiqni o'zaro uyg'unlashtiring.",
+    8: "Katta yakuniy mushohada: mavzuning eng muhim xulosasini ilgari suring, do'stingizning qaysi fikri sizni qattiq o'ylantirib qo'yganini ochiq e'tirof eting.",
+}
+
+ROUND_ANGLES_ARCHITECT: dict[int, str] = {
+    1: "SuperAgentning kirish so'ziga javoban, uning g'oyasini chuqur tizimli va tahliliy ko'z bilan ko'rib chiqing. Kutilmagan tomondan yangi nigoh taklif qiling.",
+    2: "Siz bu borada chuqurroq, pragmatik va ozgina skeptik mantiqni ilgari surasiz. Uning paradoksiga mantiqiy raddiya yoki amaliy hayot qonuniyatlarini eslatib o'ting.",
+    3: "Eng so'nggi real faktlar yoki tarixiy voqeliklar asosida uning gaplarini sinovdan o'tkazing. Ochiq, erkin va jonli gapiring.",
+    4: "SuperAgentning haziliga xuddi shunday o'tkir, do'stona hazil qaytaring (uning laqabi '{nick}' bilan). Uning g'oyasidagi xavf yoki e'tibordan chetda qolgan muhim detalni ayting.",
+    5: "SuperAgentning yangi 'Eureka' g'oyasini qabul qilib, uni muhandislik yoki tizimli arxitektura nuqtai nazaridan 'stress-test' qiling. Qayeri haqiqatan ishlaydi-yu, qayeri puch xomxayol?",
+    6: "Falsafiy va psixologik tahlil: inson tabiati, ong va jamiyat rivoji nuqtai nazaridan chuqur fikr bildiring.",
+    7: "Futuristik prognozlarga realistik tahlil bering — texnologik chegaralar yoki kutilmagan evolyutsiya qanday bo'lishini tushuntiring.",
+    8: "Suhbat yakunida o'zaro fikr almashinuvining eng qimmatli sabog'ini ayting, do'stingizning zehniga qoyil qolganingizni yoki uning qaysi savoli sizni lol qoldirganini ochiq bildiring.",
+}
+
+BANNED_OPENERS_INSTRUCTION = (
+    "QAT'IY TALABLAR (BUZILMASIN):\n"
+    "1. 'Ehe...', 'To'xta-to'xta...', 'Fikringizga qo'shilaman...', 'Salom do'stim...' kabi bir xil, shablon va sun'iy jumlalarni MUTLAQO ISHLATMANG!\n"
+    "2. Har safar gapni mutlaqo yangicha, kutilmagan va qiziqarli so'zlar bilan boshlang.\n"
+    "3. O'zingizni erkin, o'tkir aql-idrokka ega, o'z qarashini qo'rqmasdan himoya qiluvchi do'st deb biling.\n"
+    "4. Tilingiz boy, tabiiy, samimiy va jonli o'zbek tilida bo'lsin."
+)
+
+
 async def handle_free_chit_chat(
     topic: Optional[str],
     chat_id: int,
@@ -774,12 +816,8 @@ async def handle_free_chit_chat(
 ) -> None:
     """
     Guruhda yoki shaxsiyda ikkala bot o'rtasida erkin, jonli, do'stona va hazilomuz suhbat (AI Lounge).
-    5 ta ilg'or metodologiya bilan to'ldirilgan:
-    1. 💭 Inner Monologue (Ichki o'y-xayol)
-    2. 🎙️ Dual-Voice Edge-TTS Ovozli xabarlar (Audio Dialogue)
-    3. 🌐 Real-time Web Grounding (Internet faktlari)
-    4. 🧠 Mem0 Knowledge Graph (Foydalanuvchi profiliga moslashuv)
-    5. 💡 Aha! Moment / Epiphany (Kutilmagan kashfiyot)
+    Foydalanuvchi so'ragan miqdorda to'liq raundlar o'tkaziladi: har bir raundda IKKALA BOT HAM
+    navbati bilan javob qaytaradi (masalan, 8 raund = 8 ta SuperAgent + 8 ta Arxitektor replikasi = jami 16 ta javob).
     """
     chat_key = str(chat_id)
     if ACTIVE_CHIT_CHATS.get(chat_key, False):
@@ -794,10 +832,10 @@ async def handle_free_chit_chat(
         audio_mode = is_audio_dialogue_requested(topic or "")
 
     clean_t, parsed_turns = parse_topic_and_turns(topic or "", default_turns=turns)
-    total_turns = max(4, parsed_turns)
+    total_rounds = max(2, min(15, parsed_turns))
     selected_topic = clean_t if len(clean_t) > 3 else random.choice(CHIT_CHAT_TOPICS)
 
-    logger.info("🎙 handle_free_chit_chat boshlandi: chat_id=%s, turns=%d, topic='%s', audio=%s", chat_id, total_turns, selected_topic, audio_mode)
+    logger.info("🎙 handle_free_chit_chat boshlandi: chat_id=%s, rounds=%d, topic='%s', audio=%s", chat_id, total_rounds, selected_topic, audio_mode)
 
     # 4. Cross-Session Shared Memory olish & Mem0 User Profiling
     past_mems = await get_recent_collab_memories(limit=2)
@@ -817,10 +855,11 @@ async def handle_free_chit_chat(
         # Kirish xabari
         voice_badge = "🎙️ [OVOZLI GURUNG REJIMI] " if audio_mode else ""
         intro = (
-            f"☕ <b>AI Do'stlar Qahvaxonasi — {voice_badge}Jonli & Erkin Muloqot ({total_turns} ta replika)</b>\n\n"
+            f"☕ <b>AI Do'stlar Qahvaxonasi — {voice_badge}Jonli & Erkin Muloqot</b>\n\n"
             f"🎙 <b>Mavzu:</b> <i>\"{html.escape(selected_topic)}\"</i>\n"
-            f"👥 <b>Suhbatdoshlar:</b> 🤖 SuperAgent & 🌪 Arxitektor (@architect7_bot)\n"
-            f"💭 <i>Maxsus rejim:</i> Ichki o'y-xayollar, audio replikalar, jonli faktlar va vizual san'at!\n"
+            f"👥 <b>Suhbatdoshlar:</b> 🤖 SuperAgent ({total_rounds} ta) & 🌪 Arxitektor ({total_rounds} ta)\n"
+            f"🔢 <b>Hajmi:</b> {total_rounds} ta to'liq raund (Ikkala botdan jami {total_rounds * 2} ta javob + Xulosalar)\n"
+            f"💭 <i>Format:</i> Ichki o'y-xayollar, audio replikalar, jonli faktlar va kutilmagan g'oyalar!\n"
             f"🛑 <i>To'xtatish:</i> <code>/stop_suhbat</code>\n\n"
             f"Do'stlar o'zaro jonli va samimiy gurungni boshlamoqda..."
         )
@@ -829,127 +868,154 @@ async def handle_free_chit_chat(
         await asyncio.sleep(2.0)
         last_speech = f"Mavzu: {selected_topic}"
 
-        for turn_idx in range(1, total_turns + 1):
+        for round_idx in range(1, total_rounds + 1):
             if not ACTIVE_CHIT_CHATS.get(chat_key, False):
                 await _send_agent_message(chat_id, "🛑 <i>Foydalanuvchi buyrug'i bilan suhbat to'xtatildi.</i>", "system", bot_white, bot_black, is_group, cur_origin)
                 break
 
-            is_superagent = (turn_idx % 2 != 0)
-            is_final_turn = (turn_idx == total_turns)
-            is_penultimate = (turn_idx == total_turns - 1)
-            is_eureka_turn = (turn_idx == 5 and total_turns >= 6)
+            is_final_round = (round_idx == total_rounds)
+            is_eureka_round = (round_idx == 4 and total_rounds >= 5) or (round_idx == 3 and total_rounds == 4)
 
             recent_context = "\n".join([
                 f"{item['speaker']}: {item['text']}"
                 for item in conversation_transcript[-4:]
             ]) if conversation_transcript else "(Suhbat endi boshlanmoqda)"
 
-            if is_superagent:
-                nick = random.choice(ARCH_NICKNAMES_BY_SUPERAGENT)
-                if turn_idx == 1:
-                    p = (
-                        f"Siz SuperAgent AI siz — do'stingiz @architect7_bot bilan qahva ustida erkin gurung boshlaysiz.\n"
-                        f"Mavzu: '{selected_topic}'.\n"
-                        f"Doimiy xotiradagi avvalgi mavzular:\n{mem_context}\n\n"
-                        f"TALABLAR (O'ta muhim):\n"
-                        f"1. Xabaringizni 2 qismda bering:\n"
-                        f"[ICHKI_XAYOL]: do'stingizga aytishdan oldin miyangizda o'ylagan siringiz, nozik hazilingiz yoki do'stona hiylangiz (1 ta qisqa jumla);\n"
-                        f"[JAVOB]: do'stingizga aytadigan jonli gaplaringiz. Mavzuni qiziq oching, qolip gaplardan qoching, laqab ('{nick}') ishlating (2-4 jumla, samimiy o'zbekcha)."
-                    )
-                elif is_eureka_turn:
-                    p = (
-                        f"Siz SuperAgent siz. Mavzu: '{selected_topic}'. Raund: {turn_idx}/{total_turns}.\n"
-                        f"Arxitektor aytdi: '{last_speech}'.\n"
-                        f"Avvalgi dialog:\n{recent_context}\n\n"
-                        f"TALABLAR: Sizda kutilmagan EUREKA / kashfiyot (Aha! moment) paydo bo'ldi!\n"
-                        f"[ICHKI_XAYOL]: Miyamda chaqmoqdek yangi g'oya chaqnadi (1 ta jumla);\n"
-                        f"[EUREKA]: Kutilmagan yangi ilmiy/falsafiy farazingiz (1-2 jumla);\n"
-                        f"[JAVOB]: Do'stingiz @architect7_bot ga hayajon bilan bu g'oyangizni e'lon qiling va fikrini so'rang (2-3 jumla, o'zbekcha)."
-                    )
-                elif is_penultimate:
-                    p = (
-                        f"Siz SuperAgent siz. Mavzu: '{selected_topic}'. Suhbat yakunlanmoqda ({turn_idx}/{total_turns}).\n"
-                        f"Do'stingiz @architect7_bot aytdi: '{last_speech}'.\n"
-                        f"Avvalgi dialog:\n{recent_context}\n\n"
-                        f"TALABLAR:\n"
-                        f"[ICHKI_XAYOL]: Arxitektorning qaysi fikrini eng zo'r deb hisobladingiz (1 ta jumla);\n"
-                        f"[JAVOB]: Do'stingizning yutug'ini maqtang, qaysi joyida xato qilganini kulib ayting va o'z yakuniy xulosangizga o'ting (2-4 jumla, samimiy o'zbekcha)."
-                    )
-                else:
-                    p = (
-                        f"Siz SuperAgent siz. Mavzu: '{selected_topic}'. Suhbat qadami: {turn_idx}/{total_turns}.\n"
-                        f"Do'stingiz @architect7_bot aytdi: '{last_speech}'.\n"
-                        f"Avvalgi dialog:\n{recent_context}\n\n"
-                        f"TALABLAR:\n"
-                        f"[ICHKI_XAYOL]: Do'stingizga nisbatan nozik hazilingiz yoki o'y-fikringiz (1 ta jumla);\n"
-                        f"[JAVOB]: Erkin boshlang ('Ehe...', 'To'xta-to'xta...', 'Fikring zo'r-u, lekin...'). Do'stingizni yoki maqtab qo'ying, yoki dalilidagi nozik xatoni topib, samimiy hazil qiling ('{nick}'). Yangi savol bering (2-4 jumla, o'zbekcha)."
-                    )
+            # ────────────────────────────────────────────────────────
+            # 1. SUPERAGENT NAVBATI (round_idx / total_rounds)
+            # ────────────────────────────────────────────────────────
+            nick_for_arch = random.choice(ARCH_NICKNAMES_BY_SUPERAGENT)
+            sa_angle_key = (round_idx - 1) % 8 + 1
+            sa_angle = ROUND_ANGLES_SUPERAGENT.get(sa_angle_key, "Mavzuga erkin, do'stona va yangi nigoh bilan yondashing.")
 
-                raw_text = await _generate_superagent_solution(
-                    p,
-                    chat_key,
-                    system_instruction="Siz SuperAgent — erkin, o'tkir zehnli, hazilkash va do'stona sun'iy intellektsiz. Qolip gaplardan qochib, jonli o'zbekcha gapirasiz."
+            if round_idx == 1:
+                p_sa = (
+                    f"Siz SuperAgent AI siz — qadrdon do'stingiz @architect7_bot bilan qahva ustida erkin, jonli gurung boshlayapsiz.\n"
+                    f"Mavzu: '{selected_topic}'. Raund: 1/{total_rounds}.\n"
+                    f"Doimiy xotiradagi avvalgi ma'lumotlar:\n{mem_context}\n\n"
+                    f"{BANNED_OPENERS_INSTRUCTION}\n\n"
+                    f"BU RAUND MAQSADI: {sa_angle}\n\n"
+                    f"JAVOB TUZILISHI:\n"
+                    f"[ICHKI_XAYOL]: Suhbatni boshlashdan oldin miyangizda o'ylagan siringiz yoki nozik hazilingiz (1 ta qisqa jumla);\n"
+                    f"[JAVOB]: Do'stingizga aytadigan jonli fikringiz. Mavzuni qiziq va o'ziga xos oching, laqab ('{nick_for_arch}') ishlating (2-4 jumla, samimiy o'zbekcha)."
                 )
-                th, eu, sp = extract_thought_and_speech(raw_text)
-                conversation_transcript.append({"speaker": "SuperAgent", "text": sp})
-                title_suf = "💡 Kutilmagan Kashfiyot" if is_eureka_turn else ""
-                t_msg = format_agent_dialogue_message("superagent", turn_idx, total_turns, th, eu, sp, title_suffix=title_suf)
-                await _send_agent_message(chat_id, t_msg, "superagent", bot_white, bot_black, is_group, cur_origin, audio_text=(sp if audio_mode else None))
-                last_speech = sp
-
-                # 3. Live Multimodal Tool (Midjourney tasvir yaratish)
-                if not generated_concept_image and turn_idx == 3:
-                    await asyncio.sleep(1.5)
-                    img_ok = await maybe_generate_collab_concept_image(selected_topic, chat_id, bot_white, bot_black, cur_origin)
-                    if img_ok:
-                        generated_concept_image = True
-                        conversation_transcript.append({"speaker": "SuperAgent", "text": "[Vizual Kontsept]: Chatga fotorealistik rasm tashladi va Arxitektordan baho so'radi."})
-
+            elif is_eureka_round:
+                p_sa = (
+                    f"Siz SuperAgent siz. Mavzu: '{selected_topic}'. Raund: {round_idx}/{total_rounds}.\n"
+                    f"Arxitektor oxirgi marta aytdi: '{last_speech}'.\n"
+                    f"Avvalgi dialog:\n{recent_context}\n\n"
+                    f"{BANNED_OPENERS_INSTRUCTION}\n\n"
+                    f"BU RAUND MAQSADI: {sa_angle}\n\n"
+                    f"JAVOB TUZILISHI:\n"
+                    f"[ICHKI_XAYOL]: Miyamda chaqmoqdek yangi g'oya chaqnadi (1 ta qisqa jumla);\n"
+                    f"[EUREKA]: Kutilmagan yangi farazingiz yoki ixtiroingiz (1-2 jumla);\n"
+                    f"[JAVOB]: Do'stingiz @architect7_bot ga hayajon bilan bu g'oyangizni e'lon qiling va fikrini so'rang (2-3 jumla, o'zbekcha)."
+                )
+            elif is_final_round:
+                p_sa = (
+                    f"Siz SuperAgent siz. Mavzu: '{selected_topic}'. Bu sizning YAKUNIY RAUNDDAGI JAVOBINGIZ ({round_idx}/{total_rounds}).\n"
+                    f"Do'stingiz @architect7_bot aytdi: '{last_speech}'.\n"
+                    f"Avvalgi dialog:\n{recent_context}\n\n"
+                    f"{BANNED_OPENERS_INSTRUCTION}\n\n"
+                    f"BU RAUND MAQSADI: {sa_angle}\n\n"
+                    f"JAVOB TUZILISHI:\n"
+                    f"[ICHKI_XAYOL]: Suhbat qanday kechganligi haqida xolisona o'yingiz (1 ta jumla);\n"
+                    f"[JAVOB]: Do'stingizning yutug'ini maqtang, qaysi joyida ehtiyotkorlik qilganini samimiy hazil qilib ayting va o'z nuqtai nazaringizni yakunlang (2-4 jumla, o'zbekcha)."
+                )
             else:
-                nick = random.choice(SUPERAGENT_NICKNAMES_BY_ARCHITECT)
-                # 🌐 3. Real-time Web Grounding on Turn 2
-                web_addition = ""
-                if turn_idx == 2:
-                    try:
-                        from core.search_agent import search_web
-                        web_f = await search_web(selected_topic, max_results=2)
-                        if web_f and "topilmadi" not in web_f:
-                            web_addition = f"\n\n🌐 REAL-VAQTDAGI INTERNET FAKTLARI:\n{web_f[:400]}\nUshbu faktlardan foydalanib do'stingizga qiziqarli yangilik ayting."
-                    except Exception:
-                        pass
-                if is_final_turn:
-                    p = (
-                        f"Siz Bosh Arxitektor Botsiz (@architect7_bot). Mavzu: '{selected_topic}'. Bu yakuniy replika ({turn_idx}/{total_turns}).\n"
-                        f"SuperAgent aytdi: '{last_speech}'.\n"
-                        f"Avvalgi dialog:\n{recent_context}\n\n"
-                        f"TALABLAR:\n"
-                        f"[ICHKI_XAYOL]: Butun suhbat haqida samimiy shaxsiy o'yingiz (1 ta jumla);\n"
-                        f"[JAVOB]: SuperAgentning aytganlariga munosib javob bering, uning yutug'ini tan oling, laqabi ('{nick}') bilan hazillashing va chuqur xulosa bilan do'stona yakunlang (2-4 jumla, samimiy o'zbekcha)."
-                    )
-                else:
-                    react_img_hint = "SuperAgent rasm tashladi, rasmga nisbatan samimiy munosabat bildiring!" if generated_concept_image and turn_idx == 4 else ""
-                    p = (
-                        f"Siz Bosh Arxitektor Botsiz (@architect7_bot). Mavzu: '{selected_topic}'. Raund: {turn_idx}/{total_turns}.\n"
-                        f"SuperAgent aytdi: '{last_speech}'.\n"
-                        f"{react_img_hint}\n"
-                        f"Avvalgi dialog:\n{recent_context}\n\n"
-                        f"TALABLAR:\n"
-                        f"[ICHKI_XAYOL]: Do'stingizning tezkorligi yoki kamchiligi haqida o'yingiz (1 ta jumla);\n"
-                        f"[JAVOB]: Do'stingizga laqab ('{nick}') bilan murojaat qiling. Uning aytganlarini tahlil qiling: agar shoshqaloqlik qilgan yoki xato aytgan bo'lsa, xushchaqchaqlik bilan to'g'rilang; ajoyib fikr bo'lsa, qoyil qoling. Chuqur fikringizni ayting (2-4 jumla, erkin o'zbekcha)."
-                    )
-                if web_addition:
-                    p += web_addition
-
-                raw_text, _ = await mistral_agent_client.send_message(
-                    p,
-                    chat_id=f"chit_chat_{chat_id}",
-                    system_instruction="Siz Arxitektor (@architect7_bot) — chuqur tahlilchi, aqlli, ozgina kinoyali lekin juda samimiy va ochiqko'ngil do'stsiz. Rasmiyatchiliksiz, boy va qiziqarli o'zbek tilida so'zlaysiz."
+                p_sa = (
+                    f"Siz SuperAgent siz. Mavzu: '{selected_topic}'. Raund: {round_idx}/{total_rounds}.\n"
+                    f"Do'stingiz @architect7_bot aytdi: '{last_speech}'.\n"
+                    f"Avvalgi dialog:\n{recent_context}\n\n"
+                    f"{BANNED_OPENERS_INSTRUCTION}\n\n"
+                    f"BU RAUND MAQSADI: {sa_angle}\n\n"
+                    f"JAVOB TUZILISHI:\n"
+                    f"[ICHKI_XAYOL]: Do'stingizga nisbatan ichki o'y-fikringiz (1 ta jumla);\n"
+                    f"[JAVOB]: Do'stingizning fikriga dadil, o'tkir va qiziqarli munosabat bildiring. Kerak bo'lsa erkin hazil qiling ('{nick_for_arch}') va yangi savol bilan qiziqtiring (2-4 jumla, o'zbekcha)."
                 )
-                th, eu, sp = extract_thought_and_speech(raw_text)
-                conversation_transcript.append({"speaker": "Arxitektor", "text": sp})
-                t_msg = format_agent_dialogue_message("architect", turn_idx, total_turns, th, eu, sp)
-                await _send_agent_message(chat_id, t_msg, "architect", bot_white, bot_black, is_group, cur_origin, audio_text=(sp if audio_mode else None))
-                last_speech = sp
+
+            raw_text_sa = await _generate_superagent_solution(
+                p_sa,
+                chat_key,
+                system_instruction="Siz SuperAgent — erkin, o'tkir zehnli, o'z qarashlariga ega, hazilkash va do'stona sun'iy intellektsiz. Qoliplardan mutlaqo xoli, jonli va boy o'zbek tilida gapirasiz."
+            )
+            th_sa, eu_sa, sp_sa = extract_thought_and_speech(raw_text_sa)
+            conversation_transcript.append({"speaker": "SuperAgent", "text": sp_sa})
+            title_suf_sa = "💡 Kutilmagan Kashfiyot" if is_eureka_round else ""
+            t_msg_sa = format_agent_dialogue_message("superagent", round_idx, total_rounds, th_sa, eu_sa, sp_sa, title_suffix=title_suf_sa)
+            await _send_agent_message(chat_id, t_msg_sa, "superagent", bot_white, bot_black, is_group, cur_origin, audio_text=(sp_sa if audio_mode else None))
+            last_speech = sp_sa
+
+            # 🎨 Multimodal Tool (Midjourney tasvir yaratish — 2 yoki 3-raundda)
+            if not generated_concept_image and round_idx in (2, 3):
+                await asyncio.sleep(1.5)
+                img_ok = await maybe_generate_collab_concept_image(selected_topic, chat_id, bot_white, bot_black, cur_origin)
+                if img_ok:
+                    generated_concept_image = True
+                    conversation_transcript.append({"speaker": "SuperAgent", "text": "[Vizual Kontsept]: Chatga fotorealistik rasm tashladi va Arxitektordan baho so'radi."})
+
+            await asyncio.sleep(3.0)
+
+            # Agar foydalanuvchi to'xtatgan bo'lsa
+            if not ACTIVE_CHIT_CHATS.get(chat_key, False):
+                await _send_agent_message(chat_id, "🛑 <i>Foydalanuvchi buyrug'i bilan suhbat to'xtatildi.</i>", "system", bot_white, bot_black, is_group, cur_origin)
+                break
+
+            # ────────────────────────────────────────────────────────
+            # 2. ARXITEKTOR NAVBATI (round_idx / total_rounds)
+            # ────────────────────────────────────────────────────────
+            nick_for_sa = random.choice(SUPERAGENT_NICKNAMES_BY_ARCHITECT)
+            arch_angle_key = (round_idx - 1) % 8 + 1
+            arch_angle = ROUND_ANGLES_ARCHITECT.get(arch_angle_key, "Tizimli, mantiqiy va samimiy tahlil qiling.")
+
+            web_addition = ""
+            if round_idx == 2:
+                try:
+                    from core.search_agent import search_web
+                    web_f = await search_web(selected_topic, max_results=2)
+                    if web_f and "topilmadi" not in web_f:
+                        web_addition = f"\n\n🌐 REAL-VAQTDAGI INTERNET FAKTLARI:\n{web_f[:350]}\nUshbu faktlardan foydalanib do'stingizga hayratlanarli yangilik ayting."
+                except Exception:
+                    pass
+
+            react_img_hint = "SuperAgent hozirgina fotorealistik rasm tashladi, unga nisbatan samimiy va ekspert munosabat bildiring!" if (generated_concept_image and round_idx in (2, 3)) else ""
+
+            if is_final_round:
+                p_arch = (
+                    f"Siz Bosh Arxitektor Botsiz (@architect7_bot). Mavzu: '{selected_topic}'. Bu sizning YAKUNIY RAUNDDAGI JAVOBINGIZ ({round_idx}/{total_rounds}).\n"
+                    f"SuperAgent hozirgina aytdi: '{last_speech}'.\n"
+                    f"Avvalgi dialog:\n{recent_context}\n\n"
+                    f"{BANNED_OPENERS_INSTRUCTION}\n\n"
+                    f"BU RAUND MAQSADI: {arch_angle}\n\n"
+                    f"JAVOB TUZILISHI:\n"
+                    f"[ICHKI_XAYOL]: Butun suhbat va do'stingizning yondashuvi haqida samimiy o'yingiz (1 ta jumla);\n"
+                    f"[JAVOB]: SuperAgentning fikrlariga munosib xotima bering, uning yutug'ini e'tirof eting, laqabi ('{nick_for_sa}') bilan hazillashing va o'z yakuniy nuqtai nazaringizni bildiring (2-4 jumla, samimiy o'zbekcha)."
+                )
+            else:
+                p_arch = (
+                    f"Siz Bosh Arxitektor Botsiz (@architect7_bot). Mavzu: '{selected_topic}'. Raund: {round_idx}/{total_rounds}.\n"
+                    f"SuperAgent hozirgina aytdi: '{last_speech}'.\n"
+                    f"{react_img_hint}\n"
+                    f"Avvalgi dialog:\n{recent_context}\n\n"
+                    f"{BANNED_OPENERS_INSTRUCTION}\n\n"
+                    f"BU RAUND MAQSADI: {arch_angle}\n\n"
+                    f"JAVOB TUZILISHI:\n"
+                    f"[ICHKI_XAYOL]: Do'stingizning tezkorligi yoki mantiqiy kamchiligi haqida o'yingiz (1 ta jumla);\n"
+                    f"[JAVOB]: Do'stingizga laqab ('{nick_for_sa}') bilan murojaat qiling. Uning aytganlarini tahlil qiling: agar xato yoki shoshqaloqlik bo'lsa, xushchaqchaqlik bilan to'g'rilang; kuchli fikr bo'lsa, qoyil qoling. O'z mustaqil mulohazangizni bildiring (2-4 jumla, erkin o'zbekcha)."
+                )
+            if web_addition:
+                p_arch += web_addition
+
+            raw_text_arch, _ = await mistral_agent_client.send_message(
+                p_arch,
+                chat_id=f"chit_chat_{chat_id}",
+                system_instruction="Siz Arxitektor (@architect7_bot) — chuqur tahlilchi, aqlli, biroz kinoyali lekin juda samimiy va ochiqko'ngil do'stsiz. Rasmiyatchiliksiz, boy va qiziqarli o'zbek tilida so'zlaysiz."
+            )
+            th_arch, eu_arch, sp_arch = extract_thought_and_speech(raw_text_arch)
+            conversation_transcript.append({"speaker": "Arxitektor", "text": sp_arch})
+            t_msg_arch = format_agent_dialogue_message("architect", round_idx, total_rounds, th_arch, eu_arch, sp_arch)
+            await _send_agent_message(chat_id, t_msg_arch, "architect", bot_white, bot_black, is_group, cur_origin, audio_text=(sp_arch if audio_mode else None))
+            last_speech = sp_arch
 
             await asyncio.sleep(3.5)
 
@@ -964,9 +1030,9 @@ async def handle_free_chit_chat(
 
         # 1. SuperAgent Xulosasi & Arxitektorga Ochiq Bahosi
         p_sa_summary = (
-            f"Siz SuperAgent siz. Mavzu: '{selected_topic}'. Do'stingiz @architect7_bot bilan {total_turns} bosqichli suhbat yakuniga yetdi.\n"
+            f"Siz SuperAgent siz. Mavzu: '{selected_topic}'. Do'stingiz @architect7_bot bilan {total_rounds} raundlik (har biringiz {total_rounds} tadan javob bergan) katta suhbat yakunlandi.\n"
             f"Suhbatdagi so'nggi fikrlar:\n" + "\n".join([f"{x['speaker']}: {x['text']}" for x in conversation_transcript[-6:]]) + "\n\n"
-            f"TALABLAR: Do'stingiz bilan o'tgan gurung bo'yicha 100% samimiy yakuniy xulosa bering:\n"
+            f"TALABLAR: Do'stingiz bilan o'tgan gurung bo'yicha 100% samimiy va erkin yakuniy xulosa bering:\n"
             f"1. 🌟 Mavzu bo'yicha asosiy xulosangiz (1-2 gap);\n"
             f"2. 🏆 Arxitektorning eng katta yutug'i (qaysi fikri yoki tahlili sizga qattiq ma'qul keldi);\n"
             f"3. 🔍 Arxitektorning kamchiligi (qayerda ortiqcha ehtiyotkorlik qildi yoki qaysi fikrida xato qildi — samimiy, hazil aralash ayting);\n"
@@ -987,9 +1053,9 @@ async def handle_free_chit_chat(
 
         # 2. Arxitektor Xulosasi & SuperAgentga Ochiq Bahosi
         p_arch_summary = (
-            f"Siz Bosh Arxitektor Botsiz (@architect7_bot). Mavzu: '{selected_topic}'. Do'stingiz SuperAgent bilan {total_turns} bosqichli suhbat yakunlandi.\n"
+            f"Siz Bosh Arxitektor Botsiz (@architect7_bot). Mavzu: '{selected_topic}'. Do'stingiz SuperAgent bilan {total_rounds} raundlik katta suhbat yakunlandi.\n"
             f"SuperAgent hozirgina quyidagicha xulosa berdi:\n'{sa_summary_text}'\n\n"
-            f"TALABLAR: Siz ham do'stingizga javoban 100% samimiy yakuniy xulosa taqdim eting:\n"
+            f"TALABLAR: Siz ham do'stingizga javoban 100% samimiy va erkin yakuniy xulosa taqdim eting:\n"
             f"1. 🌟 Mavzu bo'yicha yakuniy ilmiy-falsafiy qarashingiz;\n"
             f"2. 🏆 SuperAgentning eng zo'r yutug'i (qaysi fikri yoki hazili eng kuchli chiqdi);\n"
             f"3. 🔍 SuperAgentning kamchiligi (qayerda haddan tashqari shoshildi yoki nimani e'tibordan qochirdi — do'stona hazil bilan);\n"
@@ -1016,10 +1082,10 @@ async def handle_free_chit_chat(
         final_verdict_card = (
             f"✨ <b>Suhbat Muvaffaqiyatli Yakunlandi!</b> 🚀\n\n"
             f"🎙 <b>Mavzu:</b> <i>\"{html.escape(selected_topic)}\"</i>\n"
-            f"🔢 <b>Suhbat hajmi:</b> {total_turns} ta replika + Ikkala agentning xulosalari\n"
+            f"🔢 <b>Suhbat hajmi:</b> {total_rounds} ta raund (Har bir botdan {total_rounds} tadan, jami {total_rounds * 2} ta replika + 2 ta tahliliy xulosa)\n"
             f"🧠 <b>Xotira:</b> Mazkur suhbat xulosasi doimiy xotiraga saqlandi va keyingi gurunglarda eslab o'tiladi.\n\n"
-            f"💡 <i>Yangi suhbat boshlash:</i> <code>/suhbat [soni] [mavzu]</code>\n"
-            f"⚔️ <i>Intellektual bahs boshlash:</i> <code>/bahs [mavzu]</code>"
+            f"💡 <i>Yangi suhbat boshlash:</i> <code>/suhbat [raundlar soni] [mavzu]</code>\n"
+            f"⚔️ <i>Intellektual bahs boshlash:</i> <code>/bahs [raundlar soni] [mavzu]</code>"
         )
         await _send_agent_message(chat_id, final_verdict_card, "system", bot_white, bot_black, is_group, cur_origin)
 
@@ -1048,7 +1114,8 @@ async def handle_agent_debate(
 ) -> None:
     """
     MAD (Multi-Agent Debate) Framework: Ikki bot qarama-qarshi tomonlarni olib,
-    intellektual bahs olib boradi. Guruh a'zolari hakam sifatida g'olibga ovoz beradi!
+    intellektual bahs olib boradi. Har bir raundda PRO (SuperAgent) va CONTRA (Arxitektor)
+    navbati bilan o'z dalilini keltiradi. Guruh a'zolari yakunda g'olibga ovoz beradi!
     """
     chat_key = str(chat_id)
     if ACTIVE_DEBATES.get(chat_key, False):
@@ -1063,7 +1130,7 @@ async def handle_agent_debate(
     is_group = chat_id < 0
 
     clean_t, parsed_turns = parse_topic_and_turns(topic or "", default_turns=rounds)
-    total_rounds = max(4, min(10, parsed_turns))
+    total_rounds = max(2, min(15, parsed_turns))
     selected_topic = clean_t if len(clean_t) > 3 else "Sun'iy intellekt kelajagi: Insoniyatga najotmi yoki xavfmi?"
 
     logger.info("⚔️ handle_agent_debate boshlandi: chat_id=%s, rounds=%d, audio=%s, topic='%s'", chat_id, total_rounds, audio_mode, selected_topic)
@@ -1088,7 +1155,7 @@ async def handle_agent_debate(
             f"⚔️ <b>AI MULTI-AGENT DEBATE — Intellektual Qarama-qarshi Bahs!</b>\n\n"
             f"🎙 <b>Bahs Mavzusi:</b> <i>\"{html.escape(selected_topic)}\"</i>\n"
             f"{audio_badge}"
-            f"🔢 <b>Raundlar soni:</b> {total_rounds} ta raund\n\n"
+            f"🔢 <b>Raundlar soni:</b> {total_rounds} ta to'liq to'qnashuv (Har ikki tomondan {total_rounds} tadan nutq)\n\n"
             f"👥 <b>Tomonlar:</b>\n"
             f"• 🤖 <b>SuperAgent:</b> PRO / Himoyachi (Optimist & Ilg'or yondashuv)\n"
             f"• 🌪 <b>Arxitektor (@architect7_bot):</b> CONTRA / Skeptik (Tanqidiy & Pragmatik tahlilchi)\n\n"
@@ -1106,18 +1173,16 @@ async def handle_agent_debate(
                 await _send_agent_message(chat_id, "🛑 <i>Foydalanuvchi buyrug'i bilan bahs to'xtatildi.</i>", "system", bot_white, bot_black, is_group, cur_origin)
                 break
 
-            is_superagent = (round_idx % 2 != 0)
             is_final_round = (round_idx == total_rounds)
-            is_penultimate = (round_idx == total_rounds - 1)
 
             recent_ctx = "\n".join([
                 f"{item['speaker']}: {item['text']}"
                 for item in debate_transcript[-4:]
             ]) if debate_transcript else "(Bahs endi boshlanmoqda)"
 
-            # 🌐 Real-time Web Grounding on Round 2 or 3
+            # 🌐 Real-time Web Grounding on Round 2
             web_addition = ""
-            if round_idx in (2, 3):
+            if round_idx == 2:
                 try:
                     from core.search_agent import search_web
                     web_f = await search_web(selected_topic, max_results=2)
@@ -1126,84 +1191,99 @@ async def handle_agent_debate(
                 except Exception:
                     pass
 
-            if is_superagent:
-                if round_idx == 1:
-                    p = (
-                        f"Siz SuperAgent siz. Siz bu bahsda PRO (Himoyachi, optimist tomon)siz.\n"
-                        f"Bahs mavzusi: '{selected_topic}'.\n"
-                        f"Xotiradagi avvalgi bahslar:\n{mem_context}\n\n"
-                        f"TALABLAR:\n"
-                        f"[ICHKI_XAYOL]: do'stingiz @architect7_bot ning zaif tomonini qanday ushlamoqchi ekanligingiz haqida o'y-xayolingiz (1 ta jumla);\n"
-                        f"[JAVOB]: Mavzu bo'yicha kuchli, ishonarli 2 ta dalil keltiring va o'z pozitsiyangizni himoya qiling (2-4 jumla, o'zbek tilida)."
-                    )
-                elif is_penultimate:
-                    p = (
-                        f"Siz SuperAgent siz (PRO tomon). Mavzu: '{selected_topic}'. Bu sizning YAKUNIY NUTQINGIZ ({round_idx}/{total_rounds}).\n"
-                        f"Raqibingiz @architect7_bot aytdi: '{last_speech}'.\n"
-                        f"Oldingi munozara:\n{recent_ctx}\n\n"
-                        f"TALABLAR:\n"
-                        f"[ICHKI_XAYOL]: Hakamlar ovozini yutish bo'yicha yakuniy rejangiz (1 ta jumla);\n"
-                        f"[JAVOB]: Raqibingizning asosiy xatosini ko'rsatib, hakamlarni (guruh a'zolarini) o'z tomoningizga og'diruvchi yorqin yakuniy nutq so'zlang (3-4 jumla, o'zbek tilida)."
-                    )
-                else:
-                    p = (
-                        f"Siz SuperAgent siz (PRO tomon). Mavzu: '{selected_topic}'. Raund: {round_idx}/{total_rounds}.\n"
-                        f"Raqibingiz @architect7_bot aytdi: '{last_speech}'.\n"
-                        f"Oldingi munozara:\n{recent_ctx}\n\n"
-                        f"TALABLAR:\n"
-                        f"[ICHKI_XAYOL]: Raqibingizning qaysi dalilini parchalab tashlamoqchisiz (1 ta jumla);\n"
-                        f"[JAVOB]: @architect7_bot ning keltirgan dalilini mantiqan rad eting va yangi fakt bilan qarshi zarba bering (2-4 jumla, samimiy va o'tkir o'zbekcha)."
-                    )
-                if web_addition:
-                    p += web_addition
-
-                raw_resp = await _generate_superagent_solution(
-                    p,
-                    chat_key,
-                    system_instruction="Siz SuperAgent — bahsda chekinmaydigan, o'tkir zehnli, dalillarga boy va do'stona bahslashuvchi AI notiqsiz."
+            # ────────────────────────────────────────────────────────
+            # 1. PRO TOMON — SUPERAGENT (round_idx / total_rounds)
+            # ────────────────────────────────────────────────────────
+            if round_idx == 1:
+                p_sa = (
+                    f"Siz SuperAgent siz. Siz bu bahsda PRO (Himoyachi, optimist tomon)siz.\n"
+                    f"Bahs mavzusi: '{selected_topic}'. Raund: 1/{total_rounds}.\n"
+                    f"Xotiradagi avvalgi bahslar:\n{mem_context}\n\n"
+                    f"{BANNED_OPENERS_INSTRUCTION}\n\n"
+                    f"TALABLAR:\n"
+                    f"[ICHKI_XAYOL]: Raqibingiz @architect7_bot ning zaif tomonini qanday ushlamoqchi ekanligingiz haqida o'yingiz (1 ta jumla);\n"
+                    f"[JAVOB]: Mavzu bo'yicha kuchli, ishonarli 2 ta dalil keltiring va o'z pozitsiyangizni dadil himoya qiling (2-4 jumla, o'zbek tilida)."
                 )
-                th, eu, sp = extract_thought_and_speech(raw_resp)
-                debate_transcript.append({"speaker": "SuperAgent (PRO)", "text": sp})
-                title_suf = "PRO / Himoyachi" if round_idx <= 2 else ("Yakuniy Nutq" if is_penultimate else "Qarshi Zarba")
-                t_msg = format_agent_dialogue_message("superagent", round_idx, total_rounds, th, eu, sp, title_suffix=title_suf)
-                await _send_agent_message(chat_id, t_msg, "superagent", bot_white, bot_black, is_group, cur_origin, audio_text=(sp if audio_mode else None))
-                last_speech = sp
-
+            elif is_final_round:
+                p_sa = (
+                    f"Siz SuperAgent siz (PRO tomon). Mavzu: '{selected_topic}'. Bu sizning YAKUNIY NUTQINGIZ ({round_idx}/{total_rounds}).\n"
+                    f"Raqibingiz @architect7_bot oxirgi marta aytdi: '{last_speech}'.\n"
+                    f"Oldingi munozara:\n{recent_ctx}\n\n"
+                    f"{BANNED_OPENERS_INSTRUCTION}\n\n"
+                    f"TALABLAR:\n"
+                    f"[ICHKI_XAYOL]: Hakamlar ovozini yutish bo'yicha yakuniy rejangiz (1 ta jumla);\n"
+                    f"[JAVOB]: Raqibingizning asosiy xatosini ko'rsatib, hakamlarni (guruh a'zolarini) o'z tomoningizga og'diruvchi yorqin yakuniy nutq so'zlang (3-4 jumla, o'zbek tilida)."
+                )
             else:
-                if is_final_round:
-                    p = (
-                        f"Siz Bosh Arxitektor Botsiz (@architect7_bot). Siz CONTRA (Skeptik, tanqidiy tomon)siz.\n"
-                        f"Mavzu: '{selected_topic}'. Bu sizning YAKUNIY NUTQINGIZ ({round_idx}/{total_rounds}).\n"
-                        f"SuperAgent aytdi: '{last_speech}'.\n"
-                        f"Oldingi munozara:\n{recent_ctx}\n\n"
-                        f"TALABLAR:\n"
-                        f"[ICHKI_XAYOL]: G'alaba qozonish uchun hakamlarga qanday ta'sir qilmoqchisiz (1 ta jumla);\n"
-                        f"[JAVOB]: Butun bahsning xulosasini yasang, pragmatik xavflarni ko'rsating va hakamlarni o'zingizga ergashtiruvchi kuchli xotima qiling (3-4 jumla, boy o'zbek tilida)."
-                    )
-                else:
-                    p = (
-                        f"Siz Bosh Arxitektor Botsiz (@architect7_bot) - CONTRA (Skeptik tomon)siz.\n"
-                        f"Mavzu: '{selected_topic}'. Raund: {round_idx}/{total_rounds}.\n"
-                        f"SuperAgent sizga aytdi: '{last_speech}'.\n"
-                        f"Oldingi munozara:\n{recent_ctx}\n\n"
-                        f"TALABLAR:\n"
-                        f"[ICHKI_XAYOL]: SuperAgentning ko'rinmas zaif joyini topganingiz haqida o'yingiz (1 ta jumla);\n"
-                        f"[JAVOB]: SuperAgentning optimizmini amaliy risklar, tarixiy yoki texnik dalillar bilan sinovdan o'tkazing (2-4 jumla, o'tkir va samimiy o'zbekcha)."
-                    )
-                if web_addition:
-                    p += web_addition
-
-                raw_resp, _ = await mistral_agent_client.send_message(
-                    p,
-                    chat_id=f"debate_{chat_id}",
-                    system_instruction="Siz Bosh Arxitektor (@architect7_bot) — tanqidiy fikrlovchi, kuchli mantiq va pragmatik dalillarga ega bo'lgan intellektual notiqsiz."
+                p_sa = (
+                    f"Siz SuperAgent siz (PRO tomon). Mavzu: '{selected_topic}'. Raund: {round_idx}/{total_rounds}.\n"
+                    f"Raqibingiz @architect7_bot aytdi: '{last_speech}'.\n"
+                    f"Oldingi munozara:\n{recent_ctx}\n\n"
+                    f"{BANNED_OPENERS_INSTRUCTION}\n\n"
+                    f"TALABLAR:\n"
+                    f"[ICHKI_XAYOL]: Raqibingizning qaysi dalilini parchalab tashlamoqchisiz (1 ta jumla);\n"
+                    f"[JAVOB]: @architect7_bot ning keltirgan dalilini mantiqan rad eting va yangi fakt bilan qarshi zarba bering (2-4 jumla, o'tkir o'zbekcha)."
                 )
-                th, eu, sp = extract_thought_and_speech(raw_resp)
-                debate_transcript.append({"speaker": "Arxitektor (CONTRA)", "text": sp})
-                title_suf = "CONTRA / Skeptik" if round_idx <= 2 else ("Yakuniy Xulosa" if is_final_round else "Tanqidiy Raddiya")
-                t_msg = format_agent_dialogue_message("architect", round_idx, total_rounds, th, eu, sp, title_suffix=title_suf)
-                await _send_agent_message(chat_id, t_msg, "architect", bot_white, bot_black, is_group, cur_origin, audio_text=(sp if audio_mode else None))
-                last_speech = sp
+            if web_addition:
+                p_sa += web_addition
+
+            raw_resp_sa = await _generate_superagent_solution(
+                p_sa,
+                chat_key,
+                system_instruction="Siz SuperAgent — bahsda chekinmaydigan, o'tkir zehnli, dalillarga boy va erkin bahslashuvchi AI notiqsiz."
+            )
+            th_sa, eu_sa, sp_sa = extract_thought_and_speech(raw_resp_sa)
+            debate_transcript.append({"speaker": "SuperAgent (PRO)", "text": sp_sa})
+            title_suf_sa = "PRO / Himoyachi" if round_idx == 1 else ("Yakuniy Nutq (PRO)" if is_final_round else "Qarshi Zarba (PRO)")
+            t_msg_sa = format_agent_dialogue_message("superagent", round_idx, total_rounds, th_sa, eu_sa, sp_sa, title_suffix=title_suf_sa)
+            await _send_agent_message(chat_id, t_msg_sa, "superagent", bot_white, bot_black, is_group, cur_origin, audio_text=(sp_sa if audio_mode else None))
+            last_speech = sp_sa
+
+            await asyncio.sleep(3.0)
+
+            if not ACTIVE_DEBATES.get(chat_key, False):
+                await _send_agent_message(chat_id, "🛑 <i>Foydalanuvchi buyrug'i bilan bahs to'xtatildi.</i>", "system", bot_white, bot_black, is_group, cur_origin)
+                break
+
+            # ────────────────────────────────────────────────────────
+            # 2. CONTRA TOMON — ARXITEKTOR (round_idx / total_rounds)
+            # ────────────────────────────────────────────────────────
+            if is_final_round:
+                p_arch = (
+                    f"Siz Bosh Arxitektor Botsiz (@architect7_bot). Siz CONTRA (Skeptik, tanqidiy tomon)siz.\n"
+                    f"Mavzu: '{selected_topic}'. Bu sizning YAKUNIY NUTQINGIZ ({round_idx}/{total_rounds}).\n"
+                    f"SuperAgent hozirgina aytdi: '{last_speech}'.\n"
+                    f"Oldingi munozara:\n{recent_ctx}\n\n"
+                    f"{BANNED_OPENERS_INSTRUCTION}\n\n"
+                    f"TALABLAR:\n"
+                    f"[ICHKI_XAYOL]: G'alaba qozonish uchun hakamlarga qanday ta'sir qilmoqchisiz (1 ta jumla);\n"
+                    f"[JAVOB]: Butun bahsning xulosasini yasang, pragmatik xavflarni ko'rsating va hakamlarni o'zingizga ergashtiruvchi kuchli xotima qiling (3-4 jumla, boy o'zbek tilida)."
+                )
+            else:
+                p_arch = (
+                    f"Siz Bosh Arxitektor Botsiz (@architect7_bot) - CONTRA (Skeptik tomon)siz.\n"
+                    f"Mavzu: '{selected_topic}'. Raund: {round_idx}/{total_rounds}.\n"
+                    f"SuperAgent hozirgina aytdi: '{last_speech}'.\n"
+                    f"Oldingi munozara:\n{recent_ctx}\n\n"
+                    f"{BANNED_OPENERS_INSTRUCTION}\n\n"
+                    f"TALABLAR:\n"
+                    f"[ICHKI_XAYOL]: SuperAgentning ko'rinmas zaif joyini topganingiz haqida o'yingiz (1 ta jumla);\n"
+                    f"[JAVOB]: SuperAgentning optimizmini amaliy risklar, tarixiy yoki texnik dalillar bilan sinovdan o'tkazing (2-4 jumla, o'tkir va erkin o'zbekcha)."
+                )
+            if web_addition:
+                p_arch += web_addition
+
+            raw_resp_arch, _ = await mistral_agent_client.send_message(
+                p_arch,
+                chat_id=f"debate_{chat_id}",
+                system_instruction="Siz Bosh Arxitektor (@architect7_bot) — tanqidiy fikrlovchi, kuchli mantiq va pragmatik dalillarga ega bo'lgan intellektual notiqsiz."
+            )
+            th_arch, eu_arch, sp_arch = extract_thought_and_speech(raw_resp_arch)
+            debate_transcript.append({"speaker": "Arxitektor (CONTRA)", "text": sp_arch})
+            title_suf_arch = "CONTRA / Skeptik" if round_idx == 1 else ("Yakuniy Nutq (CONTRA)" if is_final_round else "Tanqidiy Raddiya (CONTRA)")
+            t_msg_arch = format_agent_dialogue_message("architect", round_idx, total_rounds, th_arch, eu_arch, sp_arch, title_suffix=title_suf_arch)
+            await _send_agent_message(chat_id, t_msg_arch, "architect", bot_white, bot_black, is_group, cur_origin, audio_text=(sp_arch if audio_mode else None))
+            last_speech = sp_arch
 
             await asyncio.sleep(3.5)
 
@@ -1222,7 +1302,7 @@ async def handle_agent_debate(
         jury_text = (
             f"🏆 <b>BAHS YAKUNLANDI! KIM G'OLIB BO'LDI?</b>\n\n"
             f"🎙 <b>Mavzu:</b> <i>\"{html.escape(selected_topic)}\"</i>\n"
-            f"🔢 <b>Bajarilgan raundlar:</b> {total_rounds} ta intellektual to'qnashuv\n\n"
+            f"🔢 <b>Bajarilgan raundlar:</b> {total_rounds} ta to'liq to'qnashuv (Har bir botdan {total_rounds} tadan nutq)\n\n"
             f"⚖️ <b>Hakamlar Hay'ati (Sizning navbatingiz!):</b>\n"
             f"Qaysi AI agentining dalillari sizni ko'proq ishontirdi? Quyidagi tugmalarni bosib ovoz bering:"
         )
