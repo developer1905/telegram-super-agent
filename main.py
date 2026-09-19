@@ -1036,6 +1036,9 @@ async def main() -> None:
     logger.info("✅ Barcha handlerlar ulandi (Guruhlar va Kanallar avtopiloti qo'shildi)")
 
     # 2-Botni (Mistral Arxitektor @architect7_bot) mustaqil fonda ishga tushirish
+    from core.mistral_agent_bot import set_main_bot_instance
+    set_main_bot_instance(bot)
+
     second_bot = get_second_bot()
     second_bot_task: Optional[asyncio.Task] = None
     if second_bot:
@@ -1049,6 +1052,7 @@ async def main() -> None:
                 await setup_architect_bot(second_bot)
                 await dp_second.start_polling(
                     second_bot,
+                    handle_signals=False,
                     allowed_updates=[
                         "message",
                         "edited_message",
