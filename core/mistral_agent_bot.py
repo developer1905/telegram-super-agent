@@ -159,12 +159,49 @@ async def cmd_help_second_bot(message: Message) -> None:
         "• <code>/suhbat [N] [mavzu]</code> — Erkin matnli muloqot\n"
         "• <code>/bahs [mavzu]</code> — Rasmiy intellektual bahs & hakam ovozi\n"
         "• <code>/profile</code> — Shaxsiy qiziqishlaringiz va AI bilimlari profili\n"
+        "• <code>/fikr [on/off]</code> — Guruhda buyruqlarsiz ikkala bot erkin fikr bildirishini boshqarish\n"
         "• <code>/stop_suhbat</code> — Erkin suhbat/bahsni to'xtatish\n"
         "• <code>/stop_collab</code> — Avtopilot/Hamkorlikni to'xtatish\n"
         "• <code>/chess</code> — Shaxmat bahsini boshlash\n"
         "• <code>/code</code> — Kod tahlili va xavfsizlik auditi"
     )
     await safe_reply(message, help_text, reply_markup=get_architect_keyboard(), parse_mode="HTML")
+
+
+@second_bot_router.message(Command("fikr", "dual_opinion", "fikrlar"))
+async def cmd_second_bot_toggle_dual_opinion(message: Message) -> None:
+    """Guruhda buyruqlarsiz ikkala bot fikr bildirishini boshqarish."""
+    from core.bot_collab import set_group_dual_opinion, is_group_dual_opinion_enabled
+    chat_id = message.chat.id
+    raw_text = (message.text or "").strip().lower()
+    args = raw_text.split()[1:] if len(raw_text.split()) > 1 else []
+
+    if any(w in args for w in ["off", "o'chir", "ochir", "stop", "to'xtat"]):
+        set_group_dual_opinion(chat_id, False)
+        await safe_reply(
+            message,
+            "🔇 <b>Erkin fikr bildirish o'chirildi.</b>\n"
+            "Endi botlar faqat o'ziga murojaat qilinganda yoki /suhbat, /bahs buyruqlarida javob beradi.",
+            parse_mode="HTML"
+        )
+    elif any(w in args for w in ["on", "yoq", "ishlat", "start", "boshla"]):
+        set_group_dual_opinion(chat_id, True)
+        await safe_reply(
+            message,
+            "🎙 <b>Erkin fikr bildirish yoqildi!</b>\n"
+            "Guruhda yozilgan har qanday mavzu va xabarga SuperAgent hamda Arxitektor navbati bilan o'z fikrini bildiradi.",
+            parse_mode="HTML"
+        )
+    else:
+        status = "Yoqilgan ✅" if is_group_dual_opinion_enabled(chat_id) else "O'chirilgan ❌"
+        await safe_reply(
+            message,
+            f"🎙 <b>Guruhda erkin fikr bildirish holati:</b> {status}\n\n"
+            f"💡 <i>Ikkala bot ham hech qanday buyruqlarsiz xabarlarga fikr bildirishi uchun:</i>\n"
+            f"• <code>/fikr on</code> — Yoqish\n"
+            f"• <code>/fikr off</code> — O'chirish",
+            parse_mode="HTML"
+        )
 
 
 # ─── KO'P AGENTLI HAMKORLIK & ERKIN SUHBAT BUYRUQLARI ──────────
