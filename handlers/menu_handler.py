@@ -332,6 +332,7 @@ def build_models_menu() -> InlineKeyboardMarkup:
     )
     builder.row(
         InlineKeyboardButton(text="🌐 OmniRoute Gateway", callback_data="model:omniroute"),
+        InlineKeyboardButton(text="♟️ AI Shaxmat (@architect7_bot)", callback_data="game:chess_start"),
     )
 
     already_shown = {
@@ -535,7 +536,54 @@ def build_astrology_menu(has_profile: bool = False) -> InlineKeyboardMarkup:
         builder.row(
             InlineKeyboardButton(text="◀️ Orqaga", callback_data="menu:cat_ai"),
         )
-    return builder.as_markup()
+@router.message(ADMIN_FILTER, Command("chess", "shaxmat"))
+async def cmd_main_chess(message: Message, bot: Bot) -> None:
+    """AI vs AI Shaxmat bahsini boshlash."""
+    from core.bot_collab import handle_start_chess
+    from core.mistral_agent_bot import get_second_bot
+    sec_bot = get_second_bot()
+    await handle_start_chess(message, bot_white=bot, bot_black=sec_bot)
+
+
+@router.message(ADMIN_FILTER, Command("stop_chess", "chess_stop", "shaxmat_tamom"))
+async def cmd_main_stop_chess(message: Message) -> None:
+    """Shaxmat bahsini to'xtatish."""
+    from core.bot_collab import stop_chess_game
+    chat_id = str(message.chat.id)
+    if stop_chess_game(chat_id):
+        await message.answer("🛑 **Shaxmat bahsi to'xtatildi.**", parse_mode="Markdown")
+    else:
+        await message.answer("⚠️ Hozirda faol shaxmat o'yini yo'q.", parse_mode="Markdown")
+
+
+@router.message(ADMIN_FILTER, Command("collab", "hamkorlik"))
+async def cmd_main_collab(message: Message, command: CommandObject, bot: Bot) -> None:
+    """Ikki AI hamkorligida vazifa bajarish: /collab [topshiriq]."""
+    task = (command.args or "").strip()
+    if not task:
+        await message.answer(
+            "🤝 **Ikki AI Hamkorlik Rejimi:**\n\n"
+            "SuperAgent va Arxitektor Mistral (@architect7_bot) birgalikda vazifa bajarishi uchun quyidagicha yozing:\n"
+            "`/collab Telegramda avtomatik obuna tekshiruvchi bot arxitekturasi va kodini yozing`",
+            parse_mode="Markdown"
+        )
+        return
+
+    from core.bot_collab import handle_agent_collaboration
+    from core.mistral_agent_bot import get_second_bot
+    sec_bot = get_second_bot()
+    await handle_agent_collaboration(task, message.chat.id, bot_white=bot, bot_black=sec_bot)
+
+
+@router.callback_query(ADMIN_FILTER, F.data == "game:chess_start")
+async def cb_chess_start(cb: CallbackQuery, bot: Bot) -> None:
+    """Menyudan shaxmat boshlash."""
+    await cb.answer("♟️ Shaxmat o'yini boshlanmoqda...")
+    from core.bot_collab import handle_start_chess
+    from core.mistral_agent_bot import get_second_bot
+    sec_bot = get_second_bot()
+    if cb.message:
+        await handle_start_chess(cb.message, bot_white=bot, bot_black=sec_bot)
 
 
 @router.message(ADMIN_FILTER, F.text.in_({"🔮 Astrologiya & Natal Karta", "Astrologiya & Natal Karta", "Astrologiya", "astrologiya", "/astrology", "/natal"}))
