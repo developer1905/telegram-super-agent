@@ -710,6 +710,14 @@ async def handle_ai_chat(message: Message, ai_manager: AIManager) -> None:
     if await handle_email_text_command(message, ai_manager):
         return
 
+    # 1.2 Avtonom Vazifalar (Kanalga post, Guruhga anons, Bot muloqoti, Post rejalashtirish)
+    from core.autonomous_agent import try_execute_autonomous_task
+    try:
+        if await try_execute_autonomous_task(message, user_text, ai_manager):
+            return
+    except Exception as auto_exc:
+        logger.error("Avtonom vazifani bajarishda xatolik: %s", auto_exc)
+
     # 2. Veb-Maqola (URL) Tahlili va Kanal Posti Generatori
     url_match = re.search(r"https?://[^\s]+", user_text)
     if url_match and ("maqola" in user_text.lower() or "post tayyorla" in user_text.lower() or "tahlil qil" in user_text.lower() or "tezis" in user_text.lower()):
