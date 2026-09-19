@@ -417,6 +417,43 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
         asyncio.create_task(handle_agent_collaboration(task_text, message.chat.id, bot_white=bot, bot_black=sec_bot, origin_bot=bot, deep_mode=True, max_rounds=max_r))
         return
 
+    # 1.5. /project yoki /loyiha (MetaGPT / ChatDev to'liq loyiha va ZIP arxiv)
+    if clean_lower.startswith(("/project", "/loyiha")):
+        proj_text = re.sub(r"^(?:/project|/loyiha)(?:@\w+)?[:\s]*", "", clean_text, flags=re.IGNORECASE).strip()
+        if not proj_text and message.reply_to_message:
+            proj_text = message.reply_to_message.text or message.reply_to_message.caption or ""
+        if not proj_text:
+            await safe_message_reply(
+                message,
+                "📦 <b>MetaGPT / ChatDev Avtonom Loyiha Quruvchi:</b>\n"
+                "• <code>/project [loyiha g'oyasi]</code> — SuperAgent va Arxitektor butun arxitekturani qurib, kodlarni yozadi va tayyor <b>.zip</b> fayl qilib guruhga jo'natadi!\n\n"
+                "Masalan: <code>/project Telegram ob-havo boti SQLite bazasi bilan</code>",
+                parse_mode="HTML"
+            )
+            return
+        from core.bot_collab import handle_project_generation
+        from core.mistral_agent_bot import get_second_bot
+        sec_bot = get_second_bot()
+        asyncio.create_task(handle_project_generation(proj_text, message.chat.id, bot_white=bot, bot_black=sec_bot, origin_bot=bot))
+        return
+
+    # 1.8. /profile yoki /profil (Mem0 Shaxsiy foydalanuvchi bilimlari)
+    if clean_lower.startswith(("/profile", "/profil", "/memory")):
+        from core.mem0_agent import get_user_profile_report
+        user_id = str(message.from_user.id)
+        report = await get_user_profile_report(user_id)
+        await safe_message_reply(message, report, parse_mode="HTML")
+        return
+
+    # 1.9. /ovozli_suhbat yoki /audio_suhbat (Edge-TTS Ikki Ovozli Muloqot)
+    if clean_lower.startswith(("/ovozli_suhbat", "/audio_suhbat", "/audio_chat")):
+        from core.bot_collab import handle_free_chit_chat, parse_topic_and_turns
+        topic_text, parsed_turns = parse_topic_and_turns(clean_text, default_turns=6)
+        from core.mistral_agent_bot import get_second_bot
+        sec_bot = get_second_bot()
+        asyncio.create_task(handle_free_chit_chat(topic_text, message.chat.id, bot_white=bot, bot_black=sec_bot, origin_bot=bot, turns=parsed_turns, audio_mode=True))
+        return
+
     # 2. /suhbat yoki /chat (Erkin muloqot / AI Lounge)
     if clean_lower.startswith(("/suhbat", "/chat", "/gaplashing", "/fikr")):
         from core.bot_collab import handle_free_chit_chat, parse_topic_and_turns
