@@ -371,6 +371,43 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
                 await safe_message_reply(message, f"⚠️ **{t_user.full_name}** ogohlantirildi! ({count}/3 ta)", parse_mode="Markdown")
             return
 
+    # ── AI DUAL-AGENT HAMKORLIK & CHATDEV PEER REVIEW (CAMEL/AutoGen) ──
+    # 1. /collab yoki /hamkorlik
+    if clean_lower.startswith(("/collab", "/hamkorlik", "/vazifa")):
+        task_text = re.sub(r"^(?:/collab|/hamkorlik|/vazifa)[:\s]*", "", clean_text, flags=re.IGNORECASE).strip()
+        if not task_text and message.reply_to_message:
+            task_text = message.reply_to_message.text or message.reply_to_message.caption or ""
+        if not task_text:
+            await safe_message_reply(
+                message,
+                "💡 <b>CAMEL & ChatDev Hamkorligi:</b>\nFoydalanish: <code>/collab [vazifa matni]</code>\n"
+                "Masalan: <code>/collab Python FastAPI da mikroservis arxitekturasi va kodini yozing</code>",
+                parse_mode="HTML"
+            )
+            return
+        from core.bot_collab import handle_agent_collaboration
+        from core.mistral_agent_bot import get_second_bot
+        sec_bot = get_second_bot()
+        asyncio.create_task(handle_agent_collaboration(task_text, message.chat.id, bot_white=bot, bot_black=sec_bot))
+        return
+
+    # 2. /suhbat yoki /chat (Erkin muloqot / AI Lounge)
+    if clean_lower.startswith(("/suhbat", "/chat", "/gaplashing", "/fikr")):
+        topic_text = re.sub(r"^(?:/suhbat|/chat|/gaplashing|/fikr)[:\s]*", "", clean_text, flags=re.IGNORECASE).strip()
+        from core.bot_collab import handle_free_chit_chat
+        from core.mistral_agent_bot import get_second_bot
+        sec_bot = get_second_bot()
+        asyncio.create_task(handle_free_chit_chat(topic_text, message.chat.id, bot_white=bot, bot_black=sec_bot))
+        return
+
+    # 3. /chess yoki /shaxmat
+    if clean_lower.startswith(("/chess", "/shaxmat")):
+        from core.bot_collab import handle_start_chess
+        from core.mistral_agent_bot import get_second_bot
+        sec_bot = get_second_bot()
+        asyncio.create_task(handle_start_chess(message, bot_white=bot, bot_black=sec_bot))
+        return
+
     # ── B. RASM CHIZISH (FLUX.1 / Midjourney) ──
     img_match = re.match(r"^(?:/draw|/imagine|/midjourney|/flux|/art|rasm\s+chiz|rasm|chiz|chizib\s+ber)[:\s]*(.*)$", clean_text, re.IGNORECASE | re.DOTALL)
     if img_match:
