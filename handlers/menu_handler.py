@@ -1225,6 +1225,8 @@ async def cb_astro_ai_report(cb: CallbackQuery, ai_manager: AIManager) -> None:
 
     try:
         report = await ai_manager.generate(prompt, save_history=False, chat_id=f"astro_{cb.from_user.id}")
+        from core.astrology_agent import ensure_uzbek_astrology_report
+        report = await ensure_uzbek_astrology_report(report, ai_manager)
         back_btn = InlineKeyboardBuilder()
         back_btn.row(InlineKeyboardButton(text="◀️ Astrologiya Menyusiga Qaytish", callback_data="menu:astrology"))
         await safe_edit_or_send_long_message(wait_msg, report, reply_markup=back_btn.as_markup(), parse_mode="Markdown")
