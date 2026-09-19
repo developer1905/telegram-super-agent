@@ -612,6 +612,7 @@
           <div class="d-flex align-items-center gap-1">
             <select class="form-select form-select-sm py-1 px-2" style="font-size: 11px; width: auto; max-width: 175px;" id="chat-model-quick-select" title="Modelni almashtirish">
               <option value="gemini">✨ Google Gemini 3.1 Flash</option>
+              <option value="mistral">🌪 Mistral Codestral (Yevropa AI)</option>
               <option value="deepseek_v4">🧠 DeepSeek V4 (1M Fikr)</option>
               <option value="nvidia">🔬 NVIDIA Nemotron 120B</option>
               <option value="laguna">🌊 Laguna S 2.1 Arxitektor</option>
@@ -712,6 +713,7 @@
         </div>
         <div class="row g-2" id="model-group">
           <div class="col-6 col-md-4"><div class="neon-pill active" data-model="gemini">✨ Gemini 3.1 Flash</div></div>
+          <div class="col-6 col-md-4"><div class="neon-pill" data-model="mistral">🌪 Mistral Codestral</div></div>
           <div class="col-6 col-md-4"><div class="neon-pill" data-model="deepseek_v4">🧠 DeepSeek V4 (1M)</div></div>
           <div class="col-6 col-md-4"><div class="neon-pill" data-model="nvidia">🔬 NVIDIA Nemotron 120B</div></div>
           <div class="col-6 col-md-4"><div class="neon-pill" data-model="laguna">🌊 Laguna S 2.1</div></div>
@@ -1708,6 +1710,8 @@
           let provName = 'Gemini 3.1 Flash';
           if (data.current_provider === 'gemini') {
             provName = 'Gemini 3.1 Flash';
+          } else if (data.current_provider === 'mistral') {
+            provName = 'Mistral Codestral';
           } else if (data.current_provider === 'nvidia') {
             provName = 'NVIDIA Nemotron 120B';
           } else if (data.current_provider === 'omniroute') {
@@ -1720,6 +1724,8 @@
           let activeModelKey = 'gemini';
           if (data.current_provider === 'gemini') {
             activeModelKey = 'gemini';
+          } else if (data.current_provider === 'mistral') {
+            activeModelKey = 'mistral';
           } else if (data.current_provider === 'nvidia') {
             activeModelKey = 'nvidia';
           } else if (data.current_provider === 'omniroute') {
