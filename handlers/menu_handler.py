@@ -138,6 +138,9 @@ def build_reply_smm_menu() -> ReplyKeyboardMarkup:
     """3-guruh: SMM & Marketing vositalari."""
     buttons = [
         [
+            KeyboardButton(text="🤖 Avtonom Agent Skillari"),
+        ],
+        [
             KeyboardButton(text="🎯 Viral SMM"),
             KeyboardButton(text="⏰ Rejalashtirilgan Postlar"),
         ],
@@ -767,6 +770,30 @@ async def rk_viral_smm(message: Message) -> None:
         "📌 **Ishlatish:**\n"
         "`/smm Sun'iy intellekt va dasturlash kanali uchun`\n"
         "`/post Yangi online kurs sotuvi uchun`"
+    )
+    await message.answer(text, parse_mode="Markdown")
+
+
+@router.message(ADMIN_FILTER, F.text.in_({"🤖 Avtonom Agent Skillari", "Avtonom Agent Skillari", "Avtonom Agent", "/autotask", "/autonomous"}))
+async def rk_autonomous_skills(message: Message) -> None:
+    """Avtonom Agentning 4 ta asosiy skillari qo'llanmasi."""
+    text = (
+        "🤖 **Avtonom Agent 4 ta Asosiy Skilli (100% Avtomatlashtirilgan):**\n\n"
+        "Shunchaki botga tabiiy tilda buyruq bering — agent intentni darhol aniqlab, o'zi bajaradi:\n\n"
+        "1. 📢 **Kanalga Avtonom Post Chiqarish:**\n"
+        "• `@kanalim ga AI yangiliklari haqida post chiqar`\n"
+        "• `Kanalga motivatsiya haqida post tayyorlab joyla va rasm ham chiz`\n\n"
+        "2. 👥 **Guruhga Avtonom Anons / Xabar:**\n"
+        "• `@dasturchilar guruhiga bugun soat 20:00 dagi meetup haqida anons ber`\n"
+        "• `IT Guruh ga yangi video haqida xabar yubor`\n\n"
+        "3. 🤖 **Boshqa Botlar Bilan Muloqot (Inter-Bot Communication):**\n"
+        "• `@vkmusic_bot ga /start deb yoz`\n"
+        "• `@midjourney_bot ga /imagine cyber samurai deb yoz`\n"
+        "*(Bot javobi va yuklagan fayllari to'g'ridan-to'g'ri sizga yetkaziladi)*\n\n"
+        "4. ⏰ **Rejalashtirilgan va Muntazam Postlar:**\n"
+        "• `Ertaga soat 10:00 da @kanalim ga motivatsion post rejalashtir`\n"
+        "• `2026-09-20 18:00 da guruhga anons chiqar: ...`\n\n"
+        "⚡ *Hech qanday qo'shimcha menyu shart emas — botga to'g'ridan-to'g'ri shunday yozing!*"
     )
     await message.answer(text, parse_mode="Markdown")
 
