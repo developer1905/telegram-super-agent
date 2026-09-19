@@ -526,6 +526,25 @@ def setup_scheduler(bot: "Bot", ai_manager: "AIManager") -> AsyncIOScheduler:
         misfire_grace_time=60,
     )
 
+    # 7. Tungi Avtonom Dual-Agent Navbatchisi (02:30 da siz uxlaganda mustaqil tahlil qiladi)
+    async def night_autopilot_job():
+        try:
+            from core.bot_collab import run_night_autopilot_cycle
+            from core.mistral_agent_bot import get_second_bot
+            sec_bot = get_second_bot()
+            await run_night_autopilot_cycle(bot_white=bot, bot_black=sec_bot)
+        except Exception as na_err:
+            logger.error("Tungi avtopilot job xatosi: %s", na_err)
+
+    scheduler.add_job(
+        night_autopilot_job,
+        trigger=CronTrigger(hour=2, minute=30, timezone="Asia/Tashkent"),
+        id="night_dual_agent_autopilot",
+        name="Tungi Dual-Agent Avtopiloti",
+        replace_existing=True,
+        misfire_grace_time=300,
+    )
+
     logger.info(
         "Scheduler sozlandi: Hisobot %02d:%02d da, Email har %d daqiqada, Uptime har %d daqiqada faol",
         REPORT_HOUR, REPORT_MINUTE, EMAIL_CHECK_INTERVAL, UPTIME_CHECK_INTERVAL,
