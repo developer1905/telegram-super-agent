@@ -479,7 +479,7 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
         return
 
     # 2. /suhbat yoki /chat (Erkin muloqot / AI Lounge)
-    if clean_lower.startswith(("/suhbat", "/chat", "/gaplashing", "/fikr")):
+    if clean_lower.startswith(("/suhbat", "/chat", "/gaplashing")):
         from core.bot_collab import handle_free_chit_chat, parse_topic_and_turns
         topic_text, parsed_turns = parse_topic_and_turns(clean_text, default_turns=8)
         from core.mistral_agent_bot import get_second_bot
