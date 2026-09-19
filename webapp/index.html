@@ -1500,12 +1500,17 @@
         </div>
       </div>
     </div>
+    <!-- Vositalar (Tools) tab yakuni -->
+    </div>
 
     <!-- ══════════════ TAB 6: TIZIM DIAGNOSTIKASI ══════════════ -->
     <div class="tab-pane-content" id="tab-system">
       <div class="neon-card p-3 mb-3">
-        <div class="neon-card-header">
-          <span><i class="bi bi-gear-wide-connected me-2"></i>Tizim Diagnostikasi</span>
+        <div class="neon-card-header d-flex justify-content-between align-items-center mb-3">
+          <span class="fw-bold"><i class="bi bi-gear-wide-connected me-2 text-primary"></i>Tizim Diagnostikasi</span>
+          <button type="button" class="btn btn-sm btn-outline-primary py-1 px-2 rounded-2" onclick="loadSystemInfo()">
+            <i class="bi bi-arrow-clockwise me-1"></i> Yangilash
+          </button>
         </div>
         <div class="d-flex flex-column gap-2">
           <div class="white-list-item">
@@ -1535,24 +1540,31 @@
               <div class="text-secondary small" id="sys-model-role">Gemini 3.6 Flash / Universal</div>
             </div>
           </div>
+          <div class="white-list-item">
+            <div>
+              <div class="fw-bold small">Dual Agent Hamkorligi</div>
+              <div class="text-secondary small" id="sys-dual-agent">Architect 7 + Jarvis (Tayyor)</div>
+            </div>
+            <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2">Ulangan</span>
+          </div>
         </div>
       </div>
 
       <!-- Quick Jump to Other Bot Sections -->
       <div class="neon-card p-3 mb-3">
-        <div class="neon-card-header">
-          <span><i class="bi bi-box-arrow-up-right me-2 text-primary"></i>Boshqa Bo'limlar</span>
+        <div class="neon-card-header mb-2">
+          <span class="fw-bold"><i class="bi bi-box-arrow-up-right me-2 text-primary"></i>Boshqa Bo'limlar</span>
         </div>
         <div class="d-flex flex-column gap-2">
-          <button class="btn btn-outline-primary d-flex justify-content-between align-items-center py-2 px-3 rounded-3" onclick="switchTab('reminders')">
+          <button type="button" class="btn btn-outline-primary d-flex justify-content-between align-items-center py-2 px-3 rounded-3" onclick="switchTab('reminders')">
             <span><i class="bi bi-alarm-fill me-2 text-warning"></i>⏰ Eslatmalar & Kanal Postlari</span>
             <i class="bi bi-chevron-right"></i>
           </button>
-          <button class="btn btn-outline-primary d-flex justify-content-between align-items-center py-2 px-3 rounded-3" onclick="switchTab('memory')">
+          <button type="button" class="btn btn-outline-primary d-flex justify-content-between align-items-center py-2 px-3 rounded-3" onclick="switchTab('memory')">
             <span><i class="bi bi-database-fill me-2 text-success"></i>🧠 Doimiy Xotira (RAG Faktlar)</span>
             <i class="bi bi-chevron-right"></i>
           </button>
-          <button class="btn btn-outline-primary d-flex justify-content-between align-items-center py-2 px-3 rounded-3" onclick="switchTab('chats')">
+          <button type="button" class="btn btn-outline-primary d-flex justify-content-between align-items-center py-2 px-3 rounded-3" onclick="switchTab('chats')">
             <span><i class="bi bi-megaphone-fill me-2 text-info"></i>📢 Ulangan Guruh va Kanallar</span>
             <i class="bi bi-chevron-right"></i>
           </button>
@@ -1561,15 +1573,20 @@
 
       <!-- Quick Maintenance -->
       <div class="neon-card p-3 mb-3">
-        <div class="neon-card-header">
-          <span><i class="bi bi-trash3 me-2 text-danger"></i>AI Suhbat Xotirasi</span>
+        <div class="neon-card-header mb-2">
+          <span class="fw-bold"><i class="bi bi-trash3 me-2 text-danger"></i>AI Suhbat Xotirasi & Kesh</span>
         </div>
         <p class="text-secondary small mb-3">
           AI bilan avvalgi suhbat kontekstini tozalash (Doimiy xotiradagi faktlaringiz saqlanib qoladi):
         </p>
-        <button class="btn btn-outline-danger w-100 rounded-3 py-2 fw-bold" id="btn-clear-history">
-          <i class="bi bi-trash3-fill me-1"></i> AI Suhbat Tarixini Tozalash
-        </button>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-outline-danger flex-fill rounded-3 py-2 fw-bold small" id="btn-clear-history">
+            <i class="bi bi-trash3-fill me-1"></i> AI Tarixini Tozalash
+          </button>
+          <button type="button" class="btn btn-outline-secondary flex-fill rounded-3 py-2 fw-bold small" onclick="switchTab('tools'); switchToolSubTab('cleaner');">
+            <i class="bi bi-hdd-network me-1"></i> Server Tozalash
+          </button>
+        </div>
       </div>
     </div>
 
@@ -1577,23 +1594,23 @@
 
   <!-- Bottom Floating Dock Navigation (Direct Button Clickable) -->
   <nav class="bottom-dock">
-    <button type="button" class="dock-tab active" data-tab="agent">
+    <button type="button" class="dock-tab active" data-tab="agent" onclick="switchTab('agent', this)">
       <i class="bi bi-chat-dots-fill"></i>
       <span>AI Agent</span>
     </button>
-    <button type="button" class="dock-tab" data-tab="tasks">
+    <button type="button" class="dock-tab" data-tab="tasks" onclick="switchTab('tasks', this)">
       <i class="bi bi-check2-square"></i>
       <span>Vazifalar</span>
     </button>
-    <button type="button" class="dock-tab" data-tab="tools">
+    <button type="button" class="dock-tab" data-tab="tools" onclick="switchTab('tools', this)">
       <i class="bi bi-grid-1x2-fill"></i>
       <span>Vositalar</span>
     </button>
-    <button type="button" class="dock-tab" data-tab="overview">
+    <button type="button" class="dock-tab" data-tab="overview" onclick="switchTab('overview', this)">
       <i class="bi bi-speedometer2"></i>
       <span>Asosiy</span>
     </button>
-    <button type="button" class="dock-tab" data-tab="system">
+    <button type="button" class="dock-tab" data-tab="system" onclick="switchTab('system', this)">
       <i class="bi bi-gear-fill"></i>
       <span>Tizim</span>
     </button>
@@ -1656,31 +1673,35 @@
       document.querySelectorAll('.dock-tab').forEach(d => d.classList.remove('active'));
 
       const target = document.getElementById(`tab-${tabId}`);
-      if (target) target.classList.add('active');
-      if (el) el.classList.add('active');
+      if (target) {
+        target.classList.add('active');
+        window.scrollTo({ top: 0, behavior: 'instant' });
+      }
+
+      const activeDockBtn = el || document.querySelector(`.dock-tab[data-tab="${tabId}"]`);
+      if (activeDockBtn) activeDockBtn.classList.add('active');
 
       haptic('light');
 
-      if (tabId === 'tasks') loadTasks();
-      if (tabId === 'tools') initToolsTab();
-      if (tabId === 'reminders') loadReminders();
-      if (tabId === 'memory') loadFacts();
-      if (tabId === 'chats') loadManagedChats();
-      if (tabId === 'system') loadSystemInfo();
-      if (tabId === 'overview') loadStats();
+      try {
+        if (tabId === 'tasks') loadTasks();
+        if (tabId === 'tools') initToolsTab();
+        if (tabId === 'reminders') loadReminders();
+        if (tabId === 'memory') loadFacts();
+        if (tabId === 'chats') loadManagedChats();
+        if (tabId === 'system') loadSystemInfo();
+        if (tabId === 'overview') loadStats();
+      } catch (err) {
+        console.warn('Tab load error:', err);
+      }
     }
 
-    // Attach listeners directly to buttons to fix touch/click issues in WebViews
+    // Attach listeners directly to buttons as secondary backup
     document.querySelectorAll('.dock-tab').forEach(btn => {
-      const tabHandler = (e) => {
-        e.preventDefault();
+      btn.addEventListener('click', () => {
         const tabId = btn.getAttribute('data-tab');
         switchTab(tabId, btn);
-      };
-      btn.addEventListener('click', tabHandler);
-      btn.addEventListener('touchend', (e) => {
-        tabHandler(e);
-      }, { passive: false });
+      });
     });
 
     // Live Clock (Tashkent UTC+5)
@@ -2199,24 +2220,40 @@
         const res = await fetch('/api/system_info');
         if (res.ok) {
           const data = await res.json();
-          document.getElementById('sys-uptime').innerText = data.uptime_human || '—';
-          document.getElementById('sys-db').innerText = data.database_type || 'SQLite';
+          const upEl = document.getElementById('sys-uptime');
+          if (upEl) upEl.innerText = data.uptime_human || '—';
+
+          const dbEl = document.getElementById('sys-db');
+          if (dbEl) dbEl.innerText = data.database_type || 'SQLite';
 
           const userbotEl = document.getElementById('sys-userbot');
           const badgeUserbot = document.getElementById('badge-userbot');
-          if (data.userbot_connected) {
-            userbotEl.innerText = 'Ulangan (Telegram Session Faol)';
-            badgeUserbot.innerText = 'Online';
-            badgeUserbot.className = 'badge bg-success-subtle text-success border border-success-subtle px-3 py-2';
-          } else {
-            userbotEl.innerText = 'Ulanmagan yoki to\'xtatilgan';
-            badgeUserbot.innerText = 'Offline';
-            badgeUserbot.className = 'badge bg-warning-subtle text-warning border border-warning-subtle px-3 py-2';
+          if (userbotEl && badgeUserbot) {
+            if (data.userbot_connected) {
+              userbotEl.innerText = 'Ulangan (Telegram Session Faol)';
+              badgeUserbot.innerText = 'Online';
+              badgeUserbot.className = 'badge bg-success-subtle text-success border border-success-subtle px-3 py-2';
+            } else {
+              userbotEl.innerText = 'Ulanmagan yoki to\'xtatilgan';
+              badgeUserbot.innerText = 'Offline';
+              badgeUserbot.className = 'badge bg-warning-subtle text-warning border border-warning-subtle px-3 py-2';
+            }
           }
 
-          document.getElementById('sys-model-role').innerText = `${data.provider || 'gemini'} • Rol: ${data.role || 'universal'}`;
+          const modelRoleEl = document.getElementById('sys-model-role');
+          if (modelRoleEl) {
+            modelRoleEl.innerText = `${data.provider || 'gemini'} • Rol: ${data.role || 'universal'}`;
+          }
+
+          const dualAgentEl = document.getElementById('sys-dual-agent');
+          if (dualAgentEl) {
+            const collabCount = data.active_collabs || 0;
+            dualAgentEl.innerText = collabCount > 0 ? `Architect 7 + Jarvis (${collabCount} ta faol suhbat)` : 'Architect 7 + Jarvis (Tayyor)';
+          }
         }
-      } catch(e) {}
+      } catch(e) {
+        console.warn('loadSystemInfo xatosi:', e);
+      }
     }
 
     document.getElementById('btn-clear-history').addEventListener('click', async () => {
