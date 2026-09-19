@@ -556,7 +556,7 @@ async def cmd_main_stop_chess(message: Message) -> None:
         await message.answer("⚠️ Hozirda faol shaxmat o'yini yo'q.", parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, Command("collab", "hamkorlik"))
+@router.message(Command("collab", "hamkorlik"))
 async def cmd_main_collab(message: Message, command: CommandObject, bot: Bot) -> None:
     """Ikki AI hamkorligida vazifa bajarish: /collab [topshiriq]."""
     task = (command.args or "").strip()
@@ -576,7 +576,7 @@ async def cmd_main_collab(message: Message, command: CommandObject, bot: Bot) ->
     asyncio.create_task(handle_agent_collaboration(task, message.chat.id, bot_white=bot, bot_black=sec_bot, origin_bot=bot))
 
 
-@router.message(ADMIN_FILTER, Command("avtopilot", "kechki_vazifa", "night"))
+@router.message(Command("avtopilot", "kechki_vazifa", "night"))
 async def cmd_main_autopilot(message: Message, command: CommandObject, bot: Bot) -> None:
     """Tungi to'liq rejim: vazifa bitmaguncha suhbatlashib ishlayveradi."""
     task = (command.args or "").strip()
@@ -597,7 +597,7 @@ async def cmd_main_autopilot(message: Message, command: CommandObject, bot: Bot)
     asyncio.create_task(handle_agent_collaboration(task, message.chat.id, bot_white=bot, bot_black=sec_bot, origin_bot=bot, deep_mode=True, max_rounds=6))
 
 
-@router.message(ADMIN_FILTER, Command("suhbat", "chat", "gaplash"))
+@router.message(Command("suhbat", "chat", "gaplash"))
 async def cmd_main_suhbat(message: Message, bot: Bot) -> None:
     """Ikki AI o'rtasida erkin jonli suhbat: /suhbat [N] [mavzu]."""
     raw_text = message.text or ""
@@ -609,7 +609,7 @@ async def cmd_main_suhbat(message: Message, bot: Bot) -> None:
     asyncio.create_task(handle_free_chit_chat(topic, message.chat.id, bot_white=bot, bot_black=sec_bot, origin_bot=bot, turns=turns))
 
 
-@router.message(ADMIN_FILTER, Command("stop_collab", "stop_task", "toxtat_vazifa"))
+@router.message(Command("stop_collab", "stop_task", "toxtat_vazifa"))
 async def cmd_main_stop_collab(message: Message) -> None:
     """Hamkorlik yoki avtopilotni to'xtatish."""
     from core.bot_collab import stop_collab
@@ -620,7 +620,7 @@ async def cmd_main_stop_collab(message: Message) -> None:
         await message.answer("⚠️ Hozirda faol vazifa mavjud emas.", parse_mode="HTML")
 
 
-@router.message(ADMIN_FILTER, Command("stop_suhbat", "stop_chat", "toxtat_suhbat"))
+@router.message(Command("stop_suhbat", "stop_chat", "toxtat_suhbat"))
 async def cmd_main_stop_suhbat(message: Message) -> None:
     """Erkin suhbatni to'xtatish."""
     from core.bot_collab import stop_chit_chat
