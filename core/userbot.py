@@ -577,3 +577,93 @@ async def sync_chat_history_from_telegram(
         logger.error("sync_chat_history_from_telegram xatosi: %s", exc)
         return {"success": False, "count": 0, "message": f"❌ Xatolik yuz berdi: {exc}"}
 
+
+# ─── Boshqa Botlar Bilan Avtonom Muloqot (Inter-Bot Communication) ─
+
+async def interact_with_bot_and_wait_reply(
+    bot_target: str,
+    prompt_or_command: str,
+    timeout_sec: int = 20,
+    forward_to_chat_id: Optional[int | str] = None,
+) -> tuple[bool, str, Optional[int]]:
+    """
+    Telethon Userbot orqali boshqa botga (masalan: @vkmusic_bot, @midjourney_bot, @chatgpt_bot)
+    avtonom so'rov yuboradi, uning javobini kutadi va natijani qaytaradi.
+    Agar media (audio, fayl, rasm) kelsa, uni ixtiyoriy ravishda admin chatiga forward qiladi.
+
+    Returns:
+        (success: bool, response_summary: str, reply_msg_id: Optional[int])
+    """
+    global userbot
+    if userbot is None or not userbot.is_connected():
+        return False, "❌ Userbot (Telethon) ulanmagan yoki sessiya faol emas.", None
+
+    clean_target = bot_target.strip().lstrip("@")
+    if not clean_target:
+        return False, "❌ Bot username'i ko'rsatilmadi.", None
+
+    try:
+        entity = await userbot.get_entity(f"@{clean_target}")
+    except Exception as exc:
+        logger.error("Botni topishda xato (@%s): %s", clean_target, exc)
+        return False, f"❌ `@{clean_target}` boti Telegram tarmog'idan topilmadi ({exc}).", None
+
+    try:
+        sent_msg = await userbot.send_message(entity, prompt_or_command)
+        logger.info("Inter-bot so'rov yuborildi: @%s ga -> '%s'", clean_target, prompt_or_command[:50])
+    except Exception as exc:
+        logger.error("Botga xabar yuborishda xato (@%s): %s", clean_target, exc)
+        return False, f"❌ `@{clean_target}` botiga xabar yuborib bo'lmadi: {exc}", None
+
+    # Botdan javob kutish (polling usuli)
+    start_time = time.time()
+    last_sent_id = sent_msg.id
+    received_reply = None
+
+    while time.time() - start_time < timeout_sec:
+        await asyncio.sleep(1.5)
+        try:
+            messages = await userbot.get_messages(entity, limit=5)
+            for m in messages:
+                if m.id > last_sent_id and not m.out:
+                    received_reply = m
+                    break
+            if received_reply:
+                break
+        except Exception as exc:
+            logger.debug("Bot xabarlarini tekshirishda xatolik: %s", exc)
+
+    if not received_reply:
+        return (
+            False,
+            f"⏳ `@{clean_target}` botiga so'rov yuborildi (`{prompt_or_command}`), "
+            f"lekin u {timeout_sec} soniya ichida javob qaytarmadi. "
+            f"(Ehtimol bot band yoki sekin ishlamoqda).",
+            None,
+        )
+
+    # Javob matnini tayyorlash
+    reply_text = received_reply.message or ""
+    media_info = ""
+
+    if received_reply.media:
+        media_type = type(received_reply.media).__name__.replace("MessageMedia", "")
+        media_info = f"📎 [Keltirilgan media: {media_type}]"
+
+    # Agar adminga to'g'ridan-to'g'ri forward qilish ko'rsatilgan bo'lsa
+    if forward_to_chat_id:
+        try:
+            admin_target = int(forward_to_chat_id) if str(forward_to_chat_id).lstrip("-").isdigit() else forward_to_chat_id
+            await userbot.forward_messages(admin_target, received_reply.id, entity)
+            logger.info("Bot javobi adminga (%s) forward qilindi", forward_to_chat_id)
+        except Exception as fwd_exc:
+            logger.warning("Bot javobini forward qilishda xato: %s", fwd_exc)
+
+    summary_lines = [f"🤖 **`@{clean_target}` Botining Javobi:**\n"]
+    if reply_text:
+        summary_lines.append(reply_text)
+    if media_info:
+        summary_lines.append(f"\n{media_info}")
+
+    return True, "\n".join(summary_lines), received_reply.id
+
