@@ -598,6 +598,49 @@ async def cmd_main_autopilot(message: Message, command: CommandObject, bot: Bot)
     asyncio.create_task(handle_agent_collaboration(task, message.chat.id, bot_white=bot, bot_black=sec_bot, origin_bot=bot, deep_mode=True, max_rounds=6))
 
 
+@router.message(Command("project", "loyiha"))
+async def cmd_main_project(message: Message, bot: Bot) -> None:
+    """MetaGPT / ChatDev to'liq loyiha arxitekturasi va ZIP eksport: /project [loyiha]."""
+    raw_text = message.text or ""
+    import re
+    proj_task = re.sub(r"^(?:/project|/loyiha)(?:@\w+)?[:\s]*", "", raw_text, flags=re.IGNORECASE).strip()
+    if not proj_task:
+        await message.answer(
+            "📦 <b>MetaGPT / ChatDev Avtonom Loyiha Quruvchi:</b>\n\n"
+            "SuperAgent va Arxitektor (@architect7_bot) birgalikda butun loyiha arxitekturasini tuzadi, har bir fayl kodini yozadi va sizga tayyor <b>.zip</b> arxiv fayl qilib yetkazadi!\n\n"
+            "💡 <b>Foydalanish:</b> <code>/project [loyiha g'oyasi yoki talabi]</code>\n"
+            "Masalan: <code>/project Telegram ob-havo boti SQLite bazasi bilan</code>",
+            parse_mode="HTML"
+        )
+        return
+    from core.bot_collab import handle_project_generation
+    from core.mistral_agent_bot import get_second_bot
+    sec_bot = get_second_bot()
+    import asyncio
+    asyncio.create_task(handle_project_generation(proj_task, message.chat.id, bot_white=bot, bot_black=sec_bot, origin_bot=bot))
+
+
+@router.message(Command("ovozli_suhbat", "audio_suhbat", "voice_chat"))
+async def cmd_main_audio_suhbat(message: Message, bot: Bot) -> None:
+    """SuperAgent va Arxitektor o'rtasida jonli ikki ovozli muloqot (Edge-TTS): /ovozli_suhbat [mavzu]."""
+    raw_text = message.text or ""
+    from core.bot_collab import handle_free_chit_chat, parse_topic_and_turns
+    topic, turns = parse_topic_and_turns(raw_text, default_turns=6)
+    from core.mistral_agent_bot import get_second_bot
+    sec_bot = get_second_bot()
+    import asyncio
+    asyncio.create_task(handle_free_chit_chat(topic, message.chat.id, bot_white=bot, bot_black=sec_bot, origin_bot=bot, turns=turns, audio_mode=True))
+
+
+@router.message(Command("profile", "profil", "memory"))
+async def cmd_main_profile(message: Message) -> None:
+    """Mem0 Shaxsiy foydalanuvchi bilimlari va qiziqishlari profili: /profile."""
+    from core.mem0_agent import get_user_profile_report
+    user_id = str(message.from_user.id)
+    report = await get_user_profile_report(user_id)
+    await message.answer(report, parse_mode="HTML")
+
+
 @router.message(Command("suhbat", "chat", "gaplash"))
 async def cmd_main_suhbat(message: Message, bot: Bot) -> None:
     """Ikki AI o'rtasida erkin jonli suhbat: /suhbat [N] [mavzu]."""
