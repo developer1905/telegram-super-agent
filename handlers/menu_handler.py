@@ -311,38 +311,32 @@ def build_models_menu() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
 
     builder.row(
-        InlineKeyboardButton(
-            text=f"✨ Google Gemini ({GEMINI_MODEL})",
-            callback_data="model:gemini",
-        )
+        InlineKeyboardButton(text=f"✨ Gemini ({GEMINI_MODEL})", callback_data="model:gemini"),
+        InlineKeyboardButton(text="🔬 NVIDIA Nemotron 120B", callback_data="model:nvidia"),
     )
-    builder.row(
-        InlineKeyboardButton(
-            text="🌐 OmniRoute Gateway (350+ AI)",
-            callback_data="model:omniroute",
-        )
-    )
-
-    # 1, 2, 3, 4, 5 Maxsus Elita Agent Modellari
     builder.row(
         InlineKeyboardButton(text="🧠 1. DeepSeek V4 (1M)", callback_data="model:or_deepseek_v4"),
-        InlineKeyboardButton(text="⚡ 2. Qwen 3.8 Agent", callback_data="model:or_qwen38"),
+        InlineKeyboardButton(text="🌊 2. Laguna S 2.1", callback_data="model:or_laguna"),
     )
     builder.row(
-        InlineKeyboardButton(text="🌊 3. Laguna S 2.1", callback_data="model:or_laguna"),
-        InlineKeyboardButton(text="🔬 4. NVIDIA Nemotron", callback_data="model:nvidia"),
+        InlineKeyboardButton(text="📝 3. Dots-3 Note (512K)", callback_data="model:or_dots_note"),
+        InlineKeyboardButton(text="⚡ 4. Qwen 3.8 Agent", callback_data="model:or_qwen38"),
     )
     builder.row(
-        InlineKeyboardButton(text="📝 5. Dots-3 Note (512K)", callback_data="model:or_dots_note"),
-        InlineKeyboardButton(text="⚡ Hermes 3 (405B)", callback_data="model:or_hermes"),
+        InlineKeyboardButton(text="🔥 5. Nex-AGI Pro", callback_data="model:or_nex_pro"),
+        InlineKeyboardButton(text="⚡ Hermes 3 Agent", callback_data="model:or_hermes"),
     )
     builder.row(
         InlineKeyboardButton(text="🔀 Smart Free Router", callback_data="model:or_auto"),
         InlineKeyboardButton(text="🌐 OmniRoute Gateway", callback_data="model:omniroute"),
     )
 
+    already_shown = {
+        "deepseek_v4", "nemotron_super", "laguna", "dots_note",
+        "qwen38", "nex_pro", "hermes", "auto"
+    }
     for key, name in OPENROUTER_MODEL_NAMES.items():
-        if key in ("deepseek_v4", "qwen38", "laguna", "nemotron_reasoning", "dots_note", "hermes", "auto"):
+        if key in already_shown:
             continue
         builder.row(
             InlineKeyboardButton(
