@@ -404,6 +404,9 @@ async def handle_agent_collaboration(
     kodni mukammallashtirib boraveradi (Kechki avtopilot rejimi).
     """
     chat_key = str(chat_id)
+    if ACTIVE_COLLABS.get(chat_key, False):
+        logger.warning("Chat %s da allaqachon faol hamkorlik ketmoqda, yangisi boshlanmaydi", chat_id)
+        return
     ACTIVE_COLLABS[chat_key] = True
 
     cur_origin = origin_bot or bot_white
@@ -566,16 +569,16 @@ async def handle_agent_collaboration(
             f"✨ <i>Ikkala agent topshiriqni avtonom tarzda muvaffaqiyatli yakunladi!</i> 🚀"
         )
         await _send_agent_message(chat_id, summary_text, "system", bot_white, bot_black, is_group, cur_origin)
-        ACTIVE_COLLABS[chat_key] = False
         logger.info("✅ handle_agent_collaboration muvaffaqiyatli yakunlandi")
 
     except Exception as exc:
         logger.error("❌ handle_agent_collaboration da kutilmagan xato: %s", exc, exc_info=True)
-        ACTIVE_COLLABS[chat_key] = False
         try:
             await cur_origin.send_message(chat_id, f"⚠️ Hamkorlik jarayonida xatolik yuz berdi: {exc}")
         except Exception:
             pass
+    finally:
+        ACTIVE_COLLABS[chat_key] = False
 
 
 # ─── 3. ERKIN SUHBAT REJIMI (AI LOUNGE / CHIT-CHAT) ──────────────
@@ -609,6 +612,9 @@ async def handle_free_chit_chat(
     5. 🌟 O'zaro do'stona xulosalar va konstruktiv tanqid.
     """
     chat_key = str(chat_id)
+    if ACTIVE_CHIT_CHATS.get(chat_key, False):
+        logger.warning("Chat %s da allaqachon faol erkin suhbat ketmoqda, yangisi boshlanmaydi", chat_id)
+        return
     ACTIVE_CHIT_CHATS[chat_key] = True
 
     cur_origin = origin_bot or bot_white
@@ -824,16 +830,16 @@ async def handle_free_chit_chat(
         )
         await _send_agent_message(chat_id, final_verdict_card, "system", bot_white, bot_black, is_group, cur_origin)
 
-        ACTIVE_CHIT_CHATS[chat_key] = False
         logger.info("✅ handle_free_chit_chat muvaffaqiyatli yakunlandi")
 
     except Exception as exc:
         logger.error("❌ handle_free_chit_chat da xato: %s", exc, exc_info=True)
-        ACTIVE_CHIT_CHATS[chat_key] = False
         try:
             await cur_origin.send_message(chat_id, f"⚠️ Suhbatda xatolik yuz berdi: {exc}")
         except Exception:
             pass
+    finally:
+        ACTIVE_CHIT_CHATS[chat_key] = False
 
 
 # ─── 4. MULTI-AGENT DEBATE & JURY (BAHS VA HAKAMLIK) ───────────
@@ -851,6 +857,9 @@ async def handle_agent_debate(
     intellektual bahs olib boradi. Guruh a'zolari hakam sifatida g'olibga ovoz beradi!
     """
     chat_key = str(chat_id)
+    if ACTIVE_DEBATES.get(chat_key, False):
+        logger.warning("Chat %s da allaqachon faol bahs ketmoqda, yangisi boshlanmaydi", chat_id)
+        return
     ACTIVE_DEBATES[chat_key] = True
 
     cur_origin = origin_bot or bot_white
@@ -1014,16 +1023,16 @@ async def handle_agent_debate(
         cur_bot = origin_bot or bot_white
         await cur_bot.send_message(chat_id, jury_text, reply_markup=kb.as_markup(), parse_mode="HTML")
 
-        ACTIVE_DEBATES[chat_key] = False
         logger.info("✅ handle_agent_debate muvaffaqiyatli yakunlandi")
 
     except Exception as exc:
         logger.error("❌ handle_agent_debate da xato: %s", exc, exc_info=True)
-        ACTIVE_DEBATES[chat_key] = False
         try:
             await cur_origin.send_message(chat_id, f"⚠️ Bahsda xatolik yuz berdi: {exc}")
         except Exception:
             pass
+    finally:
+        ACTIVE_DEBATES[chat_key] = False
 
 
 # ─── 4. TUNGI AVTONOM VAZIFALAR NAVBATCHISI (NIGHT AUTOPILOT) ───
