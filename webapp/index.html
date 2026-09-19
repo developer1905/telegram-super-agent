@@ -1437,47 +1437,66 @@
 
           <!-- AI Munajjim Tahlilchi Bo'limi -->
           <div class="neon-card p-3 mb-3">
+          <!-- AI Munajjim Tahlilchi Bo'limi (20 Yillik Olim Dvigateli) -->
+          <div class="neon-card p-3 mb-3">
             <div class="neon-card-header">
-              <span><i class="bi bi-robot me-2 text-primary"></i>AI Munajjim Shaxsiy Tahlili</span>
-              <span class="badge bg-success text-white">Nous Hermes & Gemini</span>
+              <span><i class="bi bi-mortarboard-fill me-2 text-primary"></i>20 Yillik Tajribali Munajjim-Olim Tahlili</span>
+              <span class="badge bg-success text-white">Al-Biruniy & Hermes 3</span>
             </div>
             <p class="text-muted small mb-2">
-              Sizning shaxsiy natal kartangiz, uylar, arab nuqtalari va bugungi tranzitlaringiz asosida sun'iy intellektdan aniq prognoz oling:
+              Sizning natal koordinatalaringiz, 513 ta Arab Lotlari va joriy tranzitlar asosida qadimiy ellinistik va arab astrologiyasi olimi kabi <b>aniq voqealar prognozi</b> oling:
             </p>
+
+            <!-- 513 ta Arab Lotlarini Yuklash Bloki -->
+            <div class="p-2 border rounded-3 bg-white mb-3 shadow-sm">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="small fw-bold text-dark"><i class="bi bi-gem me-1 text-warning"></i>513 ta Arab Lotlarini Qo'shish:</span>
+                <span class="badge bg-secondary text-white" id="astro-custom-lots-count">0 ta lot saqlangan</span>
+              </div>
+              <p class="text-muted mb-2" style="font-size: 11px;">
+                Arab kartangizdagi lotlarni matn, ro'yxat yoki JSON shaklida tashlang. Tizim ularni 12 sohaga ajratib, Hermes 3 tahliliga kiritadi:
+              </p>
+              <textarea class="form-control mb-2" id="astro-custom-lots-input" rows="2" style="font-size: 12px;" placeholder="Part of Commerce: 14° Gemini (2-uy)&#10;Part of Victory: 22° Leo&#10;Part of Marriage: 05° Libra... yoki to'liq JSON"></textarea>
+              <button class="btn btn-sm btn-outline-primary w-100 py-1" id="btn-save-lots" onclick="handleUploadCustomLots()">
+                <i class="bi bi-cloud-arrow-up-fill me-1"></i> 📜 513 ta Arab Lotlarini Saqlash & AI ga Bog'lash
+              </button>
+            </div>
+
             <div class="mb-2">
-              <textarea class="form-control" id="astro-ai-question" rows="2" placeholder="Savolingiz: Masalan: Yaqin oylarda moliyaviy va karyera taraqqiyotim qanday bo'ladi?"></textarea>
+              <label class="form-label small fw-bold text-dark mb-1">🎯 Savolingiz yoki Qiziqtirgan Soha:</label>
+              <textarea class="form-control" id="astro-ai-question" rows="2" placeholder="Masalan: 2026-yilda moliya, biznes va shaxsiy hayotimda qanday aniq voqealar bo'ladi?"></textarea>
             </div>
             <div class="d-flex gap-1 overflow-x-auto text-nowrap mb-3">
-              <span class="quick-chip" onclick="setQuickAstroQuestion('Mening moliyaviy va boylik potentsialim, eng daromadli sohalarim qaysilar?')">💰 Moliyaviy potentsial</span>
-              <span class="quick-chip" onclick="setQuickAstroQuestion('Muhabbat, juftim bilan munosabatlar va shaxsiy hayotim tahlili')">❤️ Muhabbat & Oila</span>
-              <span class="quick-chip" onclick="setQuickAstroQuestion('Hayotiy missiyam, karyeram va 10-uyim bo\'yicha eng katta yutuqlarim')">💼 Karyera & Missiya</span>
-              <span class="quick-chip" onclick="setQuickAstroQuestion('Bugungi faol tranzitlar menga qanday ta\'sir qilmoqda va nimalarga e\'tibor berishim kerak?')">⚡ Bugungi Tranzitlar</span>
-              <span class="quick-chip" onclick="setQuickAstroQuestion('Natal kartam, Arab nuqtalarim va karmik darslarim bo\'yicha to\'liq chuqur tahlil bering')">🔮 To'liq Tahlil</span>
+              <span class="quick-chip" onclick="setQuickAstroQuestion('2026-yilda moliya, boylik lotlari va yirik daromad davrlari bo\'yicha aniq voqeaviy prognoz bering')">💰 Moliya & 2026 Voqealari</span>
+              <span class="quick-chip" onclick="setQuickAstroQuestion('Muhabbat, nikoh loti (Part of Marriage/Eros) va juftlik taqdiri tahlili')">❤️ Muhabbat & Nikoh</span>
+              <span class="quick-chip" onclick="setQuickAstroQuestion('Karyera, zafar loti (Part of Victory) va mansab cho\'qqilariga erishish vaqtlari')">💼 Karyera & Zafar</span>
+              <span class="quick-chip" onclick="setQuickAstroQuestion('Yashirin dushmanlar, xavf-xatarlar (Part of Treachery) va sog\'liq bo\'yicha ehtiyot choralari')">🛡️ Xavflar & Dushmanlar</span>
+              <span class="quick-chip" onclick="setQuickAstroQuestion('Barcha 513 ta Arab Lotlarim va sayyoralarning to\'liq 20 yillik olim darajasidagi chuqur sintezi')">🔮 Olim Darajasidagi To'liq Sintez</span>
             </div>
             <div class="row g-2 align-items-center mb-2">
               <div class="col-7">
                 <select class="form-select form-select-sm" id="astro-ai-model-select">
+                  <option value="nousresearch/hermes-3-llama-3.1-405b:free" selected>🧠 Nous Hermes 3 (405B Agent)</option>
                   <option value="gemini-2.5-flash">⚡ Gemini 2.5 Flash</option>
-                  <option value="nousresearch/hermes-3-llama-3.1-405b:free">🧠 Nous Hermes 3 (405B)</option>
                   <option value="deepseek/deepseek-r1:free">🔬 DeepSeek R1 Reasoning</option>
                 </select>
               </div>
               <div class="col-5">
                 <button class="btn btn-neon-primary w-100 py-1" id="btn-run-astro-ai" onclick="handleAstroAiReport()">
-                  <i class="bi bi-stars me-1"></i> Tahlil Olish
+                  <i class="bi bi-stars me-1"></i> Voqealar Prognozi
                 </button>
               </div>
             </div>
 
             <!-- AI Tahlil Javobi -->
             <div id="astro-ai-report-box" class="mt-3" style="display: none;">
-              <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="fw-bold small text-dark"><i class="bi bi-chat-heart me-1 text-primary"></i>Munajjim AI Xulosasi</span>
-                <button class="btn btn-sm btn-outline-secondary py-1 px-2" onclick="copyAstroAiResult()">
-                  <i class="bi bi-clipboard me-1"></i> Nusxa olish
+              <div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-primary-subtle rounded-2">
+                <span class="fw-bold small text-dark"><i class="bi bi-mortarboard me-1 text-primary"></i>20 Yillik Munajjim-Olim Xulosasi</span>
+                <button class="btn btn-sm btn-primary py-1 px-3 shadow-sm" onclick="copyAstroAiResult()">
+                  <i class="bi bi-clipboard me-1"></i> 📋 Nusxa olish
                 </button>
               </div>
-              <div class="p-3 bg-light rounded-3 small text-dark" id="astro-ai-report-content" style="white-space: pre-wrap; max-height: 480px; overflow-y: auto; line-height: 1.6;">
+              <div class="p-3 bg-light rounded-3 small text-dark border" id="astro-ai-report-content" style="white-space: pre-wrap; max-height: 520px; overflow-y: auto; line-height: 1.7; font-size: 0.88rem;">
                 <!-- AI report -->
               </div>
             </div>
@@ -3037,6 +3056,13 @@
               currentAstroChart = p.chart;
               renderAstroChart(p.chart);
             }
+            if (p.custom_lots && p.custom_lots.length > 0) {
+              const countEl = document.getElementById('astro-custom-lots-count');
+              if (countEl) {
+                countEl.innerText = `${p.custom_lots.length} ta lot faol ✨`;
+                countEl.className = 'badge bg-success text-white';
+              }
+            }
           }
         }
       } catch (err) {
@@ -3187,23 +3213,71 @@
       }
     }
 
-    async function handleAstroAiReport() {
-      const qInput = document.getElementById('astro-ai-question');
-      const modelSelect = document.getElementById('astro-ai-model-select');
-      const question = qInput ? qInput.value.trim() : '';
-      const model = modelSelect ? modelSelect.value : 'gemini-2.5-flash';
-      const btn = document.getElementById('btn-run-astro-ai');
-      const box = document.getElementById('astro-ai-report-box');
-      const content = document.getElementById('astro-ai-report-content');
+    async function handleUploadCustomLots() {
+      const input = document.getElementById('astro-custom-lots-input');
+      const text = input ? input.value.trim() : '';
+      const btn = document.getElementById('btn-save-lots');
+      const countEl = document.getElementById('astro-custom-lots-count');
 
-      if (!question) {
-        showToast('Munajjimga savolingizni kiriting yoki tezkor tugmalardan tanlang', true);
+      if (!text) {
+        showToast('Lotlar ma\'lumotlarini kiriting yoki tashlang', true);
         return;
       }
 
       haptic('medium');
       btn.disabled = true;
-      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Tahlil qilinmoqda...';
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Tahlil qilinmoqda...';
+
+      try {
+        const res = await fetch('/api/astrology/lots', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            user_id: getActiveUserId(),
+            lots_data: text
+          })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status === 'ok') {
+            if (countEl) {
+              countEl.innerText = `${data.count} ta lot faol ✨`;
+              countEl.className = 'badge bg-success text-white';
+            }
+            showToast(`✅ ${data.count} ta Arab Loti saqlandi va AI tahliliga bog'landi!`);
+            haptic('success');
+          } else {
+            showToast('Xatolik: ' + (data.message || 'Saqlab bo\'lmadi'), true);
+          }
+        } else {
+          showToast('Serverda xatolik yuz berdi', true);
+        }
+      } catch (err) {
+        showToast('Tarmoq xatosi', true);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-cloud-arrow-up-fill me-1"></i> 📜 513 ta Arab Lotlarini Saqlash & AI ga Bog\'lash';
+      }
+    }
+
+    async function handleAstroAiReport() {
+      const qInput = document.getElementById('astro-ai-question');
+      const modelSelect = document.getElementById('astro-ai-model-select');
+      const question = qInput ? qInput.value.trim() : '';
+      const model = modelSelect ? modelSelect.value : 'nousresearch/hermes-3-llama-3.1-405b:free';
+      const btn = document.getElementById('btn-run-astro-ai');
+      const box = document.getElementById('astro-ai-report-box');
+      const content = document.getElementById('astro-ai-report-content');
+
+      if (!question) {
+        showToast('Munajjim-olimga savolingizni yozing yoki tezkor tugmalardan tanlang', true);
+        return;
+      }
+
+      haptic('medium');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> 20 yillik munajjim-olim tahlil qilmoqda...';
 
       try {
         const res = await fetch('/api/astrology/interpret', {
@@ -3218,28 +3292,63 @@
 
         if (res.ok) {
           const data = await res.json();
-          lastAstroAiReport = data.response || 'Munajjim tahlili tayyor.';
-          content.innerText = lastAstroAiReport;
-          box.style.display = 'block';
-          showToast('Munajjim tahlili tayyor! ✨');
-          haptic('success');
+          const resultText = data.report || data.response || '';
+          if (resultText) {
+            lastAstroAiReport = resultText;
+            content.innerText = resultText;
+            box.style.display = 'block';
+            showToast('Voqealar prognozi tayyor! ✨');
+            haptic('success');
+            box.scrollIntoView({ behavior: 'smooth' });
+          } else {
+            showToast('Tahlil bo\'sh keldi, qayta urinib ko\'ring', true);
+          }
         } else {
-          showToast('Tahlil olishda xatolik yuz berdi', true);
+          showToast('Tahlil olishda server xatosi yuz berdi', true);
         }
       } catch (err) {
         showToast('Tarmoq xatosi', true);
       } finally {
         btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-stars me-1"></i> Tahlil Olish';
+        btn.innerHTML = '<i class="bi bi-stars me-1"></i> Voqealar Prognozi';
       }
     }
 
     function copyAstroAiResult() {
-      if (lastAstroAiReport) {
-        navigator.clipboard.writeText(lastAstroAiReport);
-        showToast('AI Tahlil nusxalandi! 📋');
-        haptic('light');
+      const textToCopy = lastAstroAiReport || document.getElementById('astro-ai-report-content')?.innerText || '';
+      if (!textToCopy) {
+        showToast('Nusxalash uchun hisobot topilmadi', true);
+        return;
       }
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(textToCopy).then(() => {
+          showToast('20 Yillik Munajjim Tahlili to\'liq nusxalandi! 📋');
+          haptic('light');
+        }).catch(() => {
+          _doFallbackCopy(textToCopy);
+        });
+      } else {
+        _doFallbackCopy(textToCopy);
+      }
+    }
+
+    function _doFallbackCopy(text) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.top = '-9999px';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try {
+        document.execCommand('copy');
+        showToast('20 Yillik Munajjim Tahlili nusxalandi! 📋');
+        haptic('light');
+      } catch (e) {
+        showToast('Nusxalab bo\'lmadi, qo\'lda belgilab oling', true);
+      }
+      document.body.removeChild(ta);
     }
 
     // Initial load
