@@ -312,22 +312,25 @@ def build_models_menu() -> InlineKeyboardMarkup:
 
     builder.row(
         InlineKeyboardButton(text=f"✨ Gemini ({GEMINI_MODEL})", callback_data="model:gemini"),
+        InlineKeyboardButton(text="🌪 Mistral Codestral", callback_data="model:mistral"),
+    )
+    builder.row(
         InlineKeyboardButton(text="🔬 NVIDIA Nemotron 120B", callback_data="model:nvidia"),
-    )
-    builder.row(
         InlineKeyboardButton(text="🧠 1. DeepSeek V4 (1M)", callback_data="model:or_deepseek_v4"),
+    )
+    builder.row(
         InlineKeyboardButton(text="🌊 2. Laguna S 2.1", callback_data="model:or_laguna"),
-    )
-    builder.row(
         InlineKeyboardButton(text="📝 3. Dots-3 Note (512K)", callback_data="model:or_dots_note"),
+    )
+    builder.row(
         InlineKeyboardButton(text="⚡ 4. Qwen 3.8 Agent", callback_data="model:or_qwen38"),
-    )
-    builder.row(
         InlineKeyboardButton(text="🔥 5. Nex-AGI Pro", callback_data="model:or_nex_pro"),
-        InlineKeyboardButton(text="⚡ Hermes 3 Agent", callback_data="model:or_hermes"),
     )
     builder.row(
+        InlineKeyboardButton(text="⚡ Hermes 3 Agent", callback_data="model:or_hermes"),
         InlineKeyboardButton(text="🔀 Smart Free Router", callback_data="model:or_auto"),
+    )
+    builder.row(
         InlineKeyboardButton(text="🌐 OmniRoute Gateway", callback_data="model:omniroute"),
     )
 
@@ -1916,6 +1919,31 @@ async def cb_model_nvidia(cb: CallbackQuery, ai_manager: AIManager) -> None:
         f"• NVIDIA NIM API yoki OpenRouter dagi bepul Nemotron zaxiralari orqali 100% barqaror ishlaydi."
     )
     await safe_edit_text(cb, text, reply_markup=builder.as_markup(), parse_mode="Markdown")
+
+
+@router.callback_query(ADMIN_FILTER, F.data == "model:mistral")
+async def cb_model_mistral(cb: CallbackQuery, ai_manager: AIManager) -> None:
+    await cb.answer("✅ Mistral Codestral tanlandi")
+    result = ai_manager.switch_provider("mistral")
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="◀️ Orqaga", callback_data="menu:models"))
+    text = (
+        f"{result}\n\n"
+        f"🌪 **Mistral AI (Codestral & Nemo):**\n"
+        f"Yevropaning yetakchi sun'iy intellekti (console.mistral.ai) orqali professional dasturlash, "
+        f"mantiqiy tahlil va ko'p tilli yordamchi faollashtirildi!"
+    )
+    await safe_edit_text(cb, text, reply_markup=builder.as_markup(), parse_mode="Markdown")
+
+
+@router.message(ADMIN_FILTER, Command("mistral", "codestral"))
+async def cmd_mistral_shortcut(message: Message, ai_manager: AIManager) -> None:
+    """/mistral yoki /codestral orqali Mistral provayderiga o'tish."""
+    res = ai_manager.switch_provider("mistral")
+    await message.answer(
+        f"{res}\n\n🌪 **Mistral AI (Codestral)** faol! Endi barcha savollaringizga Mistral javob beradi.",
+        parse_mode="Markdown"
+    )
 
 
 @router.callback_query(ADMIN_FILTER, F.data.startswith("model:or_"))
