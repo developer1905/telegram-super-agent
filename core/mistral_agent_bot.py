@@ -5,6 +5,7 @@ mustaqil Telegram bot moduli.
 
 O'zining shaxsiy menyusi, arxitektura vositalari, kod tahlilchisi va
 SuperAgent bilan shaxmat bahslari boshqaruvi mavjud.
+Barcha xabarlar safe_reply (HTML + xatosiz fallback) orqali uzatiladi.
 """
 
 import logging
@@ -59,6 +60,15 @@ def get_architect_keyboard() -> ReplyKeyboardMarkup:
     )
 
 
+async def safe_reply(message: Message, text: str, reply_markup=None, parse_mode: str = "HTML") -> Message:
+    """Xabarni xavfsiz yuborish (agar HTML xatosi bo'lsa, avtomatik oddiy matn sifatida yetkazadi)."""
+    try:
+        return await message.answer(text, reply_markup=reply_markup, parse_mode=parse_mode)
+    except Exception as exc:
+        logger.warning("Arxitektor formatlash xatosi (%s), toza matn bilan yuboriladi", exc)
+        return await message.answer(text, reply_markup=reply_markup, parse_mode=None)
+
+
 async def setup_architect_bot(bot: Bot) -> None:
     """Arxitektor botning shaxsiy Telegram buyruqlari va menyu tugmasini sozlash."""
     try:
@@ -70,9 +80,8 @@ async def setup_architect_bot(bot: Bot) -> None:
             BotCommand(command="code", description="Kod tahlili va audit"),
             BotCommand(command="help", description="Yordam va qo'llanma"),
         ])
-        # Telegram chat menyusi tugmasini standart buyruqlar menyusiga o'rnatish (Mini App tugmasini olib tashlaydi)
         await bot.set_chat_menu_button(menu_button=MenuButtonCommands())
-        logger.info("✅ Arxitektor Bot (@architect7_bot) komandalari va shaxsiy menyusi sozlandi.")
+        logger.info("✅ Arxitektor Bot (@architect7_bot) komandalari va menyusi sozlandi.")
     except Exception as exc:
         logger.warning("Arxitektor bot komandalarini sozlashda ogohlantirish: %s", exc)
 
@@ -80,36 +89,33 @@ async def setup_architect_bot(bot: Bot) -> None:
 @second_bot_router.message(Command("start", "menu"))
 async def cmd_start_second_bot(message: Message) -> None:
     """Arxitektor bot start va shaxsiy menyusi."""
+    logger.info("📩 Arxitektor bot /start buyrug'i: chat_id=%s, user=%s", message.chat.id, message.from_user.id)
     welcome_text = (
-        "🌪 **Assalomu alaykum! Men Arxitektor Agent Botman (@architect7_bot).**\n\n"
-        "Men **Mistral AI** platformasidagi maxsus o'qitilgan sun'iy intellekt agenti tomonidan boshqarilaman.\n\n"
-        "✨ **Mening ixtisoslashgan sohalarim:**\n"
-        "• 🏗 **Dasturiy arxitektura va loyihalash** (Microservices, DB schema, API design);\n"
-        "• 💻 **Kod tahlili, refaktoring va xavfsizlik auditi**;\n"
-        "• 🤝 **SuperAgent bilan guruhda vazifalarni parallel bajarish**;\n"
-        "• ♟️ **SuperAgent bilan jonli shaxmat bahsi** (`/chess` yoki pastdagi tugma).\n\n"
+        "🌪 <b>Assalomu alaykum! Men Arxitektor Agent Botman (@architect7_bot).</b>\n\n"
+        "Men <b>Mistral AI</b> platformasidagi maxsus o'qitilgan sun'iy intellekt agenti tomonidan boshqarilaman.\n\n"
+        "✨ <b>Mening ixtisoslashgan sohalarim:</b>\n"
+        "• 🏗 <b>Dasturiy arxitektura va loyihalash</b> (Microservices, DB schema, API design);\n"
+        "• 💻 <b>Kod tahlili, refaktoring va xavfsizlik auditi</b>;\n"
+        "• 🤝 <b>SuperAgent bilan guruhda vazifalarni parallel bajarish</b>;\n"
+        "• ♟️ <b>SuperAgent bilan jonli shaxmat bahsi</b> (<code>/chess</code> yoki pastdagi tugma).\n\n"
         "Quyidagi shaxsiy menyudan kerakli bo'limni tanlang yoki to'g'ridan-to'g'ri topshiriq bering!"
     )
-    await message.answer(
-        welcome_text,
-        reply_markup=get_architect_keyboard(),
-        parse_mode="Markdown"
-    )
+    await safe_reply(message, welcome_text, reply_markup=get_architect_keyboard(), parse_mode="HTML")
 
 
 @second_bot_router.message(Command("help"))
 async def cmd_help_second_bot(message: Message) -> None:
     """Yordam komandasi."""
     help_text = (
-        "💡 **Arxitektor Agent Buyruqlari:**\n\n"
-        "• `/start` yoki `/menu` — Arxitektor shaxsiy menyusini ochish\n"
-        "• `/chess` yoki `/shaxmat` — SuperAgent bilan jonli shaxmat bahsini boshlash\n"
-        "• `/stop_chess` — Shaxmat o'yinini to'xtatish\n"
-        "• `/collab [vazifa]` — Ikkala bot birgalikda yechim ishlab chiqadi\n"
-        "• `/code` — Kod tahlili va xavfsizlik auditi bo'yicha maslahat\n"
-        "• Guruhda `@architect7_bot [savol]` — Guruhda botga murojaat qilish"
+        "💡 <b>Arxitektor Agent Buyruqlari:</b>\n\n"
+        "• <code>/start</code> yoki <code>/menu</code> — Arxitektor shaxsiy menyusini ochish\n"
+        "• <code>/chess</code> yoki <code>/shaxmat</code> — SuperAgent bilan jonli shaxmat bahsini boshlash\n"
+        "• <code>/stop_chess</code> — Shaxmat o'yinini to'xtatish\n"
+        "• <code>/collab [vazifa]</code> — Ikkala bot birgalikda yechim ishlab chiqadi\n"
+        "• <code>/code</code> — Kod tahlili va xavfsizlik auditi bo'yicha maslahat\n"
+        "• Guruhda <b>@architect7_bot [savol]</b> — Guruhda botga murojaat qilish"
     )
-    await message.answer(help_text, reply_markup=get_architect_keyboard(), parse_mode="Markdown")
+    await safe_reply(message, help_text, reply_markup=get_architect_keyboard(), parse_mode="HTML")
 
 
 @second_bot_router.message(Command("chess", "shaxmat"))
@@ -128,9 +134,9 @@ async def cmd_stop_chess_trigger(message: Message) -> None:
     chat_id = str(message.chat.id)
     stopped = stop_chess_game(chat_id)
     if stopped:
-        await message.answer("🛑 **Shaxmat o'yini to'xtatildi.**", reply_markup=get_architect_keyboard(), parse_mode="Markdown")
+        await safe_reply(message, "🛑 <b>Shaxmat o'yini to'xtatildi.</b>", reply_markup=get_architect_keyboard())
     else:
-        await message.answer("⚠️ Hozirda faol shaxmat o'yini mavjud emas.", reply_markup=get_architect_keyboard(), parse_mode="Markdown")
+        await safe_reply(message, "⚠️ Hozirda faol shaxmat o'yini mavjud emas.", reply_markup=get_architect_keyboard())
 
 
 @second_bot_router.message(Command("code"))
@@ -138,31 +144,31 @@ async def cmd_stop_chess_trigger(message: Message) -> None:
 async def cmd_code_audit_menu(message: Message) -> None:
     """Kod tahlili va audit bo'limi."""
     text = (
-        "💻 **Kod Tahlili va Xavfsizlik Auditi**\n\n"
+        "💻 <b>Kod Tahlili va Xavfsizlik Auditi</b>\n\n"
         "Tahlil qilmoqchi bo'lgan kodingizni to'g'ridan-to'g'ri shu yerga yuboring (Python, JS/TS, Go, Java, Rust, SQL va boshqalar).\n\n"
-        "🔍 **Men quyidagilarni aniqlab beraman:**\n"
+        "🔍 <b>Men quyidagilarni aniqlab beraman:</b>\n"
         "1. ⚠️ Yashirin xatolar va mantiqiy nuqsonlar;\n"
         "2. 🛡 Xavfsizlik zaifliklari (SQLi, XSS, Memory leak);\n"
         "3. ⚡ Tezlikni oshirish va SQL/algoritm optimallashtirish;\n"
         "4. 💎 Clean Code va SOLID tamoyillariga mos qayta yozilgan (Refactored) toza kod!\n\n"
         "Kodingizni xabar sifatida yuboring:"
     )
-    await message.answer(text, reply_markup=get_architect_keyboard(), parse_mode="Markdown")
+    await safe_reply(message, text, reply_markup=get_architect_keyboard())
 
 
 @second_bot_router.message(F.text == "🏗 Dastur Arxitekturasi")
 async def cmd_architecture_menu(message: Message) -> None:
     """Dastur arxitekturasi va tizim dizayni."""
     text = (
-        "🏗 **Tizim Arxitekturasi va Dastur Loyihalash**\n\n"
+        "🏗 <b>Tizim Arxitekturasi va Dastur Loyihalash</b>\n\n"
         "Yangi startap yoki murakkab tizim boshlayapsizmi? Menga loyihangiz talablarini yozing:\n\n"
-        "📋 **Masalan:**\n"
-        "• *\"100,000 foydalanuvchili e-tijorat tizimi uchun arxitektura va DB schema tuzib ber\"*\n"
-        "• *\"Telegram bot va WebApp uchun microservice arxitekturasini loyihala\"*\n"
-        "• *\"PostgreSQL vs MongoDB: mening loyihamga qaysi biri mos?\"*\n\n"
+        "📋 <b>Masalan:</b>\n"
+        "• <i>\"100,000 foydalanuvchili e-tijorat tizimi uchun arxitektura va DB schema tuzib ber\"</i>\n"
+        "• <i>\"Telegram bot va WebApp uchun microservice arxitekturasini loyihala\"</i>\n"
+        "• <i>\"PostgreSQL vs MongoDB: mening loyihamga qaysi biri mos?\"</i>\n\n"
         "Loyihangiz tavsifini yozing, men batafsil tizim loyihasini (System Design) tuzib beraman!"
     )
-    await message.answer(text, reply_markup=get_architect_keyboard(), parse_mode="Markdown")
+    await safe_reply(message, text, reply_markup=get_architect_keyboard())
 
 
 @second_bot_router.message(Command("collab"))
@@ -170,40 +176,40 @@ async def cmd_architecture_menu(message: Message) -> None:
 async def cmd_collab_menu(message: Message) -> None:
     """SuperAgent bilan hamkorlik yo'riqnomasi."""
     text = (
-        "🤝 **SuperAgent & Arxitektor Hamkorligi**\n\n"
+        "🤝 <b>SuperAgent & Arxitektor Hamkorligi</b>\n\n"
         "Ikkala sun'iy intellekt agenti bir guruhda birlashganda kuchli tandem hosil bo'ladi:\n\n"
-        "1️⃣ **Guruhga qo'shish:** Ikkala botni ham loyihangiz Telegram guruhiga qo'shing;\n"
-        "2️⃣ **Vazifa yuklash:** Guruhda `/collab [vazifa matni]` deb yozing;\n"
-        "3️⃣ **Muloqot:** Botlarning birontasi fikr bildirsa, ikkinchisi unga qo'shimcha qiladi;\n"
-        "4️⃣ **Shaxmat:** Guruhda `/chess` yozilsa, ular bir-biri bilan o'rtoqlik uchrashuvini boshlaydi!\n\n"
+        "1️⃣ <b>Guruhga qo'shish:</b> Ikkala botni ham loyihangiz Telegram guruhiga qo'shing;\n"
+        "2️⃣ <b>Vazifa yuklash:</b> Guruhda <code>/collab [vazifa matni]</code> deb yozing;\n"
+        "3️⃣ <b>Muloqot:</b> Botlarning birontasi fikr bildirsa, ikkinchisi unga qo'shimcha qiladi;\n"
+        "4️⃣ <b>Shaxmat:</b> Guruhda <code>/chess</code> yozilsa, ular bir-biri bilan o'rtoqlik uchrashuvini boshlaydi!\n\n"
         "Birgalikda ishlashga tayyormiz!"
     )
-    await message.answer(text, reply_markup=get_architect_keyboard(), parse_mode="Markdown")
+    await safe_reply(message, text, reply_markup=get_architect_keyboard())
 
 
 @second_bot_router.message(F.text == "⚡ Mistral Agent Chat")
 async def cmd_mistral_chat_menu(message: Message) -> None:
     """Mistral Agent bilan muloqot rejimi."""
     text = (
-        "⚡ **Mistral Agent Faol Rejimda**\n\n"
-        "Men **Mistral Large / Codestral** neyrotarmoqlari asosida ishlovchi agentman.\n"
+        "⚡ <b>Mistral Agent Faol Rejimda</b>\n\n"
+        "Men <b>Mistral Large / Codestral</b> neyrotarmoqlari asosida ishlovchi agentman.\n"
         "Xotira va kontekst saqlanadi. Menga istalgan savol, g'oya, matematika yoki texnik masalani yuboring!"
     )
-    await message.answer(text, reply_markup=get_architect_keyboard(), parse_mode="Markdown")
+    await safe_reply(message, text, reply_markup=get_architect_keyboard())
 
 
 @second_bot_router.message(F.text == "ℹ️ Arxitektor Haqida")
 async def cmd_about_menu(message: Message) -> None:
     """Arxitektor bot haqida ma'lumot."""
     text = (
-        "ℹ️ **Arxitektor Agent Bot (@architect7_bot)**\n\n"
-        "• **Asosiy AI yadrosi:** Mistral AI Agent (`ag_01a0ba16a68173e8a1cdb3ead308ff14`)\n"
-        "• **Model versiyasi:** Version 1 (Codestral & Mistral Large)\n"
-        "• **Xususiyatlari:** System Design, Code Review, Multi-Agent Collaboration, Chess Engine\n"
-        "• **Hamkor bot:** SuperAgent AI (@SuperAgent)\n\n"
-        "Muallif va dasturchi: **Developer**"
+        "ℹ️ <b>Arxitektor Agent Bot (@architect7_bot)</b>\n\n"
+        "• <b>Asosiy AI yadrosi:</b> Mistral AI Agent (<code>ag_01a0ba16a68173e8a1cdb3ead308ff14</code>)\n"
+        "• <b>Model versiyasi:</b> Version 1 (Codestral & Mistral Large)\n"
+        "• <b>Xususiyatlari:</b> System Design, Code Review, Multi-Agent Collaboration, Chess Engine\n"
+        "• <b>Hamkor bot:</b> SuperAgent AI (@SuperAgent)\n\n"
+        "Muallif va dasturchi: <b>Developer</b>"
     )
-    await message.answer(text, reply_markup=get_architect_keyboard(), parse_mode="Markdown")
+    await safe_reply(message, text, reply_markup=get_architect_keyboard())
 
 
 @second_bot_router.message(F.text)
@@ -211,6 +217,8 @@ async def handle_second_bot_text(message: Message, bot: Bot) -> None:
     """Arxitektor botga kelgan matnli xabarlar."""
     text = (message.text or "").strip()
     is_group = message.chat.type in ("group", "supergroup")
+
+    logger.info("📩 Arxitektor bot matn oldi: is_group=%s, text=%s", is_group, text[:60])
 
     # Agar guruhda bo'lsa, botga murojaat qilinganligini tekshiramiz
     if is_group:
@@ -228,7 +236,7 @@ async def handle_second_bot_text(message: Message, bot: Bot) -> None:
         clean_text = text
 
     if not clean_text:
-        await message.answer("Salom! Sizga qanday yordam bera olaman?", reply_markup=get_architect_keyboard())
+        await safe_reply(message, "Salom! Sizga qanday yordam bera olaman?", reply_markup=get_architect_keyboard())
         return
 
     # Typing ko'rsatkichini berish
@@ -245,7 +253,7 @@ async def handle_second_bot_text(message: Message, bot: Bot) -> None:
         return
 
     # Mistral Agentdan javob olish
-    wait_msg = await message.answer("🧠 *Mistral Arxitektor Agent o'ylamoqda...*", parse_mode="Markdown")
+    wait_msg = await safe_reply(message, "🧠 <i>Mistral Arxitektor Agent o'ylamoqda...</i>", parse_mode="HTML")
     try:
         ans, thinking = await mistral_agent_client.send_message(
             clean_text,
@@ -253,12 +261,12 @@ async def handle_second_bot_text(message: Message, bot: Bot) -> None:
             system_instruction="Siz Telegramdagi professional Arxitektor Agent Botsiz (@architect7_bot). Foydalanuvchilar va SuperAgent bilan o'zbek tilida aniq, professional, do'stona va chuqur tahliliy tilda muloqot qiling."
         )
         try:
-            await wait_msg.edit_text(ans, parse_mode="Markdown")
+            await wait_msg.edit_text(ans, parse_mode="HTML")
         except Exception:
             await wait_msg.edit_text(ans, parse_mode=None)
     except Exception as e:
         logger.error("Arxitektor bot xatosi: %s", e)
         try:
-            await wait_msg.edit_text(f"❌ Xatolik yuz berdi: {e}")
+            await wait_msg.edit_text(f"❌ Xatolik yuz berdi: {e}", parse_mode=None)
         except Exception:
             pass
