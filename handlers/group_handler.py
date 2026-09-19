@@ -388,7 +388,7 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
         from core.bot_collab import handle_agent_collaboration
         from core.mistral_agent_bot import get_second_bot
         sec_bot = get_second_bot()
-        asyncio.create_task(handle_agent_collaboration(task_text, message.chat.id, bot_white=bot, bot_black=sec_bot))
+        asyncio.create_task(handle_agent_collaboration(task_text, message.chat.id, bot_white=bot, bot_black=sec_bot, origin_bot=bot))
         return
 
     # 2. /suhbat yoki /chat (Erkin muloqot / AI Lounge)
@@ -397,7 +397,7 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
         from core.bot_collab import handle_free_chit_chat
         from core.mistral_agent_bot import get_second_bot
         sec_bot = get_second_bot()
-        asyncio.create_task(handle_free_chit_chat(topic_text, message.chat.id, bot_white=bot, bot_black=sec_bot))
+        asyncio.create_task(handle_free_chit_chat(topic_text, message.chat.id, bot_white=bot, bot_black=sec_bot, origin_bot=bot))
         return
 
     # 3. /chess yoki /shaxmat
