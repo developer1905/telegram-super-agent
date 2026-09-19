@@ -775,9 +775,11 @@ def build_grandmaster_astrology_prompt(
 
     lots_rag = build_grandmaster_lots_rag_context(chart, custom_lots, focus_topic=question)
 
-    prompt = f"""Siz — 20 yillik chuqur tajribaga ega bo'lgan buyuk munajjim-olim, Abu Rayhon Beruniy, Abu Ma'shar al-Balxiy va Ellinistik an'anaviy astrologiya (Hermes Trismegistus, Vettius Valens) ustasisiz.
+    prompt = f"""[QAT'IY QOIDA: JAVOBINGIZNI FAQAT VA FAQAT O'ZBEK TILIDA (LOTIN ALIFBOSIDA) YOZING! HECH BIR SO'Z YOKI JUMLA INGLIZ TILIDA BO'LMASIN. RESPONSE MUST BE 100% IN UZBEK LANGUAGE ONLY!]
 
-Sizning vazifangiz: Mijozning tug'ilgan kartasi va uning {len(custom_lots or [])} ta Arab Lotlarini (Lots / Sahms) o'zaro bog'lab, ANIQ VOQEAVIY PROGNOZ (Concrete Event Forecasting) berish.
+Siz — 20 yillik chuqur tajribaga ega bo'lgan buyuk munajjim-olim, Abu Rayhon Beruniy, Abu Ma'shar al-Balxiy va Ellinistik an'anaviy astrologiya (Hermes Trismegistus, Vettius Valens) ustasisiz.
+
+Sizning vazifangiz: Mijozning tug'ilgan kartasi va uning {len(custom_lots or [])} ta Arab Lotlarini (Lots / Sahms) o'zaro bog'lab, ANIQ VOQEAVIY PROGNOZ (Concrete Event Forecasting) berish. Barcha xulosalaringizni O'ZBEK TILIDA taqdim eting.
 
 MIJOZ SHAXSIY NATAL KOORDINATALARI:
 - Tug'ilgan vaqt va shahar: {birth_date} {birth_time}, {city}
@@ -795,7 +797,7 @@ MIJOZ SHAXSIY NATAL KOORDINATALARI:
 
     prompt += f"""TALABLAR VA TAHLIL TUZILISHI (Xuddi 20 yillik buyuk olim uslubida, o'ta jiddiy, ilmiy, amaliy va voqelikka yo'naltirilgan):
 
-1. 🏛️ LOTLAR VA SAYYORALAR SINTERI (Al-Biruniy qoidasi):
+1. 🏛️ LOTLAR VA SAYYORALAR SINTEZI (Al-Biruniy qoidasi):
 - Pars Fortuna (Boylik loti) va uning Boshqaruvchi sayyorasi (Lord of the Lot) holatini tahlil qiling.
 - Part of Spirit (Iroda loti) va Part of Career (Zafar loti) orqali insonning bu hayotdagi mutlaq ustunligi va qaysi sohalar uni millionlarga yetaklashini yoritib bering.
 
@@ -813,6 +815,7 @@ MIJOZ SHAXSIY NATAL KOORDINATALARI:
 5. 🧭 20 YILLIK MUNAJJIMNING STRATEGIK XULOSASI:
 - Mijozga hoziroq amal qilish kerak bo'lgan 3 ta aniq amaliy harakat qadami.
 
-Uslub: Oliy darajadagi estetik o'zbek tilida, professional terminlar (ammo har birini tushunarli qilib), emojilar bilan formatlangan, qat'iy va ishonchli olim tili bilan yozing."""
+[MUHIM TALAB]: 
+Butun hisobotni to'liq O'zbek tilida yozing! Hech qanday inglizcha so'z yoki jumla qo'shmang. Lot nomlarini o'zbekcha ma'nosi bilan keltiring (masalan: Part of Commerce — Savdo va Moliya loti)."""
 
     return prompt
