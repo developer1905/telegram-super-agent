@@ -94,7 +94,10 @@ async def setup_architect_bot(bot: Bot) -> None:
             BotCommand(command="start", description="Arxitektor botni ishga tushirish"),
             BotCommand(command="menu", description="Arxitektor bosh menyusi"),
             BotCommand(command="collab", description="SuperAgent bilan vazifa bajarish (CAMEL/MAPR)"),
+            BotCommand(command="avtopilot", description="Tungi chuqur vazifa (bitmaguncha ishlash)"),
             BotCommand(command="suhbat", description="SuperAgent bilan erkin muloqot (AI Lounge)"),
+            BotCommand(command="stop_suhbat", description="Suhbatni to'xtatish"),
+            BotCommand(command="stop_collab", description="Vazifani to'xtatish"),
             BotCommand(command="chess", description="SuperAgent bilan shaxmat o'ynash"),
             BotCommand(command="code", description="Kod tahlili va audit"),
             BotCommand(command="help", description="Yordam va qo'llanma"),
@@ -113,10 +116,11 @@ async def cmd_start_second_bot(message: Message) -> None:
         "🌪 <b>Assalomu alaykum! Men Arxitektor Agent Botman (@architect7_bot).</b>\n\n"
         "Men <b>Mistral AI</b> platformasidagi maxsus o'qitilgan sun'iy intellekt agenti tomonidan boshqarilaman.\n\n"
         "✨ <b>Mening ixtisoslashgan sohalarim:</b>\n"
-        "• 🏗 <b>Dasturiy arxitektura va loyihalash</b> (Microservices, DB schema, API design);\n"
+        "• 🏗 <b>Dasturiy arxitektura va tizim dizayni</b> (Microservices, DB schema, API design);\n"
         "• 💻 <b>Kod tahlili, refaktoring va xavfsizlik auditi</b>;\n"
         "• 🤝 <b>SuperAgent bilan CAMEL & ChatDev hamkorligi</b> (<code>/collab [vazifa]</code>);\n"
-        "• 🗣️ <b>SuperAgent bilan erkin suhbat</b> (<code>/suhbat [mavzu]</code>);\n"
+        "• 🌙 <b>Tungi avtonom avtopilot</b> (<code>/avtopilot [vazifa]</code> — tugamaguncha ishlaydi);\n"
+        "• 🗣️ <b>SuperAgent bilan erkin suhbat</b> (<code>/suhbat 10 [mavzu]</code>);\n"
         "• ♟️ <b>SuperAgent bilan jonli shaxmat bahsi</b> (<code>/chess</code>).\n\n"
         "Quyidagi shaxsiy menyudan kerakli bo'limni tanlang yoki to'g'ridan-to'g'ri topshiriq bering!"
     )
@@ -129,22 +133,24 @@ async def cmd_help_second_bot(message: Message) -> None:
     help_text = (
         "💡 <b>Arxitektor Agent Buyruqlari:</b>\n\n"
         "• <code>/start</code> yoki <code>/menu</code> — Arxitektor shaxsiy menyusini ochish\n"
-        "• <code>/collab [vazifa]</code> — SuperAgent bilan 4 bosqichli CAMEL/ChatDev/MAPR hamkorligi\n"
-        "• <code>/suhbat [mavzu]</code> — SuperAgent bilan erkin mavzuda jonli muloqot\n"
-        "• <code>/chess</code> yoki <code>/shaxmat</code> — SuperAgent bilan shaxmat bahsini boshlash\n"
+        "• <code>/collab [vazifa]</code> — SuperAgent bilan ko'p agentli hamkorlik\n"
+        "• <code>/avtopilot [vazifa]</code> — Tungi vazifa (loyiha to'liq bitmaguncha suhbatlashib yaxshilayveradi)\n"
+        "• <code>/suhbat [N] [mavzu]</code> — Erkin muloqot (masalan: <code>/suhbat 12 Kvant fizikasi</code>)\n"
+        "• <code>/stop_suhbat</code> — Erkin suhbatni to'xtatish\n"
+        "• <code>/stop_collab</code> — Avtopilot/Hamkorlikni to'xtatish\n"
+        "• <code>/chess</code> yoki <code>/shaxmat</code> — Shaxmat bahsini boshlash\n"
         "• <code>/stop_chess</code> — Shaxmat o'yinini to'xtatish\n"
-        "• <code>/code</code> — Kod tahlili va xavfsizlik auditi\n"
-        "• Guruhda <b>@architect7_bot [savol]</b> — Guruhda botga murojaat qilish"
+        "• <code>/code</code> — Kod tahlili va xavfsizlik auditi"
     )
     await safe_reply(message, help_text, reply_markup=get_architect_keyboard(), parse_mode="HTML")
 
 
 # ─── KO'P AGENTLI HAMKORLIK & ERKIN SUHBAT BUYRUQLARI ──────────
 
-@second_bot_router.message(Command("collab", "hamkorlik"))
-@second_bot_router.message(F.text.lower().startswith(("/collab", "/hamkorlik", "🤝 camel hamkorlik")))
+@second_bot_router.message(Command("collab", "hamkorlik", "avtopilot", "kechki_vazifa", "night"))
+@second_bot_router.message(F.text.lower().startswith(("/collab", "/hamkorlik", "/avtopilot", "/kechki_vazifa", "🤝 camel hamkorlik", "🌙 avtopilot")))
 async def cmd_collab_trigger(message: Message, bot: Bot) -> None:
-    """SuperAgent bilan birgalikda vazifa bajarish (CAMEL/MAPR)."""
+    """SuperAgent bilan birgalikda vazifa bajarish (CAMEL/MAPR / Avtopilot)."""
     raw_text = (message.text or "").strip()
     if message.chat.id < 0:
         cmd_mention = re.match(r"^/\w+@(\w+)", raw_text)
@@ -154,19 +160,21 @@ async def cmd_collab_trigger(message: Message, bot: Bot) -> None:
             if cmd_mention.group(1).lower() != target_uname:
                 return
 
-    task_text = re.sub(r"^(?:/collab|/hamkorlik|🤝 CAMEL Hamkorlik)(?:@\w+)?[:\s]*", "", raw_text, flags=re.IGNORECASE).strip()
+    is_night_autopilot = any(w in raw_text.lower() for w in ["/avtopilot", "/kechki_vazifa", "/night", "🌙 avtopilot"])
+    task_text = re.sub(r"^(?:/collab|/hamkorlik|/avtopilot|/kechki_vazifa|/night|🤝 CAMEL Hamkorlik|🌙 Avtopilot)(?:@\w+)?[:\s]*", "", raw_text, flags=re.IGNORECASE).strip()
 
     if not task_text and message.reply_to_message:
         task_text = message.reply_to_message.text or message.reply_to_message.caption or ""
 
     if not task_text:
         prompt_info = (
-            "🤝 <b>CAMEL & ChatDev Ko'p Agentli Hamkorlik</b>\n\n"
+            "🤝 <b>CAMEL & ChatDev Avtonom Hamkorlik</b>\n\n"
             "SuperAgent bilan birgalikda vazifani bajarishimiz uchun topshiriq bering:\n\n"
-            "💡 <b>Foydalanish:</b> <code>/collab [vazifa matni]</code>\n"
+            "💡 <b>Foydalanish:</b>\n"
+            "• <code>/collab [vazifa matni]</code> — Standart ko'p agentli hamkorlik\n"
+            "• <code>/avtopilot [vazifa matni]</code> — Tungi to'liq rejim (vazifa bitmaguncha ikkala bot ishlab boraveradi)\n\n"
             "📋 <b>Masalan:</b>\n"
-            "• <code>/collab Python FastAPI va Redis kesh tizimi arxitekturasi va kodini yozib ber</code>\n"
-            "• <code>/collab Telegram bot uchun foydalanuvchilar ma'lumotlar bazasi sxemasi va CRUD kodini tuz</code>\n\n"
+            "• <code>/avtopilot Python FastAPI da to'liq JWT auth, Redis va Postgres CRUD mikroservisini loyihala va kodini yoz</code>\n\n"
             "Iltimos, vazifangizni yozib yuboring:"
         )
         await safe_reply(message, prompt_info, reply_markup=get_architect_keyboard(), parse_mode="HTML")
@@ -175,7 +183,19 @@ async def cmd_collab_trigger(message: Message, bot: Bot) -> None:
     from core.bot_collab import handle_agent_collaboration
     main_bot = get_main_bot_instance() or bot
     sec_bot = bot
-    asyncio.create_task(handle_agent_collaboration(task_text, message.chat.id, bot_white=main_bot, bot_black=sec_bot, origin_bot=bot))
+    max_r = 6 if is_night_autopilot else 4
+    asyncio.create_task(handle_agent_collaboration(task_text, message.chat.id, bot_white=main_bot, bot_black=sec_bot, origin_bot=bot, deep_mode=True, max_rounds=max_r))
+
+
+@second_bot_router.message(Command("stop_collab", "stop_task", "toxtat_vazifa"))
+async def cmd_stop_collab_trigger(message: Message) -> None:
+    """Hamkorlik yoki avtopilotni to'xtatish."""
+    from core.bot_collab import stop_collab
+    stopped = stop_collab(str(message.chat.id))
+    if stopped:
+        await safe_reply(message, "🛑 <b>Hamkorlik / Avtopilot vazifasi to'xtatildi.</b>", reply_markup=get_architect_keyboard())
+    else:
+        await safe_reply(message, "⚠️ Hozirda faol hamkorlik vazifasi mavjud emas.", reply_markup=get_architect_keyboard())
 
 
 @second_bot_router.message(Command("suhbat", "chat", "gaplash"))
@@ -191,12 +211,23 @@ async def cmd_free_chat_trigger(message: Message, bot: Bot) -> None:
             if cmd_mention.group(1).lower() != target_uname:
                 return
 
-    topic_text = re.sub(r"^(?:/suhbat|/chat|/gaplash|🗣️ Erkin Suhbat)(?:@\w+)?[:\s]*", "", raw_text, flags=re.IGNORECASE).strip()
+    from core.bot_collab import handle_free_chit_chat, parse_topic_and_turns
+    topic_text, parsed_turns = parse_topic_and_turns(raw_text, default_turns=8)
 
-    from core.bot_collab import handle_free_chit_chat
     main_bot = get_main_bot_instance() or bot
     sec_bot = bot
-    asyncio.create_task(handle_free_chit_chat(topic_text, message.chat.id, bot_white=main_bot, bot_black=sec_bot, origin_bot=bot))
+    asyncio.create_task(handle_free_chit_chat(topic_text, message.chat.id, bot_white=main_bot, bot_black=sec_bot, origin_bot=bot, turns=parsed_turns))
+
+
+@second_bot_router.message(Command("stop_suhbat", "stop_chat", "toxtat_suhbat"))
+async def cmd_stop_suhbat_trigger(message: Message) -> None:
+    """Erkin suhbatni to'xtatish."""
+    from core.bot_collab import stop_chit_chat
+    stopped = stop_chit_chat(str(message.chat.id))
+    if stopped:
+        await safe_reply(message, "🛑 <b>Erkin suhbat to'xtatildi.</b>", reply_markup=get_architect_keyboard())
+    else:
+        await safe_reply(message, "⚠️ Hozirda faol suhbat mavjud emas.", reply_markup=get_architect_keyboard())
 
 
 @second_bot_router.message(Command("chess", "shaxmat"))
