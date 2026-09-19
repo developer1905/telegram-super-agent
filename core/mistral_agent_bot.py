@@ -139,7 +139,15 @@ async def cmd_help_second_bot(message: Message) -> None:
 @second_bot_router.message(F.text.lower().startswith(("/collab", "/hamkorlik", "🤝 camel hamkorlik")))
 async def cmd_collab_trigger(message: Message, bot: Bot) -> None:
     """SuperAgent bilan birgalikda vazifa bajarish (CAMEL/MAPR)."""
-    raw_text = message.text or ""
+    raw_text = (message.text or "").strip()
+    if message.chat.id < 0:
+        cmd_mention = re.match(r"^/\w+@(\w+)", raw_text)
+        if cmd_mention:
+            bot_info = await bot.get_me()
+            target_uname = (bot_info.username or "architect7_bot").lower()
+            if cmd_mention.group(1).lower() != target_uname:
+                return
+
     task_text = re.sub(r"^(?:/collab|/hamkorlik|🤝 CAMEL Hamkorlik)(?:@\w+)?[:\s]*", "", raw_text, flags=re.IGNORECASE).strip()
 
     if not task_text and message.reply_to_message:
@@ -168,7 +176,15 @@ async def cmd_collab_trigger(message: Message, bot: Bot) -> None:
 @second_bot_router.message(F.text.lower().startswith(("/suhbat", "/chat", "/gaplash", "🗣️ erkin suhbat")))
 async def cmd_free_chat_trigger(message: Message, bot: Bot) -> None:
     """SuperAgent bilan erkin mavzuda jonli muloqot (AI Lounge)."""
-    raw_text = message.text or ""
+    raw_text = (message.text or "").strip()
+    if message.chat.id < 0:
+        cmd_mention = re.match(r"^/\w+@(\w+)", raw_text)
+        if cmd_mention:
+            bot_info = await bot.get_me()
+            target_uname = (bot_info.username or "architect7_bot").lower()
+            if cmd_mention.group(1).lower() != target_uname:
+                return
+
     topic_text = re.sub(r"^(?:/suhbat|/chat|/gaplash|🗣️ Erkin Suhbat)(?:@\w+)?[:\s]*", "", raw_text, flags=re.IGNORECASE).strip()
 
     from core.bot_collab import handle_free_chit_chat
@@ -181,6 +197,15 @@ async def cmd_free_chat_trigger(message: Message, bot: Bot) -> None:
 @second_bot_router.message(F.text == "♟️ AI Shaxmat Bahsi")
 async def cmd_chess_trigger(message: Message, bot: Bot) -> None:
     """Shaxmat o'yinini boshlash."""
+    raw_text = (message.text or "").strip()
+    if message.chat.id < 0:
+        cmd_mention = re.match(r"^/\w+@(\w+)", raw_text)
+        if cmd_mention:
+            bot_info = await bot.get_me()
+            target_uname = (bot_info.username or "architect7_bot").lower()
+            if cmd_mention.group(1).lower() != target_uname:
+                return
+
     from core.bot_collab import handle_start_chess
     main_bot = get_main_bot_instance() or bot
     await handle_start_chess(message, bot_white=main_bot, bot_black=bot)
