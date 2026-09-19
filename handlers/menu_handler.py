@@ -11,6 +11,7 @@ handlers/menu_handler.py — Asosiy Menyu va Inline Tugmalar
 
 from __future__ import annotations
 
+import datetime
 import html
 import logging
 import uuid
