@@ -46,6 +46,17 @@ NVIDIA_API_KEY: str = os.getenv("NVIDIA_API_KEY", "") or os.getenv("NEMOTRON_API
 NVIDIA_BASE_URL: str = os.getenv("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1")
 NVIDIA_MODEL: str = os.getenv("NVIDIA_MODEL", "nvidia/llama-3.1-nemotron-70b-instruct")
 
+# ─── Mistral AI API (https://console.mistral.ai) ─────────────
+MISTRAL_API_KEY: str = os.getenv("MISTRAL_API_KEY", "")
+MISTRAL_BASE_URL: str = os.getenv("MISTRAL_BASE_URL", "https://api.mistral.ai/v1")
+MISTRAL_MODEL: str = os.getenv("MISTRAL_MODEL", "codestral-latest")
+MISTRAL_FALLBACK_MODELS: list[str] = [
+    "codestral-latest",
+    "ministral-8b-latest",
+    "open-mistral-nemo",
+    "ministral-3b-latest",
+]
+
 # ─── OmniRoute AI Gateway (https://github.com/diegosouzapw/OmniRoute) ────
 # 350+ provayder, 150+ bepul tier va 1200+ modellarni birlashtiruvchi shlyuz
 OMNIROUTE_BASE_URL: str = os.getenv("OMNIROUTE_BASE_URL", "http://localhost:20128/v1")
