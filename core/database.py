@@ -199,6 +199,18 @@ class DatabaseManager:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+
+            # 10. Astrology Profiles (Shaxsiy Natal Karta va Astrologik Xotira)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS astrology_profiles (
+                    user_id TEXT PRIMARY KEY,
+                    birth_date TEXT NOT NULL,
+                    birth_time TEXT NOT NULL,
+                    city TEXT NOT NULL,
+                    chart_json TEXT NOT NULL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
             conn.commit()
 
     # ─── 1. SHAXSIY MA'LUMOTLAR BAZASI (KNOWLEDGE BASE / RAG) ──────
@@ -949,6 +961,54 @@ class DatabaseManager:
                 conn.commit()
                 return cur.rowcount > 0
         return await loop.run_in_executor(None, _del)
+
+    # ─── 10. ASTROLOGIYA VA NATAL KARTA PROFILLARI ─────────────────
+
+    async def save_astrology_profile(self, user_id: str, birth_date: str, birth_time: str, city: str, chart_data: dict) -> bool:
+        """Foydalanuvchining shaxsiy astrologik profili va hisoblangan kartasini saqlash."""
+        loop = asyncio.get_running_loop()
+        u_id = str(user_id)
+        chart_str = json.dumps(chart_data, ensure_ascii=False)
+        def _save():
+            with self._get_sqlite_conn() as conn:
+                cur = conn.cursor()
+                cur.execute("""
+                    INSERT INTO astrology_profiles (user_id, birth_date, birth_time, city, chart_json, updated_at)
+                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT(user_id) DO UPDATE SET
+                        birth_date = excluded.birth_date,
+                        birth_time = excluded.birth_time,
+                        city = excluded.city,
+                        chart_json = excluded.chart_json,
+                        updated_at = CURRENT_TIMESTAMP
+                """, (u_id, birth_date, birth_time, city, chart_str))
+                conn.commit()
+                return True
+        return await loop.run_in_executor(None, _save)
+
+    async def get_astrology_profile(self, user_id: str) -> Optional[dict]:
+        """Foydalanuvchining shaxsiy astrologik kartasini olish."""
+        loop = asyncio.get_running_loop()
+        u_id = str(user_id)
+        def _get():
+            with self._get_sqlite_conn() as conn:
+                conn.row_factory = sqlite3.Row
+                cur = conn.cursor()
+                cur.execute("SELECT * FROM astrology_profiles WHERE user_id = ? LIMIT 1", (u_id,))
+                row = cur.fetchone()
+                if not row:
+                    # Agar aniq topilmasa, standart 'default' yoki admin ID profili bormi tekshiramiz
+                    cur.execute("SELECT * FROM astrology_profiles ORDER BY updated_at DESC LIMIT 1")
+                    row = cur.fetchone()
+                if row:
+                    res = dict(row)
+                    try:
+                        res["chart"] = json.loads(res.get("chart_json") or "{}")
+                    except Exception:
+                        res["chart"] = {}
+                    return res
+                return None
+        return await loop.run_in_executor(None, _get)
 
 
 # Global database singleton
