@@ -379,32 +379,50 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
             return
 
     # ── AI DUAL-AGENT HAMKORLIK & CHATDEV PEER REVIEW (CAMEL/AutoGen) ──
-    # 1. /collab yoki /hamkorlik
-    if clean_lower.startswith(("/collab", "/hamkorlik", "/vazifa")):
-        task_text = re.sub(r"^(?:/collab|/hamkorlik|/vazifa)(?:@\w+)?[:\s]*", "", clean_text, flags=re.IGNORECASE).strip()
+    # 0. To'xtatish buyruqlari
+    if clean_lower.startswith(("/stop_collab", "/stop_task", "/toxtat_vazifa")):
+        from core.bot_collab import stop_collab
+        stopped = stop_collab(str(message.chat.id))
+        await safe_message_reply(message, "🛑 <b>Hamkorlik / Avtopilot to'xtatildi.</b>" if stopped else "⚠️ Hozirda faol hamkorlik yo'q.", parse_mode="HTML")
+        return
+
+    if clean_lower.startswith(("/stop_suhbat", "/stop_chat", "/toxtat_suhbat")):
+        from core.bot_collab import stop_chit_chat
+        stopped = stop_chit_chat(str(message.chat.id))
+        await safe_message_reply(message, "🛑 <b>Erkin suhbat to'xtatildi.</b>" if stopped else "⚠️ Hozirda faol suhbat yo'q.", parse_mode="HTML")
+        return
+
+    # 1. /collab yoki /avtopilot
+    if clean_lower.startswith(("/collab", "/hamkorlik", "/vazifa", "/avtopilot", "/kechki_vazifa", "/night")):
+        is_night = any(w in clean_lower for w in ["/avtopilot", "/kechki_vazifa", "/night"])
+        task_text = re.sub(r"^(?:/collab|/hamkorlik|/vazifa|/avtopilot|/kechki_vazifa|/night)(?:@\w+)?[:\s]*", "", clean_text, flags=re.IGNORECASE).strip()
         if not task_text and message.reply_to_message:
             task_text = message.reply_to_message.text or message.reply_to_message.caption or ""
         if not task_text:
             await safe_message_reply(
                 message,
-                "💡 <b>CAMEL & ChatDev Hamkorligi:</b>\nFoydalanish: <code>/collab [vazifa matni]</code>\n"
-                "Masalan: <code>/collab Python FastAPI da mikroservis arxitekturasi va kodini yozing</code>",
+                "💡 <b>Ko'p Agentli Avtonom Hamkorlik:</b>\n"
+                "• <code>/collab [vazifa]</code> — Standart hamkorlik\n"
+                "• <code>/avtopilot [vazifa]</code> — Tungi to'liq rejim (vazifa bitmaguncha suhbatlashib yaxshilayveradi)\n"
+                "• <code>/stop_collab</code> — To'xtatish\n\n"
+                "Masalan: <code>/avtopilot Python FastAPI da to'liq JWT auth va Redis kesh tizimi loyihasi va kodini yozing</code>",
                 parse_mode="HTML"
             )
             return
         from core.bot_collab import handle_agent_collaboration
         from core.mistral_agent_bot import get_second_bot
         sec_bot = get_second_bot()
-        asyncio.create_task(handle_agent_collaboration(task_text, message.chat.id, bot_white=bot, bot_black=sec_bot, origin_bot=bot))
+        max_r = 6 if is_night else 4
+        asyncio.create_task(handle_agent_collaboration(task_text, message.chat.id, bot_white=bot, bot_black=sec_bot, origin_bot=bot, deep_mode=True, max_rounds=max_r))
         return
 
     # 2. /suhbat yoki /chat (Erkin muloqot / AI Lounge)
     if clean_lower.startswith(("/suhbat", "/chat", "/gaplashing", "/fikr")):
-        topic_text = re.sub(r"^(?:/suhbat|/chat|/gaplashing|/fikr)(?:@\w+)?[:\s]*", "", clean_text, flags=re.IGNORECASE).strip()
-        from core.bot_collab import handle_free_chit_chat
+        from core.bot_collab import handle_free_chit_chat, parse_topic_and_turns
+        topic_text, parsed_turns = parse_topic_and_turns(clean_text, default_turns=8)
         from core.mistral_agent_bot import get_second_bot
         sec_bot = get_second_bot()
-        asyncio.create_task(handle_free_chit_chat(topic_text, message.chat.id, bot_white=bot, bot_black=sec_bot, origin_bot=bot))
+        asyncio.create_task(handle_free_chit_chat(topic_text, message.chat.id, bot_white=bot, bot_black=sec_bot, origin_bot=bot, turns=parsed_turns))
         return
 
     # 3. /chess yoki /shaxmat
