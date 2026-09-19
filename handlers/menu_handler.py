@@ -323,7 +323,27 @@ def build_models_menu() -> InlineKeyboardMarkup:
         )
     )
 
+    # 1, 2, 3, 4, 5 Maxsus Elita Agent Modellari
+    builder.row(
+        InlineKeyboardButton(text="🧠 1. DeepSeek V4 (1M)", callback_data="model:or_deepseek_v4"),
+        InlineKeyboardButton(text="⚡ 2. Qwen 3.8 Agent", callback_data="model:or_qwen38"),
+    )
+    builder.row(
+        InlineKeyboardButton(text="🌊 3. Laguna S 2.1", callback_data="model:or_laguna"),
+        InlineKeyboardButton(text="🔬 4. NVIDIA Nemotron", callback_data="model:nvidia"),
+    )
+    builder.row(
+        InlineKeyboardButton(text="📝 5. Dots-3 Note (512K)", callback_data="model:or_dots_note"),
+        InlineKeyboardButton(text="⚡ Hermes 3 (405B)", callback_data="model:or_hermes"),
+    )
+    builder.row(
+        InlineKeyboardButton(text="🔀 Smart Free Router", callback_data="model:or_auto"),
+        InlineKeyboardButton(text="🌐 OmniRoute Gateway", callback_data="model:omniroute"),
+    )
+
     for key, name in OPENROUTER_MODEL_NAMES.items():
+        if key in ("deepseek_v4", "qwen38", "laguna", "nemotron_reasoning", "dots_note", "hermes", "auto"):
+            continue
         builder.row(
             InlineKeyboardButton(
                 text=name,
@@ -810,6 +830,41 @@ async def rk_video_downloader(message: Message) -> None:
         "Bot videoni darhol Telegram orqali MP4 formatda sizga jo'natadi!"
     )
     await message.answer(text, parse_mode="Markdown")
+
+
+@router.message(ADMIN_FILTER, F.text.in_({"/deepseek", "deepseek", "DeepSeek"}))
+async def cmd_quick_deepseek(message: Message, ai_manager: AIManager) -> None:
+    res = ai_manager.switch_openrouter_model("deepseek_v4")
+    await message.answer(f"🧠 **DeepSeek V4 Flash (1M) Faollashtirildi!**\n\n{res}\n\n💡 1 Million token kontekstli eng kuchli mantiqiy model.", parse_mode="Markdown")
+
+
+@router.message(ADMIN_FILTER, F.text.in_({"/qwen", "qwen", "Qwen"}))
+async def cmd_quick_qwen(message: Message, ai_manager: AIManager) -> None:
+    res = ai_manager.switch_openrouter_model("qwen38")
+    await message.answer(f"⚡ **Qwen 3.8 27B Agent Faollashtirildi!**\n\n{res}\n\n💡 Asboblarni boshqarish va dasturlash bo'yicha kuchli agent rejimida.", parse_mode="Markdown")
+
+
+@router.message(ADMIN_FILTER, F.text.in_({"/laguna", "laguna", "Laguna"}))
+async def cmd_quick_laguna(message: Message, ai_manager: AIManager) -> None:
+    res = ai_manager.switch_openrouter_model("laguna")
+    await message.answer(f"🌊 **Poolside Laguna S 2.1 Faollashtirildi!**\n\n{res}\n\n💡 Dasturiy arxitektura va avtonom erkin fikrlash rejimi faol.", parse_mode="Markdown")
+
+
+@router.message(ADMIN_FILTER, F.text.in_({"/nemotron", "nemotron", "Nemotron"}))
+async def cmd_quick_nemotron(message: Message, ai_manager: AIManager) -> None:
+    res = ai_manager.switch_provider("nvidia")
+    await message.answer(
+        f"🔬 **NVIDIA Nemotron Reasoning Engine Faollashtirildi!**\n\n{res}\n\n"
+        f"💡 Nvidia mantiqiy zanjiri (Chain-of-Thought) va ilmiy tahlil modeli faol.\n"
+        f"• Rasmiy NVIDIA NIM yoki OpenRouter zaxira serverlari orqali 100% ishlaydi!",
+        parse_mode="Markdown",
+    )
+
+
+@router.message(ADMIN_FILTER, F.text.in_({"/dots", "dots", "Dots"}))
+async def cmd_quick_dots(message: Message, ai_manager: AIManager) -> None:
+    res = ai_manager.switch_openrouter_model("dots_note")
+    await message.answer(f"📝 **Dots-3 Note (512K) Faollashtirildi!**\n\n{res}\n\n💡 Katta hujjatlar va tadqiqotlarni chuqur tahlil qilish uchun faol.", parse_mode="Markdown")
 
 
 @router.message(ADMIN_FILTER, F.text.in_({"🤖 AI Modellar", "AI Modellar", "ai modellar", "Modellar", "modellar", "/models"}))
@@ -1849,6 +1904,22 @@ async def cb_model_omniroute(cb: CallbackQuery, ai_manager: AIManager) -> None:
         f"💡 Agar lokal shlyuz ishlatmoqchi bo'lsangiz, terminalda bir marta:\n"
         f"`npx omniroute`\n"
         f"buyrug'ini yurgizib qo'yishingiz mumkin!"
+    )
+    await safe_edit_text(cb, text, reply_markup=builder.as_markup(), parse_mode="Markdown")
+
+
+@router.callback_query(ADMIN_FILTER, F.data == "model:nvidia")
+async def cb_model_nvidia(cb: CallbackQuery, ai_manager: AIManager) -> None:
+    await cb.answer("✅ NVIDIA Nemotron tanlandi")
+    result = ai_manager.switch_provider("nvidia")
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="◀️ Orqaga", callback_data="menu:models"))
+    text = (
+        f"{result}\n\n"
+        f"🔬 **NVIDIA Nemotron Reasoning Engine:**\n"
+        f"NVIDIA kompaniyasining eng ilg'or mantiqiy fikrlash (Chain-of-Thought) va "
+        f"matematik/ilmiy tahlil modeli faollashtirildi!\n\n"
+        f"• NVIDIA NIM API yoki OpenRouter dagi bepul Nemotron zaxiralari orqali 100% barqaror ishlaydi."
     )
     await safe_edit_text(cb, text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
