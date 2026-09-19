@@ -208,9 +208,14 @@ class DatabaseManager:
                     birth_time TEXT NOT NULL,
                     city TEXT NOT NULL,
                     chart_json TEXT NOT NULL,
+                    custom_lots_json TEXT DEFAULT '[]',
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+            try:
+                cursor.execute("ALTER TABLE astrology_profiles ADD COLUMN custom_lots_json TEXT DEFAULT '[]'")
+            except Exception:
+                pass
             conn.commit()
 
     # ─── 1. SHAXSIY MA'LUMOTLAR BAZASI (KNOWLEDGE BASE / RAG) ──────
@@ -1006,9 +1011,35 @@ class DatabaseManager:
                         res["chart"] = json.loads(res.get("chart_json") or "{}")
                     except Exception:
                         res["chart"] = {}
+                    try:
+                        res["custom_lots"] = json.loads(res.get("custom_lots_json") or "[]")
+                    except Exception:
+                        res["custom_lots"] = []
                     return res
                 return None
         return await loop.run_in_executor(None, _get)
+
+    async def save_custom_lots(self, user_id: str, lots: list) -> bool:
+        """Foydalanuvchining 513 tagacha bo'lgan maxsus Arab Lotlarini saqlash."""
+        loop = asyncio.get_running_loop()
+        u_id = str(user_id)
+        lots_str = json.dumps(lots, ensure_ascii=False)
+        def _save_lots():
+            with self._get_sqlite_conn() as conn:
+                cur = conn.cursor()
+                # Avval profil bormi tekshiramiz
+                cur.execute("SELECT user_id FROM astrology_profiles WHERE user_id = ?", (u_id,))
+                if cur.fetchone():
+                    cur.execute("UPDATE astrology_profiles SET custom_lots_json = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?", (lots_str, u_id))
+                else:
+                    # Agar profil bo'lmasa, dastlabki bo'sh profil bilan yaratamiz
+                    cur.execute("""
+                        INSERT INTO astrology_profiles (user_id, birth_date, birth_time, city, chart_json, custom_lots_json, updated_at)
+                        VALUES (?, '2000-01-01', '12:00', 'Toshkent', '{}', ?, CURRENT_TIMESTAMP)
+                    """, (u_id, lots_str))
+                conn.commit()
+                return True
+        return await loop.run_in_executor(None, _save_lots)
 
 
 # Global database singleton
