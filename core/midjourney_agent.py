@@ -172,8 +172,21 @@ def get_user_image_settings(user_id: int) -> dict:
             "model": "flux",
             "ar": "1:1",
             "style": "photo",
+            "draw_mode": False,  # Rasm kutish holati
         }
     return USER_IMAGE_SETTINGS[user_id]
+
+
+def set_draw_mode(user_id: int, active: bool) -> None:
+    """Foydalanuvchi uchun rasm kutish holatini o'rnatish/o'chirish."""
+    cfg = get_user_image_settings(user_id)
+    cfg["draw_mode"] = active
+
+
+def is_draw_mode(user_id: int) -> bool:
+    """Foydalanuvchi rasm chizish rejimida ekanligini tekshirish."""
+    return get_user_image_settings(user_id).get("draw_mode", False)
+
 
 
 def build_image_studio_panel(user_id: int) -> tuple[str, InlineKeyboardMarkup]:
@@ -183,7 +196,10 @@ def build_image_studio_panel(user_id: int) -> tuple[str, InlineKeyboardMarkup]:
     - 5 ta Proporsiyalar (1:1, 16:9, 9:16, 4:3, 3:4)
     - 6 ta Badiiy Uslublar (Fotorealistik, Anime, 3D, Cyberpunk, Moybo'yoq, Vektor)
     - 4 ta Bir zumda ishga tushuvchi Tayyor G'oyalar
+    Ochilganda draw_mode = True bo'ladi (keyingi oddiy matn rasm prompt sifatida qabul qilinadi).
     """
+    # Studio ochilganda draw_mode'ni yoqish
+    set_draw_mode(user_id, True)
     cfg = get_user_image_settings(user_id)
     cur_model = cfg.get("model", "flux")
     cur_ar = cfg.get("ar", "1:1")
