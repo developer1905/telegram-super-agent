@@ -57,6 +57,11 @@ MISTRAL_FALLBACK_MODELS: list[str] = [
     "ministral-3b-latest",
 ]
 
+# ─── 2-Bot: Mistral Arxitektor Agent Bot (@architect7_bot) ───
+SECOND_BOT_TOKEN: str = os.getenv("SECOND_BOT_TOKEN", "")
+MISTRAL_AGENT_API_KEY: str = os.getenv("MISTRAL_AGENT_API_KEY", "")
+MISTRAL_AGENT_ID: str = os.getenv("MISTRAL_AGENT_ID", "ag_01a0ba16a68173e8a1cdb3ead308ff14")
+
 # ─── OmniRoute AI Gateway (https://github.com/diegosouzapw/OmniRoute) ────
 # 350+ provayder, 150+ bepul tier va 1200+ modellarni birlashtiruvchi shlyuz
 OMNIROUTE_BASE_URL: str = os.getenv("OMNIROUTE_BASE_URL", "http://localhost:20128/v1")
