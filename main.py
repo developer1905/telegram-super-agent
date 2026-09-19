@@ -139,6 +139,8 @@ async def api_switch_model_handler(request: web.Request) -> web.Response:
 
     if model == "gemini":
         ai_manager.switch_provider("gemini")
+    elif model in ("nvidia", "nemotron"):
+        ai_manager.switch_provider("nvidia")
     elif model == "omniroute":
         ai_manager.switch_provider("omniroute")
     else:
