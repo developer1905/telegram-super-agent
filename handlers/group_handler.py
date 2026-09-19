@@ -37,6 +37,7 @@ from aiogram.types import (
     ChatMemberUpdated,
     BufferedInputFile,
     ChatPermissions,
+    CallbackQuery,
 )
 
 from config import ADMIN_ID
@@ -423,6 +424,15 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
         from core.mistral_agent_bot import get_second_bot
         sec_bot = get_second_bot()
         asyncio.create_task(handle_free_chit_chat(topic_text, message.chat.id, bot_white=bot, bot_black=sec_bot, origin_bot=bot, turns=parsed_turns))
+        return
+
+    # 2.5. /bahs yoki /debate (Multi-Agent Debate & Jury)
+    if clean_lower.startswith(("/bahs", "/debate", "/tortishuv")):
+        from core.bot_collab import handle_agent_debate, parse_topic_and_turns
+        topic_text, parsed_turns = parse_topic_and_turns(clean_text, default_turns=6)
+        from core.mistral_agent_bot import get_second_bot
+        sec_bot = get_second_bot()
+        asyncio.create_task(handle_agent_debate(topic_text, message.chat.id, bot_white=bot, bot_black=sec_bot, origin_bot=bot, rounds=parsed_turns))
         return
 
     # 3. /chess yoki /shaxmat
@@ -831,3 +841,49 @@ async def handle_channel_post(message: Message, ai_manager: AIManager, bot: Bot)
         )
     except Exception as exc:
         logger.error("Kanal postida AI javob xatosi: %s", exc)
+
+
+@router.callback_query(F.data.startswith("collab_vote:"))
+async def cb_group_collab_vote(callback: CallbackQuery) -> None:
+    """Multi-Agent Debate hakamlik ovozlarini hisoblash va natijalarni jonli yangilash."""
+    parts = callback.data.split(":")
+    if len(parts) != 3:
+        await callback.answer("⚠️ Noto'g'ri ovoz berish formati.", show_alert=True)
+        return
+
+    _, debate_id, choice = parts
+    from core.bot_collab import DEBATE_VOTES
+    debate = DEBATE_VOTES.get(debate_id)
+    if not debate:
+        await callback.answer("⏳ Ushbu bahs uchun ovoz berish yakunlangan yoki mavjud emas.", show_alert=True)
+        return
+
+    user_id = callback.from_user.id
+    for k in ["superagent", "architect", "draw"]:
+        debate[k].discard(user_id)
+
+    debate[choice].add(user_id)
+
+    s_count = len(debate["superagent"])
+    a_count = len(debate["architect"])
+    d_count = len(debate["draw"])
+    total = s_count + a_count + d_count
+
+    s_pct = int((s_count / total) * 100) if total > 0 else 0
+    a_pct = int((a_count / total) * 100) if total > 0 else 0
+    d_pct = int((d_count / total) * 100) if total > 0 else 0
+
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    b = InlineKeyboardBuilder()
+    b.button(text=f"🤖 SuperAgent ({s_count} ta • {s_pct}%)", callback_data=f"collab_vote:{debate_id}:superagent")
+    b.button(text=f"🌪 Arxitektor ({a_count} ta • {a_pct}%)", callback_data=f"collab_vote:{debate_id}:architect")
+    b.button(text=f"🤝 Durang ({d_count} ta • {d_pct}%)", callback_data=f"collab_vote:{debate_id}:draw")
+    b.adjust(2, 1)
+
+    try:
+        await callback.message.edit_reply_markup(reply_markup=b.as_markup())
+    except Exception:
+        pass
+
+    target_name = "SuperAgent" if choice == "superagent" else ("Arxitektor" if choice == "architect" else "Durang")
+    await callback.answer(f"✅ Ovozingiz qabul qilindi: {target_name} ({total} ta ovoz berildi)!", show_alert=False)
