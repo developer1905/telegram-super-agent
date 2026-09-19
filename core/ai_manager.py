@@ -521,16 +521,19 @@ class AIManager:
         messages.append({"role": "user", "content": cur_text})
 
         fallback_free_models = [
+            "deepseek/deepseek-v4-flash-0731:free",
+            "qwen/qwen3.8-27b:free",
+            "openrouter/free",
             "nousresearch/hermes-3-llama-3.1-405b:free",
-            "nex-agi/nex-n2.5-mini:free",
             "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
-            "nousresearch/hermes-3-llama-3.1-70b",
-            "liquid/lfm-2.5-2.6b:free",
-            "inclusionai/ling-3.0-flash-vl:free",
+            "poolside/laguna-s-2.1:free",
+            "nex-agi/nex-n2.5-pro:free",
+            "nex-agi/nex-n2.5-mini:free",
+            "dots-studio/dots-3-note-preview:free",
             "cohere/north-mini-code:free",
         ]
 
-        target_model = OPENROUTER_MODELS.get(self.current_or_model, "nousresearch/hermes-3-llama-3.1-405b:free")
+        target_model = OPENROUTER_MODELS.get(self.current_or_model, "openrouter/free")
         models_to_try = [target_model] + [m for m in fallback_free_models if m != target_model]
 
         for model_id in models_to_try:
