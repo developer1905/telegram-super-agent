@@ -90,15 +90,18 @@ def build_reply_ai_studio_menu() -> ReplyKeyboardMarkup:
     """1-guruh: AI & Kreativ Studio vositalari."""
     buttons = [
         [
+            KeyboardButton(text="🔮 Astrologiya & Natal Karta"),
             KeyboardButton(text="🎨 Rasm Chizish Studio"),
+        ],
+        [
             KeyboardButton(text="⚡ Hermes Agent"),
-        ],
-        [
             KeyboardButton(text="🔬 Deep Research"),
-            KeyboardButton(text="💻 Kod & Shartnoma Auditi"),
         ],
         [
+            KeyboardButton(text="💻 Kod & Shartnoma Auditi"),
             KeyboardButton(text="🎙 Ovozli Agent (STT & TTS)"),
+        ],
+        [
             KeyboardButton(text="🎬 Video Yuklovchi"),
         ],
         [
@@ -221,15 +224,18 @@ def build_inline_ai_menu() -> InlineKeyboardMarkup:
     """Inline: AI & Kreativ Studio bo'limi."""
     builder = InlineKeyboardBuilder()
     builder.row(
-        InlineKeyboardButton(text="🎨 Rasm Chizish Studio", callback_data="menu:image_studio"),
+        InlineKeyboardButton(text="🔮 Astrologiya & Natal", callback_data="menu:astrology"),
+        InlineKeyboardButton(text="🎨 Rasm Studio", callback_data="menu:image_studio"),
+    )
+    builder.row(
         InlineKeyboardButton(text="⚡ Hermes 3 Agent", callback_data="menu:hermes"),
-    )
-    builder.row(
         InlineKeyboardButton(text="🔬 Deep Research", callback_data="menu:deep_research"),
-        InlineKeyboardButton(text="💻 Kod Auditi", callback_data="menu:code_audit"),
     )
     builder.row(
-        InlineKeyboardButton(text="🎙 Ovozli Audio (TTS)", callback_data="menu:tts_info"),
+        InlineKeyboardButton(text="💻 Kod Auditi", callback_data="menu:code_audit"),
+        InlineKeyboardButton(text="🎙 Ovozli Audio", callback_data="menu:tts_info"),
+    )
+    builder.row(
         InlineKeyboardButton(text="🎬 Video Yuklovchi", callback_data="menu:video_dl"),
     )
     builder.row(
@@ -480,6 +486,170 @@ async def rk_back_to_main(message: Message) -> None:
         reply_markup=build_reply_keyboard_menu(),
         parse_mode="Markdown",
     )
+
+
+def build_astrology_menu(has_profile: bool = False) -> InlineKeyboardMarkup:
+    """Astrologiya interaktiv boshqaruv paneli klaviaturasi."""
+    builder = InlineKeyboardBuilder()
+    if has_profile:
+        builder.row(
+            InlineKeyboardButton(text="🌌 Natal Kartam", callback_data="astro:view_natal"),
+            InlineKeyboardButton(text="🔄 Bugungi Tranzitlar", callback_data="astro:view_transits"),
+        )
+        builder.row(
+            InlineKeyboardButton(text="☀️ Yillik Solyar Prognoz", callback_data="astro:view_solar"),
+            InlineKeyboardButton(text="☪️ Arab Nuqtalari (Boylik)", callback_data="astro:view_arabic"),
+        )
+        builder.row(
+            InlineKeyboardButton(text="🧠 AI Munajjim Tahlili", callback_data="astro:ai_report"),
+        )
+        builder.row(
+            InlineKeyboardButton(text="✏️ Kartani Yangilash", callback_data="astro:setup"),
+            InlineKeyboardButton(text="◀️ Orqaga", callback_data="menu:cat_ai"),
+        )
+    else:
+        builder.row(
+            InlineKeyboardButton(text="✨ Natal Karta Yaratish", callback_data="astro:setup"),
+        )
+        builder.row(
+            InlineKeyboardButton(text="◀️ Orqaga", callback_data="menu:cat_ai"),
+        )
+    return builder.as_markup()
+
+
+@router.message(ADMIN_FILTER, F.text.in_({"🔮 Astrologiya & Natal Karta", "Astrologiya & Natal Karta", "Astrologiya", "astrologiya", "/astrology", "/natal"}))
+async def rk_astrology(message: Message) -> None:
+    """Astrologiya va Natal Karta boshqaruv paneli."""
+    profile = await db.get_astrology_profile(str(message.from_user.id))
+    has_profile = bool(profile and profile.get("chart"))
+
+    if has_profile:
+        chart = profile["chart"]
+        asc = chart.get("ascendant", {}).get("formatted", "Noma'lum")
+        sun_sign = chart.get("planets", {}).get("Quyosh", {}).get("sign", "Noma'lum")
+        moon_sign = chart.get("planets", {}).get("Oy", {}).get("sign", "Noma'lum")
+        text = (
+            f"🔮 **Professional Astrologiya & Natal Karta Paneli**\n\n"
+            f"👤 **Egasining xaritasi:** `{profile.get('birth_date')}` `{profile.get('birth_time')}`, `{profile.get('city')}`\n"
+            f"☀️ **Quyosh:** `{sun_sign}` | 🌙 **Oy:** `{moon_sign}`\n"
+            f"🌟 **Ufq (Ascendant):** `{asc}`\n\n"
+            f"Quyidagi bo'limlardan birini tanlang va professional tahlil oling 👇"
+        )
+    else:
+        text = (
+            "🔮 **Professional Astrologiya & Natal Karta Tizimi**\n\n"
+            "Sizning tug'ilgan ma'lumotlaringiz hali kiritilmagan.\n\n"
+            "📌 **Qanday kiritiladi?** Shunchaki chatga yozing:\n"
+            "`/natal YYYY-MM-DD HH:MM Shahar`\n\n"
+            "Masalan:\n"
+            "• `/natal 1998-05-19 14:30 Toshkent`\n"
+            "• `/natal 2001-11-05 09:15 Samarqand`\n\n"
+            "Yoki quyidagi **'✨ Natal Karta Yaratish'** tugmasini bosing!"
+        )
+
+    await message.answer(text, reply_markup=build_astrology_menu(has_profile), parse_mode="Markdown")
+
+
+@router.message(ADMIN_FILTER, Command("natal"))
+async def cmd_natal_param(message: Message, command: CommandObject) -> None:
+    """'/natal YYYY-MM-DD HH:MM Shahar' buyrug'i orqali natal karta hisoblash va saqlash."""
+    args = (command.args or "").strip()
+    if not args:
+        await rk_astrology(message)
+        return
+
+    parts = args.split()
+    date_str = parts[0] if len(parts) > 0 else ""
+    time_str = parts[1] if len(parts) > 1 and ":" in parts[1] else "12:00"
+    city_parts = parts[2:] if len(parts) > 2 else (parts[1:] if ":" not in time_str else ["Toshkent"])
+    city_str = " ".join(city_parts) if city_parts else "Toshkent"
+
+    wait_msg = await message.answer("🔭 **Astronomik koordinatalar va sayyoralar uylari hisoblanmoqda...**", parse_mode="Markdown")
+    try:
+        from core.astrology_agent import calculate_full_natal_chart, calculate_transits
+        chart = calculate_full_natal_chart(date_str, time_str, city_str)
+        await db.save_astrology_profile(
+            user_id=str(message.from_user.id),
+            birth_date=date_str,
+            birth_time=time_str,
+            city=city_str,
+            chart_data=chart,
+        )
+
+        asc = chart["ascendant"]["formatted"]
+        mc = chart["mc"]["formatted"]
+        fortuna = chart["arabic_parts"]["Pars Fortuna (Omad va Boylik)"]["formatted"]
+        spirit = chart["arabic_parts"]["Part of Spirit (Ruh va Iroda)"]["formatted"]
+
+        p_lines = []
+        for p_name, p_data in chart["planets"].items():
+            p_lines.append(f"  • {p_data.get('planet_symbol', '●')} **{p_name}:** `{p_data.get('formatted')}` ({p_data.get('house')})")
+
+        res_text = (
+            f"🌌 **SHAXSIY NATAL KARTANGIZ TAYYOR BO'LDI!**\n\n"
+            f"📅 **Sana va Vaqt:** `{date_str} {time_str}`\n"
+            f"📍 **Joy:** `{chart['city']}` (GMT+{chart['tz']:.0f})\n"
+            f"🌟 **Ufq (ASC):** `{asc}`\n"
+            f"👑 **Cho'qqi (MC):** `{mc}`\n\n"
+            f"🪐 **Sayyoralar Joylashuvi:**\n" + "\n".join(p_lines) + "\n\n"
+            f"☪️ **Qadimiy Arab Nuqtalari:**\n"
+            f"• 💰 **Pars Fortuna (Omad/Boylik):** `{fortuna}`\n"
+            f"• 🕊 **Part of Spirit (Ruh/Maqsad):** `{spirit}`\n\n"
+            f"✅ **Karta xotiraga saqlandi!** Endi barcha AI modellar (Hermes, Gemini, DeepSeek) ushbu xaritaning xususiyatlarini biladi."
+        )
+        await wait_msg.edit_text(res_text, reply_markup=build_astrology_menu(True), parse_mode="Markdown")
+    except Exception as e:
+        logger.error("cmd_natal xatosi: %s", e)
+        await wait_msg.edit_text(f"❌ Xatolik yuz berdi: {e}\nMisol: `/natal 1998-05-19 14:30 Toshkent`")
+
+
+@router.message(ADMIN_FILTER, Command("transit"))
+async def cmd_transits(message: Message) -> None:
+    """Bugungi kun sayyoralarining natal kartaga ta'sirini ko'rish."""
+    profile = await db.get_astrology_profile(str(message.from_user.id))
+    if not profile or not profile.get("chart"):
+        await message.answer("⚠️ Avval natal kartangizni kiriting: `/natal YYYY-MM-DD HH:MM Shahar`", parse_mode="Markdown")
+        return
+
+    from core.astrology_agent import calculate_transits
+    chart = profile["chart"]
+    transits = calculate_transits(chart.get("planets", {}))
+
+    if not transits:
+        await message.answer("🌟 **Bugun sayyoralarda keskin noqulay tranzitlar yo'q.** Tinch va osoyishta davr.")
+        return
+
+    lines = [f"🔄 **BUGUNGI KUNINGIZ UCHUN FAOL TRANZITLAR ({datetime.date.today().strftime('%d.%m.%Y')}):**\n"]
+    for t in transits:
+        lines.append(f"• **{t['transiting_planet']}** {t['symbol']} **{t['natal_planet']}** ({t['orb']}°)\n  └ _{t['meaning']}_")
+
+    await message.answer("\n".join(lines), parse_mode="Markdown")
+
+
+@router.message(ADMIN_FILTER, Command("solar"))
+async def cmd_solar(message: Message, command: CommandObject) -> None:
+    """Yillik Quyosh qaytishi (Solar Return) prognozi."""
+    profile = await db.get_astrology_profile(str(message.from_user.id))
+    if not profile or not profile.get("chart"):
+        await message.answer("⚠️ Avval natal kartangizni kiriting: `/natal YYYY-MM-DD HH:MM Shahar`", parse_mode="Markdown")
+        return
+
+    from core.astrology_agent import calculate_solar_return_summary
+    target_year = 2026
+    if command.args and command.args.strip().isdigit():
+        target_year = int(command.args.strip())
+
+    chart = profile["chart"]
+    sun_lon = chart.get("planets", {}).get("Quyosh", {}).get("longitude", 0.0)
+    solar_info = calculate_solar_return_summary(sun_lon, target_year=target_year)
+
+    text = (
+        f"☀️ **SOLYAR KARTA — {target_year}-YIL UCHUN SHAXSIY PROGNOZ**\n\n"
+        f"🌟 **Quyosh darajasi:** `{solar_info['natal_sun_degree']}`\n\n"
+        f"📋 **Yilning Asosiy Tendensiyalari:**\n"
+        + "\n".join(solar_info["key_themes"])
+    )
+    await message.answer(text, parse_mode="Markdown")
 
 
 @router.message(ADMIN_FILTER, F.text.in_({"🎨 Rasm Chizish", "Rasm Chizish", "rasm chizish", "🎨 Rasm Chizish Studio", "Rasm Chizish Studio", "🎨 Midjourney Rasm", "Midjourney Rasm", "midjourney rasm", "/imagine", "/midjourney"}))
@@ -895,6 +1065,189 @@ async def cb_cat_ai(cb: CallbackQuery) -> None:
         "🎨 **AI & Kreativ Studio**\n\nKerakli ijodiy va agentik vositani tanlang:",
         reply_markup=build_inline_ai_menu(),
     )
+
+
+@router.callback_query(ADMIN_FILTER, F.data == "menu:astrology")
+async def cb_menu_astrology(cb: CallbackQuery) -> None:
+    """Astrologiya bosh menyusi."""
+    await cb.answer()
+    profile = await db.get_astrology_profile(str(cb.from_user.id))
+    has_profile = bool(profile and profile.get("chart"))
+    if has_profile:
+        chart = profile["chart"]
+        asc = chart.get("ascendant", {}).get("formatted", "Noma'lum")
+        sun = chart.get("planets", {}).get("Quyosh", {}).get("sign", "Noma'lum")
+        moon = chart.get("planets", {}).get("Oy", {}).get("sign", "Noma'lum")
+        text = (
+            f"🔮 **Professional Astrologiya & Natal Karta**\n\n"
+            f"👤 `{profile.get('birth_date')} {profile.get('birth_time')}`, `{profile.get('city')}`\n"
+            f"☀️ Quyosh: `{sun}` | 🌙 Oy: `{moon}`\n"
+            f"🌟 Ufq (ASC): `{asc}`\n\n"
+            f"Bo'limni tanlang 👇"
+        )
+    else:
+        text = (
+            "🔮 **Professional Astrologiya & Natal Karta**\n\n"
+            "Sizning tug'ilgan ma'lumotlaringiz hali kiritilmagan.\n"
+            "Kiritish uchun chatga yozing:\n"
+            "`/natal 1998-05-19 14:30 Toshkent`"
+        )
+    await safe_edit_text(cb, text, reply_markup=build_astrology_menu(has_profile))
+
+
+@router.callback_query(ADMIN_FILTER, F.data == "astro:view_natal")
+async def cb_astro_view_natal(cb: CallbackQuery) -> None:
+    """Natal kartani ko'rish."""
+    await cb.answer()
+    profile = await db.get_astrology_profile(str(cb.from_user.id))
+    if not profile or not profile.get("chart"):
+        await cb.answer("Karta topilmadi", show_alert=True)
+        return
+
+    chart = profile["chart"]
+    asc = chart.get("ascendant", {}).get("formatted")
+    mc = chart.get("mc", {}).get("formatted")
+    p_lines = []
+    for p_name, p_data in chart.get("planets", {}).items():
+        p_lines.append(f"• {p_data.get('planet_symbol', '●')} **{p_name}:** `{p_data.get('formatted')}` ({p_data.get('house', '1-Uy')})")
+
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="◀️ Orqaga", callback_data="menu:astrology"))
+    text = (
+        f"🌌 **SHAXSIY NATAL XARITANGIZ:**\n\n"
+        f"📅 `{profile.get('birth_date')} {profile.get('birth_time')}`, `{profile.get('city')}`\n"
+        f"🌟 **Ufq (ASC):** `{asc}`\n"
+        f"👑 **Cho'qqi (MC):** `{mc}`\n\n"
+        f"🪐 **Sayyoralar:**\n" + "\n".join(p_lines)
+    )
+    await safe_edit_text(cb, text, reply_markup=builder.as_markup())
+
+
+@router.callback_query(ADMIN_FILTER, F.data == "astro:view_transits")
+async def cb_astro_view_transits(cb: CallbackQuery) -> None:
+    """Joriy tranzitlarni ko'rish."""
+    await cb.answer()
+    profile = await db.get_astrology_profile(str(cb.from_user.id))
+    if not profile or not profile.get("chart"):
+        await cb.answer("Karta topilmadi", show_alert=True)
+        return
+
+    from core.astrology_agent import calculate_transits
+    chart = profile["chart"]
+    transits = calculate_transits(chart.get("planets", {}))
+
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="◀️ Orqaga", callback_data="menu:astrology"))
+
+    if not transits:
+        await safe_edit_text(cb, "🌟 **Bugun sayyoralarda keskin noqulay tranzitlar yo'q.** Tinch va osoyishta davr.", reply_markup=builder.as_markup())
+        return
+
+    lines = [f"🔄 **BUGUNGI KUN UCHUN FAOL TRANZITLAR ({datetime.date.today().strftime('%d.%m.%Y')}):**\n"]
+    for t in transits[:7]:
+        lines.append(f"• **{t['transiting_planet']}** {t['symbol']} **{t['natal_planet']}** ({t['orb']}°)\n  └ _{t['meaning']}_")
+
+    await safe_edit_text(cb, "\n".join(lines), reply_markup=builder.as_markup())
+
+
+@router.callback_query(ADMIN_FILTER, F.data == "astro:view_solar")
+async def cb_astro_view_solar(cb: CallbackQuery) -> None:
+    """Solyar hisobotni ko'rish."""
+    await cb.answer()
+    profile = await db.get_astrology_profile(str(cb.from_user.id))
+    if not profile or not profile.get("chart"):
+        await cb.answer("Karta topilmadi", show_alert=True)
+        return
+
+    from core.astrology_agent import calculate_solar_return_summary
+    chart = profile["chart"]
+    sun_lon = chart.get("planets", {}).get("Quyosh", {}).get("longitude", 0.0)
+    solar_info = calculate_solar_return_summary(sun_lon, target_year=2026)
+
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="◀️ Orqaga", callback_data="menu:astrology"))
+    text = (
+        f"☀️ **SOLYAR KARTA — 2026-YIL UCHUN PROGNOZ**\n\n"
+        f"🌟 Quyosh darajasi: `{solar_info['natal_sun_degree']}`\n\n"
+        f"📋 **Yilning Asosiy Tendensiyalari:**\n"
+        + "\n".join(solar_info["key_themes"])
+    )
+    await safe_edit_text(cb, text, reply_markup=builder.as_markup())
+
+
+@router.callback_query(ADMIN_FILTER, F.data == "astro:view_arabic")
+async def cb_astro_view_arabic(cb: CallbackQuery) -> None:
+    """Arab nuqtalarini ko'rish."""
+    await cb.answer()
+    profile = await db.get_astrology_profile(str(cb.from_user.id))
+    if not profile or not profile.get("chart"):
+        await cb.answer("Karta topilmadi", show_alert=True)
+        return
+
+    chart = profile["chart"]
+    arabic = chart.get("arabic_parts", {})
+
+    lines = ["☪️ **QADIMIY ARAB NUQTALARI (ARABIC PARTS):**\n"]
+    for name, d in arabic.items():
+        lines.append(f"• **{name}:** `{d.get('formatted')}`\n  └ _{d.get('description')}_\n")
+
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="◀️ Orqaga", callback_data="menu:astrology"))
+    await safe_edit_text(cb, "\n".join(lines), reply_markup=builder.as_markup())
+
+
+@router.callback_query(ADMIN_FILTER, F.data == "astro:ai_report")
+async def cb_astro_ai_report(cb: CallbackQuery, ai_manager: AIManager) -> None:
+    """AI orqali to'liq tahliliy astrologik hisobot generatsiya qilish."""
+    await cb.answer("AI hisobot tayyorlamoqda...")
+    profile = await db.get_astrology_profile(str(cb.from_user.id))
+    if not profile or not profile.get("chart"):
+        await cb.answer("Avval kartangizni kiriting", show_alert=True)
+        return
+
+    chart = profile["chart"]
+    wait_msg = await cb.message.answer("🔮 **Professional munajjim (Nous Hermes 3 / Gemini) shaxsiy kartangizni chuqur tahlil qilmoqda...**", parse_mode="Markdown")
+
+    prompt = (
+        f"Siz professional munajjim va shaxsiyat psixologiyasining buyuk tahlilchisisiz.\n"
+        f"Mening tug'ilgan ma'lumotlarim: {profile.get('birth_date')} {profile.get('birth_time')}, {profile.get('city')}.\n"
+        f"Quyidagi xaritani professional tahlil qiling:\n"
+        f"- Ufq (Ascendant): {chart.get('ascendant', {}).get('formatted')}\n"
+        f"- Quyosh: {chart.get('planets', {}).get('Quyosh', {}).get('formatted')} ({chart.get('planets', {}).get('Quyosh', {}).get('house')})\n"
+        f"- Oy: {chart.get('planets', {}).get('Oy', {}).get('formatted')} ({chart.get('planets', {}).get('Oy', {}).get('house')})\n"
+        f"- Pars Fortuna (Omad/Boylik nuqtasi): {chart.get('arabic_parts', {}).get('Pars Fortuna (Omad va Boylik)', {}).get('formatted')}\n"
+        f"- Part of Spirit: {chart.get('arabic_parts', {}).get('Part of Spirit (Ruh va Iroda)', {}).get('formatted')}\n\n"
+        f"Tahlil tarkibi (O'zbek tilida, estetik va aniq):\n"
+        f"1) 👤 **Shaxsiyat kuchi va yashirin talant** (Quyosh, Oy, Ascendant sintezi);\n"
+        f"2) 💰 **Moliya, Boylik va Karyera** (Pars Fortuna, 2-uy va 10-uy MC bo'yicha);\n"
+        f"3) 💖 **Munosabatlar va sevgi** (Venera va 7-uy);\n"
+        f"4) 🎯 **2026-yil uchun asosiy strategik tavsiya**.\n"
+        f"Qisqa, lo'nda va amaliy hayotda qo'llash mumkin bo'lgan uslubda yozing."
+    )
+
+    try:
+        report = await ai_manager.generate(prompt)
+        await wait_msg.edit_text(report[:4000], parse_mode="Markdown")
+    except Exception as e:
+        logger.error("Astro AI report xatosi: %s", e)
+        await wait_msg.edit_text(f"❌ AI hisobot generatsiyasida xatolik: {e}")
+
+
+@router.callback_query(ADMIN_FILTER, F.data == "astro:setup")
+async def cb_astro_setup(cb: CallbackQuery) -> None:
+    await cb.answer()
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="◀️ Orqaga", callback_data="menu:astrology"))
+    text = (
+        "✏️ **Natal Kartangizni Kiritish yoki Yangilash:**\n\n"
+        "Tug'ilgan kuningiz, aniq vaqti va tug'ilgan shahringizni quyidagi formatda chatga yuboring:\n\n"
+        "`/natal YYYY-MM-DD HH:MM Shahar`\n\n"
+        "Masalan:\n"
+        "• `/natal 1998-05-19 14:30 Toshkent`\n"
+        "• `/natal 2000-01-01 08:00 Samarqand`\n\n"
+        "*(Agar aniq soatini bilmasangiz, 12:00 deb yozing)*"
+    )
+    await safe_edit_text(cb, text, reply_markup=builder.as_markup())
 
 
 @router.callback_query(ADMIN_FILTER, F.data == "menu:cat_prod")
