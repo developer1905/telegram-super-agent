@@ -611,23 +611,19 @@
           </div>
           <div class="d-flex align-items-center gap-1">
             <select class="form-select form-select-sm py-1 px-2" style="font-size: 11px; width: auto; max-width: 175px;" id="chat-model-quick-select" title="Modelni almashtirish">
-              <option value="gemini">✨ Google Gemini (Tezkor)</option>
-              <option value="hermes">⚡ Nous Hermes 3 (405B Agent)</option>
-              <option value="hermes70b">🧠 Nous Hermes 3 (70B Reasoning)</option>
-              <option value="auto">🔀 Auto (Eng tez bepul)</option>
-              <option value="nex_mini">⚡ Nex N2.5 Mini</option>
-              <option value="nemotron_reasoning">🧠 Nemotron 30B Fikr</option>
+              <option value="gemini">✨ Google Gemini 3.1 Flash</option>
+              <option value="deepseek_v4">🧠 DeepSeek V4 (1M Fikr)</option>
+              <option value="nvidia">🔬 NVIDIA Nemotron 120B</option>
+              <option value="laguna">🌊 Laguna S 2.1 Arxitektor</option>
+              <option value="dots_note">📝 Dots-3 Note (512K)</option>
+              <option value="nex_pro">🔥 Nex-AGI Pro Agent</option>
+              <option value="nex_mini">⚡ Nex Mini Tezkor</option>
               <option value="liquid">💧 Liquid LFM 2.6B</option>
-              <option value="ling_vl">👁 Ling 3.0 Vision</option>
               <option value="cohere_code">💻 Cohere Mini Code</option>
-              <option value="nemotron_ultra">⚡ Nemotron 550B</option>
-              <option value="nemotron_super">🚀 Nemotron 120B</option>
-              <option value="nemotron_lightning">⚡ Nemotron 3.5 Tez</option>
-              <option value="gemma31b">🌟 Google Gemma 31B</option>
-              <option value="gemma26b">✨ Google Gemma 26B</option>
-              <option value="glm">💬 GLM 5.2 Suhbat</option>
-              <option value="nex_pro">🔥 Nex-AGI N2.5 Pro</option>
-              <option value="inkling">💡 Inkling Ijodkor</option>
+              <option value="ling_vl">👁 Ling 3.0 Vision</option>
+              <option value="qwen38">⚡ Qwen 3.8 Agent</option>
+              <option value="hermes">⚡ Nous Hermes 3 Agent</option>
+              <option value="auto">🔀 Smart Free Router</option>
               <option value="omniroute">🌐 OmniRoute Gateway</option>
             </select>
             <button class="btn btn-sm btn-outline-secondary rounded-pill px-2 py-1" style="font-size: 11px;" onclick="clearInAppChat()" title="Suhbatni tozalash">
@@ -716,20 +712,18 @@
         </div>
         <div class="row g-2" id="model-group">
           <div class="col-6 col-md-4"><div class="neon-pill active" data-model="gemini">✨ Gemini 3.1 Flash</div></div>
-          <div class="col-6 col-md-4"><div class="neon-pill" data-model="auto">🔀 Auto (Tezkor)</div></div>
-          <div class="col-6 col-md-4"><div class="neon-pill" data-model="nex_mini">⚡ Nex N2.5 Mini</div></div>
-          <div class="col-6 col-md-4"><div class="neon-pill" data-model="nemotron_reasoning">🧠 Nemotron Fikr</div></div>
+          <div class="col-6 col-md-4"><div class="neon-pill" data-model="deepseek_v4">🧠 DeepSeek V4 (1M)</div></div>
+          <div class="col-6 col-md-4"><div class="neon-pill" data-model="nvidia">🔬 NVIDIA Nemotron 120B</div></div>
+          <div class="col-6 col-md-4"><div class="neon-pill" data-model="laguna">🌊 Laguna S 2.1</div></div>
+          <div class="col-6 col-md-4"><div class="neon-pill" data-model="dots_note">📝 Dots-3 Note (512K)</div></div>
+          <div class="col-6 col-md-4"><div class="neon-pill" data-model="nex_pro">🔥 Nex-AGI Pro</div></div>
+          <div class="col-6 col-md-4"><div class="neon-pill" data-model="nex_mini">⚡ Nex Mini Tezkor</div></div>
           <div class="col-6 col-md-4"><div class="neon-pill" data-model="liquid">💧 Liquid LFM 2.6B</div></div>
+          <div class="col-6 col-md-4"><div class="neon-pill" data-model="cohere_code">💻 Cohere Code</div></div>
           <div class="col-6 col-md-4"><div class="neon-pill" data-model="ling_vl">👁 Ling 3.0 Vision</div></div>
-          <div class="col-6 col-md-4"><div class="neon-pill" data-model="cohere_code">💻 Cohere Mini Code</div></div>
-          <div class="col-6 col-md-4"><div class="neon-pill" data-model="nemotron_ultra">⚡ Nemotron 550B</div></div>
-          <div class="col-6 col-md-4"><div class="neon-pill" data-model="nemotron_super">🚀 Nemotron 120B</div></div>
-          <div class="col-6 col-md-4"><div class="neon-pill" data-model="nemotron_lightning">⚡ Nemotron Tezkor</div></div>
-          <div class="col-6 col-md-4"><div class="neon-pill" data-model="gemma31b">🌟 Google Gemma 31B</div></div>
-          <div class="col-6 col-md-4"><div class="neon-pill" data-model="gemma26b">✨ Google Gemma 26B</div></div>
-          <div class="col-6 col-md-4"><div class="neon-pill" data-model="glm">💬 GLM 5.2 Suhbat</div></div>
-          <div class="col-6 col-md-4"><div class="neon-pill" data-model="nex_pro">🔥 Nex-AGI N2.5 Pro</div></div>
-          <div class="col-6 col-md-4"><div class="neon-pill" data-model="inkling">💡 Inkling Ijodkor</div></div>
+          <div class="col-6 col-md-4"><div class="neon-pill" data-model="qwen38">⚡ Qwen 3.8 Agent</div></div>
+          <div class="col-6 col-md-4"><div class="neon-pill" data-model="hermes">⚡ Hermes 3 Agent</div></div>
+          <div class="col-6 col-md-4"><div class="neon-pill" data-model="auto">🔀 Smart Router</div></div>
           <div class="col-6 col-md-4"><div class="neon-pill" data-model="omniroute">🌐 OmniRoute (350+ AI)</div></div>
         </div>
       </div>
@@ -1711,12 +1705,23 @@
           document.getElementById('stat-kb').innerText = data.knowledge_count || 0;
           document.getElementById('stat-posts').innerText = data.pending_posts || 0;
 
-          const provider = data.current_provider === 'gemini' ? 'Gemini 3.6 Flash' : (data.current_or_model || 'auto');
-          document.getElementById('agent-active-badge').innerText = `${provider} • ${data.current_role || 'universal'}`;
+          let provName = 'Gemini 3.1 Flash';
+          if (data.current_provider === 'gemini') {
+            provName = 'Gemini 3.1 Flash';
+          } else if (data.current_provider === 'nvidia') {
+            provName = 'NVIDIA Nemotron 120B';
+          } else if (data.current_provider === 'omniroute') {
+            provName = 'OmniRoute Gateway';
+          } else {
+            provName = data.current_or_model || 'auto';
+          }
+          document.getElementById('agent-active-badge').innerText = `${provName} • ${data.current_role || 'universal'}`;
 
           let activeModelKey = 'gemini';
           if (data.current_provider === 'gemini') {
             activeModelKey = 'gemini';
+          } else if (data.current_provider === 'nvidia') {
+            activeModelKey = 'nvidia';
           } else if (data.current_provider === 'omniroute') {
             activeModelKey = 'omniroute';
           } else {
