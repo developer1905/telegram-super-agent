@@ -260,7 +260,15 @@ async def api_system_info_handler(request: web.Request) -> web.Response:
     hours = int(uptime_seconds // 3600)
     minutes = int((uptime_seconds % 3600) // 60)
 
+    active_collabs = 0
+    try:
+        from core.bot_collab import ACTIVE_COLLABS, ACTIVE_CHIT_CHATS
+        active_collabs = len(ACTIVE_COLLABS) + len(ACTIVE_CHIT_CHATS)
+    except Exception:
+        pass
+
     return web.json_response({
+        "status": "ok",
         "uptime_human": f"{hours} soat, {minutes} daqiqa",
         "tashkent_time": tashkent_now,
         "userbot_connected": userbot_connected,
@@ -268,6 +276,7 @@ async def api_system_info_handler(request: web.Request) -> web.Response:
         "provider": ai_manager.current_provider,
         "model": ai_manager.current_or_model,
         "role": ai_manager.current_role,
+        "active_collabs": active_collabs,
     })
 
 
