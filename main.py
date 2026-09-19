@@ -1031,15 +1031,34 @@ async def main() -> None:
     dp.include_router(voice_handler.router)    # Voice-to-Task
     dp.include_router(group_handler.router)    # Guruhlar, kanallar va my_chat_member
 
-    # 2-Bot (Mistral Arxitektor Agent Bot @architect7_bot)
-    second_bot = get_second_bot()
-    if second_bot:
-        dp.include_router(second_bot_router)
-        logger.info("✅ 2-Bot: Mistral Arxitektor Agent Bot (@architect7_bot) routeri ulandi")
-
     dp.include_router(message_handler.router)  # Oxirida (catch-all)
 
     logger.info("✅ Barcha handlerlar ulandi (Guruhlar va Kanallar avtopiloti qo'shildi)")
+
+    # 2-Botni (Mistral Arxitektor @architect7_bot) mustaqil fonda ishga tushirish
+    second_bot = get_second_bot()
+    if second_bot:
+        async def _run_second_bot_isolated():
+            try:
+                dp_second = Dispatcher()
+                dp_second.include_router(second_bot_router)
+                await second_bot.delete_webhook(drop_pending_updates=False)
+                sec_me = await second_bot.get_me()
+                logger.info("🚀 2-Bot (@%s - %s) mustaqil dispatcher bilan ishga tushdi!", sec_me.username, sec_me.first_name)
+                await dp_second.start_polling(
+                    second_bot,
+                    allowed_updates=[
+                        "message",
+                        "edited_message",
+                        "channel_post",
+                        "edited_channel_post",
+                        "callback_query",
+                    ],
+                )
+            except Exception as sec_err:
+                logger.error("2-Bot polling xatosi: %s", sec_err)
+
+        asyncio.create_task(_run_second_bot_isolated())
 
     # 6. Smart Inbox Triage kuzatuvchisini faollashtirish
     if userbot_module.userbot and userbot_module.userbot.is_connected():
@@ -1062,7 +1081,8 @@ async def main() -> None:
                 f"✅ Userbot: {'ulandi' if userbot_module.userbot else '⚠️ ulanmagan'}\n"
                 "✅ Scheduler: 21:00 da hisobot\n"
                 "✅ Health Server: /health endpoint faol\n"
-                "✅ Guruh va Kanallar avtopiloti: faol\n\n"
+                "✅ Guruh va Kanallar avtopiloti: faol\n"
+                f"✅ 2-Bot (@architect7_bot): {'faol' if second_bot else 'sozlanmagan'}\n\n"
                 "Menyuni ochish uchun /start ni bosing."
             ),
             parse_mode="Markdown",
@@ -1070,16 +1090,7 @@ async def main() -> None:
     except Exception as exc:
         logger.warning("Adminga xabar yuborilmadi: %s", exc)
 
-    # 9. Polling boshlash (Webhook to'qnashuvining oldini olish)
-    bots_to_poll = [bot]
-    if second_bot:
-        try:
-            await second_bot.delete_webhook(drop_pending_updates=False)
-            bots_to_poll.append(second_bot)
-            logger.info("✅ 2-Bot (@architect7_bot) polling ro'yxatiga qo'shildi")
-        except Exception as e:
-            logger.warning("2-Bot delete_webhook xatosi: %s", e)
-
+    # 9. Asosiy bot polling boshlash (Webhook to'qnashuvining oldini olish)
     try:
         await bot.delete_webhook(drop_pending_updates=False)
     except Exception as exc:
