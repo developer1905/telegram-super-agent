@@ -774,47 +774,69 @@ async def api_astrology_profile_handler(request: web.Request) -> web.Response:
 
 
 async def api_astrology_interpret_handler(request: web.Request) -> web.Response:
-    """Mini App: AI orqali professional astrologik prognoz generatsiya qilish."""
+    """Mini App: 20 yillik tajribali munajjim-olim (Grandmaster) darajasida voqeaviy prognoz generatsiya qilish."""
     try:
         ai_manager: AIManager = request.app["ai_manager"]
         data = await request.json()
         question = data.get("question", "").strip()
         user_id = str(data.get("user_id", "default_user"))
+        selected_model = data.get("model", "")
 
         profile = await db.get_astrology_profile(user_id)
         if not profile or not profile.get("chart"):
             return web.json_response({"status": "error", "message": "Avval natal kartangizni hisoblang"}, status=400)
 
-        chart = profile["chart"]
-        from core.astrology_agent import calculate_transits
-        transits = calculate_transits(chart.get("planets", {}))
+        custom_lots = profile.get("custom_lots", [])
+        from core.astrology_agent import build_grandmaster_astrology_prompt
+        prompt = build_grandmaster_astrology_prompt(profile, custom_lots, question=question, target_year=2026)
 
-        prompt = (
-            f"Siz professional munajjim va shaxsiyat tahlilchisisiz.\n"
-            f"Mijozning tug'ilgan ma'lumotlari: {profile.get('birth_date')} {profile.get('birth_time')}, {profile.get('city')}.\n"
-            f"Asosiy ko'rsatkichlar:\n"
-            f"- Ufq (ASC): {chart.get('ascendant', {}).get('formatted')}\n"
-            f"- Quyosh: {chart.get('planets', {}).get('Quyosh', {}).get('formatted')} ({chart.get('planets', {}).get('Quyosh', {}).get('house')})\n"
-            f"- Oy: {chart.get('planets', {}).get('Oy', {}).get('formatted')} ({chart.get('planets', {}).get('Oy', {}).get('house')})\n"
-            f"- Pars Fortuna: {chart.get('arabic_parts', {}).get('Pars Fortuna (Omad va Boylik)', {}).get('formatted')}\n"
-            f"- Part of Spirit: {chart.get('arabic_parts', {}).get('Part of Spirit (Ruh va Iroda)', {}).get('formatted')}\n\n"
-        )
-        if question:
-            prompt += f"Mijozning maxsus savoli / maqsadi: {question}\n\n"
+        # Modelni dinamik almashtirish (Hermes 3, Gemini va hk)
+        prev_provider = ai_manager.current_provider
+        prev_model = ai_manager.current_or_model
 
-        prompt += (
-            "Vazifa: O'zbek tilida estetik, tushunarli va professional tahlil bering:\n"
-            "1. 👤 Shaxsiy xarakter kuchi va yashirin qobiliyatlar;\n"
-            "2. 💰 Moliya, Boylik nuqtasi (Pars Fortuna) va Karyera strategiyasi;\n"
-            "3. 💖 Munosabatlar va sevgi uyg'unligi;\n"
-            "4. 🎯 Bugungi tranzitlar va 2026-yil uchun asosiy strategik tavsiya.\n"
-            "Amaliy, konstruktiv va ilhomlantiruvchi tilda yozing."
-        )
+        if "hermes" in selected_model.lower():
+            ai_manager.switch_openrouter_model("hermes")
+        elif "gemini" in selected_model.lower():
+            ai_manager.switch_provider("gemini")
 
-        report = await ai_manager.generate(prompt)
-        return web.json_response({"status": "ok", "report": report})
+        try:
+            report = await ai_manager.generate(prompt, save_history=False, chat_id=f"astro_{user_id}")
+        finally:
+            ai_manager.current_provider = prev_provider
+            ai_manager.current_or_model = prev_model
+
+        return web.json_response({
+            "status": "ok",
+            "report": report,
+            "response": report,
+            "lots_count": len(custom_lots),
+        })
     except Exception as exc:
         logger.error("api_astrology_interpret xatosi: %s", exc)
+        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+
+
+async def api_astrology_lots_handler(request: web.Request) -> web.Response:
+    """Mini App: 513 tagacha bo'lgan Arab Lotlarini qabul qilish va profilga saqlash."""
+    try:
+        data = await request.json()
+        user_id = str(data.get("user_id", "default_user"))
+        raw_lots = data.get("lots_data", "")
+
+        from core.astrology_agent import parse_custom_arabic_lots
+        parsed = parse_custom_arabic_lots(raw_lots)
+        if not parsed:
+            return web.json_response({"status": "error", "message": "Lotlar ma'lumotlarini o'qib bo'lmadi"}, status=400)
+
+        await db.save_custom_lots(user_id, parsed)
+        return web.json_response({
+            "status": "ok",
+            "count": len(parsed),
+            "lots": parsed,
+            "message": f"Muvaffaqiyatli! {len(parsed)} ta Arab Loti xotiraga saqlandi va AI tahliliga ulandi."
+        })
+    except Exception as exc:
+        logger.error("api_astrology_lots xatosi: %s", exc)
         return web.json_response({"status": "error", "message": str(exc)}, status=500)
 
 
@@ -870,6 +892,7 @@ async def start_web_server(ai_manager: AIManager, bot: Optional[Bot] = None) -> 
     app.router.add_post("/api/astrology/calculate", api_astrology_calculate_handler)
     app.router.add_get("/api/astrology/profile", api_astrology_profile_handler)
     app.router.add_post("/api/astrology/interpret", api_astrology_interpret_handler)
+    app.router.add_post("/api/astrology/lots", api_astrology_lots_handler)
 
     port = int(os.getenv("PORT", "8080"))
     runner = web.AppRunner(app)
