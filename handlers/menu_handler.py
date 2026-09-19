@@ -59,60 +59,26 @@ router = Router(name="menu")
 ADMIN_FILTER = F.from_user.id == ADMIN_ID
 
 
-# ─── Yordamchi: Doimiy Klaviatura Menyusi (Reply Keyboard) ────
+# ─── Yordamchi: Doimiy Klaviatura Menyulari (Reply Keyboards) ─
 
 def build_reply_keyboard_menu() -> ReplyKeyboardMarkup:
-    """Doimiy pastki klaviatura menyusi (Reply Keyboard). 100% ishonchli va tezkor."""
+    """Asosiy ixcham pastki klaviatura menyusi (Guruhlangan toifalar)."""
     buttons = [
         [
             KeyboardButton(text="📱 Mini App Paneli"),
         ],
         [
-            KeyboardButton(text="🎨 Rasm Chizish"),
-            KeyboardButton(text="⚡ Hermes Agent"),
+            KeyboardButton(text="🎨 AI & Kreativ Studio"),
+            KeyboardButton(text="💼 Ish & Unumdorlik"),
         ],
         [
-            KeyboardButton(text="📝 Vazifalar (Notion)"),
-            KeyboardButton(text="🌐 Saytlar (Uptime)"),
+            KeyboardButton(text="📈 SMM & Marketing"),
+            KeyboardButton(text="⚙️ Sozlamalar & Xotira"),
         ],
         [
-            KeyboardButton(text="📰 Yangiliklar & Tahlil"),
-            KeyboardButton(text="👤 Shaxsiy Profil (Mem0)"),
-        ],
-        [
-            KeyboardButton(text="🔬 Deep Research"),
-            KeyboardButton(text="💻 Kod & Shartnoma Auditi"),
-        ],
-        [
-            KeyboardButton(text="🎯 Viral SMM"),
-            KeyboardButton(text="🎬 Video Yuklovchi"),
-        ],
-        [
-            KeyboardButton(text="🎙 Ovozli Agent (STT & TTS)"),
-            KeyboardButton(text="🤖 AI Modellar"),
-        ],
-        [
-            KeyboardButton(text="🎭 Tizim Rollari"),
-            KeyboardButton(text="⏰ Rejalashtirilgan Postlar"),
-        ],
-        [
-            KeyboardButton(text="🧠 Doimiy Xotira"),
-            KeyboardButton(text="🔄 Tarixni Sinxronlash"),
-        ],
-        [
-            KeyboardButton(text="📊 Holat & Statistika"),
-            KeyboardButton(text="📡 Telegram Xulosasi"),
-        ],
-        [
-            KeyboardButton(text="📧 Email Pochta"),
-            KeyboardButton(text="🔍 Raqobatchilar Tahlili"),
-        ],
-        [
-            KeyboardButton(text="🧹 Xotirani Tozalash"),
-            KeyboardButton(text="❓ Yordam"),
+            KeyboardButton(text="📊 Holat & Yordam"),
         ],
     ]
-
     return ReplyKeyboardMarkup(
         keyboard=buttons,
         resize_keyboard=True,
@@ -120,13 +86,113 @@ def build_reply_keyboard_menu() -> ReplyKeyboardMarkup:
     )
 
 
-# ─── Yordamchi: Klaviaturalar ────────────────────────────────
+def build_reply_ai_studio_menu() -> ReplyKeyboardMarkup:
+    """1-guruh: AI & Kreativ Studio vositalari."""
+    buttons = [
+        [
+            KeyboardButton(text="🎨 Rasm Chizish Studio"),
+            KeyboardButton(text="⚡ Hermes Agent"),
+        ],
+        [
+            KeyboardButton(text="🔬 Deep Research"),
+            KeyboardButton(text="💻 Kod & Shartnoma Auditi"),
+        ],
+        [
+            KeyboardButton(text="🎙 Ovozli Agent (STT & TTS)"),
+            KeyboardButton(text="🎬 Video Yuklovchi"),
+        ],
+        [
+            KeyboardButton(text="🔙 Asosiy Menyu"),
+        ],
+    ]
+    return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True, is_persistent=True)
+
+
+def build_reply_productivity_menu() -> ReplyKeyboardMarkup:
+    """2-guruh: Ish & Unumdorlik vositalari."""
+    buttons = [
+        [
+            KeyboardButton(text="📝 Vazifalar (Notion)"),
+            KeyboardButton(text="🌐 Saytlar (Uptime)"),
+        ],
+        [
+            KeyboardButton(text="📧 Email Pochta"),
+            KeyboardButton(text="⏰ Eslatmalar"),
+        ],
+        [
+            KeyboardButton(text="📰 Yangiliklar & Tahlil"),
+            KeyboardButton(text="👤 Shaxsiy Profil (Mem0)"),
+        ],
+        [
+            KeyboardButton(text="🔙 Asosiy Menyu"),
+        ],
+    ]
+    return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True, is_persistent=True)
+
+
+def build_reply_smm_menu() -> ReplyKeyboardMarkup:
+    """3-guruh: SMM & Marketing vositalari."""
+    buttons = [
+        [
+            KeyboardButton(text="🎯 Viral SMM"),
+            KeyboardButton(text="⏰ Rejalashtirilgan Postlar"),
+        ],
+        [
+            KeyboardButton(text="🔍 Raqobatchilar Tahlili"),
+            KeyboardButton(text="📡 Telegram Xulosasi"),
+        ],
+        [
+            KeyboardButton(text="🔄 Tarixni Sinxronlash"),
+        ],
+        [
+            KeyboardButton(text="🔙 Asosiy Menyu"),
+        ],
+    ]
+    return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True, is_persistent=True)
+
+
+def build_reply_settings_menu() -> ReplyKeyboardMarkup:
+    """4-guruh: AI Sozlamalari & Doimiy Xotira."""
+    buttons = [
+        [
+            KeyboardButton(text="🤖 AI Modellar"),
+            KeyboardButton(text="🎭 Tizim Rollari"),
+        ],
+        [
+            KeyboardButton(text="🧠 Doimiy Xotira"),
+            KeyboardButton(text="🧹 Xotirani Tozalash"),
+        ],
+        [
+            KeyboardButton(text="🔙 Asosiy Menyu"),
+        ],
+    ]
+    return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True, is_persistent=True)
+
+
+def build_reply_system_menu() -> ReplyKeyboardMarkup:
+    """5-guruh: Tizim Holati & Yordam."""
+    buttons = [
+        [
+            KeyboardButton(text="📊 Holat & Statistika"),
+            KeyboardButton(text="📋 Bugungi Log"),
+        ],
+        [
+            KeyboardButton(text="📱 Mini App Paneli"),
+            KeyboardButton(text="❓ Yordam"),
+        ],
+        [
+            KeyboardButton(text="🔙 Asosiy Menyu"),
+        ],
+    ]
+    return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True, is_persistent=True)
+
+
+# ─── Yordamchi: Inline Klaviaturalar (Guruhlangan va Ixcham) ─
 
 def build_main_menu() -> InlineKeyboardMarkup:
-    """Asosiy menyu inline klaviaturasi."""
+    """Asosiy menyu inline klaviaturasi (toifalarga guruhlangan)."""
     builder = InlineKeyboardBuilder()
 
-    # WebApp URL mavjud bo'lsa yuqorida Mini App tugmasi
     target_web_url = get_clean_webapp_url()
     if target_web_url:
         builder.row(
@@ -137,40 +203,95 @@ def build_main_menu() -> InlineKeyboardMarkup:
         )
 
     builder.row(
+        InlineKeyboardButton(text="🎨 AI & Kreativ", callback_data="menu:cat_ai"),
+        InlineKeyboardButton(text="💼 Ish & Unumdorlik", callback_data="menu:cat_prod"),
+    )
+    builder.row(
+        InlineKeyboardButton(text="📈 SMM & Marketing", callback_data="menu:cat_smm"),
+        InlineKeyboardButton(text="⚙️ Sozlamalar", callback_data="menu:cat_settings"),
+    )
+    builder.row(
+        InlineKeyboardButton(text="📊 Holat & Statistika", callback_data="menu:status"),
+        InlineKeyboardButton(text="❓ Yordam", callback_data="menu:help"),
+    )
+    return builder.as_markup()
+
+
+def build_inline_ai_menu() -> InlineKeyboardMarkup:
+    """Inline: AI & Kreativ Studio bo'limi."""
+    builder = InlineKeyboardBuilder()
+    builder.row(
         InlineKeyboardButton(text="🎨 Rasm Chizish Studio", callback_data="menu:image_studio"),
         InlineKeyboardButton(text="⚡ Hermes 3 Agent", callback_data="menu:hermes"),
     )
     builder.row(
+        InlineKeyboardButton(text="🔬 Deep Research", callback_data="menu:deep_research"),
+        InlineKeyboardButton(text="💻 Kod Auditi", callback_data="menu:code_audit"),
+    )
+    builder.row(
+        InlineKeyboardButton(text="🎙 Ovozli Audio (TTS)", callback_data="menu:tts_info"),
+        InlineKeyboardButton(text="🎬 Video Yuklovchi", callback_data="menu:video_dl"),
+    )
+    builder.row(
+        InlineKeyboardButton(text="◀️ Bosh Menyu", callback_data="menu:main"),
+    )
+    return builder.as_markup()
+
+
+def build_inline_productivity_menu() -> InlineKeyboardMarkup:
+    """Inline: Ish & Unumdorlik bo'limi."""
+    builder = InlineKeyboardBuilder()
+    builder.row(
         InlineKeyboardButton(text="📝 TodoList (Notion)", callback_data="menu:todo"),
         InlineKeyboardButton(text="🌐 Saytlar Uptime", callback_data="menu:uptime"),
+    )
+    builder.row(
+        InlineKeyboardButton(text="📧 Email Agent", callback_data="email:menu"),
+        InlineKeyboardButton(text="⏰ Eslatmalar", callback_data="menu:reminders"),
     )
     builder.row(
         InlineKeyboardButton(text="📰 Yangiliklar & Tahlil", callback_data="menu:news"),
         InlineKeyboardButton(text="👤 Profilim (Mem0)", callback_data="menu:mem0_profile"),
     )
     builder.row(
-        InlineKeyboardButton(text="🎙 Ovozli Audio (TTS)", callback_data="menu:tts_info"),
-        InlineKeyboardButton(text="🤖 Model Tanlash", callback_data="menu:models"),
+        InlineKeyboardButton(text="◀️ Bosh Menyu", callback_data="menu:main"),
     )
+    return builder.as_markup()
+
+
+def build_inline_smm_menu() -> InlineKeyboardMarkup:
+    """Inline: SMM & Marketing bo'limi."""
+    builder = InlineKeyboardBuilder()
     builder.row(
-        InlineKeyboardButton(text="🎭 Rol Tanlash", callback_data="menu:roles"),
-        InlineKeyboardButton(text="⏰ Eslatmalar", callback_data="menu:reminders"),
-    )
-    builder.row(
+        InlineKeyboardButton(text="🎯 Viral SMM", callback_data="menu:viral_smm"),
         InlineKeyboardButton(text="⏰ Reja Postlar", callback_data="menu:scheduled_posts"),
+    )
+    builder.row(
+        InlineKeyboardButton(text="🔍 Raqobatchilar Tahlili", callback_data="menu:competitors"),
+        InlineKeyboardButton(text="📡 Telegram Xulosasi", callback_data="menu:tg_summary"),
+    )
+    builder.row(
+        InlineKeyboardButton(text="🔄 Tarixni Sinxronlash", callback_data="menu:sync_history"),
+    )
+    builder.row(
+        InlineKeyboardButton(text="◀️ Bosh Menyu", callback_data="menu:main"),
+    )
+    return builder.as_markup()
+
+
+def build_inline_settings_menu() -> InlineKeyboardMarkup:
+    """Inline: Sozlamalar & Doimiy Xotira bo'limi."""
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text="🤖 Model Tanlash", callback_data="menu:models"),
+        InlineKeyboardButton(text="🎭 Rol Tanlash", callback_data="menu:roles"),
+    )
+    builder.row(
         InlineKeyboardButton(text="🧠 Doimiy Xotira (RAG)", callback_data="menu:memory"),
+        InlineKeyboardButton(text="🧹 Xotirani Tozalash", callback_data="menu:clear"),
     )
     builder.row(
-        InlineKeyboardButton(text="📊 Holat & Statistika", callback_data="menu:status"),
-        InlineKeyboardButton(text="🧹 Xotirani Tozala", callback_data="menu:clear"),
-    )
-    builder.row(
-        InlineKeyboardButton(text="📧 Email Agent", callback_data="email:menu"),
-        InlineKeyboardButton(text="📱 Telegram Xulosasi", callback_data="menu:tg_summary"),
-    )
-    builder.row(
-        InlineKeyboardButton(text="📋 Bugungi Log", callback_data="menu:log"),
-        InlineKeyboardButton(text="❓ Yordam", callback_data="menu:help"),
+        InlineKeyboardButton(text="◀️ Bosh Menyu", callback_data="menu:main"),
     )
     return builder.as_markup()
 
@@ -277,7 +398,91 @@ async def safe_edit_text(
 
 # ─── Doimiy Pastki Klaviatura Handleri (Reply Keyboard) ──────
 
-@router.message(ADMIN_FILTER, F.text.in_({"🎨 Rasm Chizish", "Rasm Chizish", "rasm chizish", "🎨 Midjourney Rasm", "Midjourney Rasm", "midjourney rasm", "/imagine", "/midjourney"}))
+@router.message(ADMIN_FILTER, F.text.in_({"🎨 AI & Kreativ Studio", "AI & Kreativ Studio", "AI Studio", "ai studio"}))
+async def rk_group_ai_studio(message: Message) -> None:
+    """1-toifa: AI & Kreativ Studio guruh menyusi."""
+    text = (
+        "🎨 **AI & Kreativ Studio Bo'limi**\n\n"
+        "Quyidagi vositalardan birini tanlang:\n"
+        "• 🎨 **Rasm Chizish Studio** — FLUX.1 va Midjourney v6 rasm chizish\n"
+        "• ⚡ **Hermes Agent** — Nous Hermes 3 avtonom fikrlovchi agent\n"
+        "• 🔬 **Deep Research** — Chuqur ko'p manbali internet tadqiqoti\n"
+        "• 💻 **Kod & Shartnoma Auditi** — Dasturiy kod va hujjatlar auditi\n"
+        "• 🎙 **Ovozli Agent** — Tabiiy ovozli suhbat (STT & TTS)\n"
+        "• 🎬 **Video Yuklovchi** — Instagram, TikTok, YouTube dan yuklash"
+    )
+    await message.answer(text, reply_markup=build_reply_ai_studio_menu(), parse_mode="Markdown")
+
+
+@router.message(ADMIN_FILTER, F.text.in_({"💼 Ish & Unumdorlik", "Ish & Unumdorlik", "Unumdorlik", "unumdorlik"}))
+async def rk_group_productivity(message: Message) -> None:
+    """2-toifa: Ish & Unumdorlik guruh menyusi."""
+    text = (
+        "💼 **Ish & Unumdorlik Bo'limi**\n\n"
+        "Kunlik ishlaringizni tartibga soluvchi vositalar:\n"
+        "• 📝 **Vazifalar (Notion)** — Aqlli TodoList va Notion sinxronizatsiyasi\n"
+        "• 🌐 **Saytlar (Uptime)** — Veb-sayt va serverlar onlayn monitoringi\n"
+        "• 📧 **Email Pochta** — Xatlarni o'qish, AI xulosasi va xat yuborish\n"
+        "• ⏰ **Eslatmalar** — Aniq vaqtli shaxsiy eslatmalar\n"
+        "• 📰 **Yangiliklar & Tahlil** — Dasturlash, kitoblar va futbol yangiliklari\n"
+        "• 👤 **Shaxsiy Profil (Mem0)** — AI o'rgangan xotirangiz va qiziqishlaringiz"
+    )
+    await message.answer(text, reply_markup=build_reply_productivity_menu(), parse_mode="Markdown")
+
+
+@router.message(ADMIN_FILTER, F.text.in_({"📈 SMM & Marketing", "SMM & Marketing", "SMM", "smm"}))
+async def rk_group_smm(message: Message) -> None:
+    """3-toifa: SMM & Marketing guruh menyusi."""
+    text = (
+        "📈 **SMM & Marketing Bo'limi**\n\n"
+        "Kanal va guruhlaringizni avtomatlashtirish:\n"
+        "• 🎯 **Viral SMM** — Yuqori reaksiyali postlar va kontent-reja\n"
+        "• ⏰ **Rejalashtirilgan Postlar** — Avtomatik taymerli post joylash\n"
+        "• 🔍 **Raqobatchilar Tahlili** — Trendlar va raqobatchi kanallar monitoringi\n"
+        "• 📡 **Telegram Xulosasi** — Akkauntingizdagi yangi xabarlar umumiy tahlili\n"
+        "• 🔄 **Tarixni Sinxronlash** — Userbot orqali suhbatlar tarixini yangilash"
+    )
+    await message.answer(text, reply_markup=build_reply_smm_menu(), parse_mode="Markdown")
+
+
+@router.message(ADMIN_FILTER, F.text.in_({"⚙️ Sozlamalar & Xotira", "Sozlamalar & Xotira", "Sozlamalar", "sozlamalar"}))
+async def rk_group_settings(message: Message) -> None:
+    """4-toifa: Sozlamalar & Xotira guruh menyusi."""
+    text = (
+        "⚙️ **Sozlamalar & Xotira Bo'limi**\n\n"
+        "AI modeli va doimiy xotirani boshqarish:\n"
+        "• 🤖 **AI Modellar** — Gemini, DeepSeek, Claude, Llama tanlash\n"
+        "• 🎭 **Tizim Rollari** — Dasturchi, SMM mutaxassis, Tarjimon, Universal\n"
+        "• 🧠 **Doimiy Xotira** — Saqlangan faktlar va RAG bazasi\n"
+        "• 🧹 **Xotirani Tozalash** — Joriy chat kontekstini tozalash"
+    )
+    await message.answer(text, reply_markup=build_reply_settings_menu(), parse_mode="Markdown")
+
+
+@router.message(ADMIN_FILTER, F.text.in_({"📊 Holat & Yordam", "Holat & Yordam", "Tizim & Yordam"}))
+async def rk_group_system(message: Message) -> None:
+    """5-toifa: Holat & Yordam guruh menyusi."""
+    text = (
+        "📊 **Tizim Holati & Yordam**\n\n"
+        "• 📊 **Holat & Statistika** — Disk, RAM, modellar va bugungi statistika\n"
+        "• 📋 **Bugungi Log** — Barcha amalga oshirilgan amallar hisoboti\n"
+        "• 📱 **Mini App Paneli** — Veb boshqaruv panelini ochish\n"
+        "• ❓ **Yordam** — To'liq buyruqlar va imkoniyatlar qo'llanmasi"
+    )
+    await message.answer(text, reply_markup=build_reply_system_menu(), parse_mode="Markdown")
+
+
+@router.message(ADMIN_FILTER, F.text.in_({"🔙 Asosiy Menyu", "Asosiy Menyu", "asosiy menyu", "🔙 Orqaga", "Orqaga", "orqaga", "/menu", "menu", "Bosh Menyu", "bosh menyu"}))
+async def rk_back_to_main(message: Message) -> None:
+    """Bosh menyuga qaytish."""
+    await message.answer(
+        "🏠 **Asosiy Menyu:**\nQuyidagi toifalardan birini tanlang 👇",
+        reply_markup=build_reply_keyboard_menu(),
+        parse_mode="Markdown",
+    )
+
+
+@router.message(ADMIN_FILTER, F.text.in_({"🎨 Rasm Chizish", "Rasm Chizish", "rasm chizish", "🎨 Rasm Chizish Studio", "Rasm Chizish Studio", "🎨 Midjourney Rasm", "Midjourney Rasm", "midjourney rasm", "/imagine", "/midjourney"}))
 async def rk_midjourney(message: Message) -> None:
     """Reply keyboard '🎨 Rasm Chizish' tugmasi — interaktiv AI Studio paneli ochiladi."""
     user_id = message.from_user.id if message.from_user else 0
@@ -676,9 +881,139 @@ async def cb_main_menu(cb: CallbackQuery, ai_manager: AIManager) -> None:
     await cb.answer()
     await safe_edit_text(
         cb,
-        "🏠 Asosiy menyu:",
+        "🏠 **Asosiy Boshqaruv Menyusi:**\nQuyidagi toifalardan birini tanlang 👇",
         reply_markup=build_main_menu(),
     )
+
+
+@router.callback_query(ADMIN_FILTER, F.data == "menu:cat_ai")
+async def cb_cat_ai(cb: CallbackQuery) -> None:
+    """Inline: AI & Kreativ Studio toifasi."""
+    await cb.answer()
+    await safe_edit_text(
+        cb,
+        "🎨 **AI & Kreativ Studio**\n\nKerakli ijodiy va agentik vositani tanlang:",
+        reply_markup=build_inline_ai_menu(),
+    )
+
+
+@router.callback_query(ADMIN_FILTER, F.data == "menu:cat_prod")
+async def cb_cat_prod(cb: CallbackQuery) -> None:
+    """Inline: Ish & Unumdorlik toifasi."""
+    await cb.answer()
+    await safe_edit_text(
+        cb,
+        "💼 **Ish & Unumdorlik Bo'limi**\n\nRejalar, vazifalar va shaxsiy xabarnomalar:",
+        reply_markup=build_inline_productivity_menu(),
+    )
+
+
+@router.callback_query(ADMIN_FILTER, F.data == "menu:cat_smm")
+async def cb_cat_smm(cb: CallbackQuery) -> None:
+    """Inline: SMM & Marketing toifasi."""
+    await cb.answer()
+    await safe_edit_text(
+        cb,
+        "📈 **SMM & Marketing Avtopilot**\n\nKanal va guruhlar boshqaruvi:",
+        reply_markup=build_inline_smm_menu(),
+    )
+
+
+@router.callback_query(ADMIN_FILTER, F.data == "menu:cat_settings")
+async def cb_cat_settings(cb: CallbackQuery) -> None:
+    """Inline: Sozlamalar & Doimiy Xotira toifasi."""
+    await cb.answer()
+    await safe_edit_text(
+        cb,
+        "⚙️ **Sozlamalar & Doimiy Xotira**\n\nAI modeli, rol va xotira boshqaruvi:",
+        reply_markup=build_inline_settings_menu(),
+    )
+
+
+@router.callback_query(ADMIN_FILTER, F.data == "menu:deep_research")
+async def cb_deep_research(cb: CallbackQuery) -> None:
+    await cb.answer()
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="◀️ Orqaga", callback_data="menu:cat_ai"))
+    await safe_edit_text(
+        cb,
+        "🔬 **Deep Research Agent (Chuqur Internet Tadqiqoti)**\n\n"
+        "OpenAI Deep Research tamoyilida ishlovchi avtonom agent!\n"
+        "U internetdagi 3-5 ta manbani parallel qidirib, to'liq ilmiy va analitik hisobot tuzadi.\n\n"
+        "📌 **Ishlatish:** Chatga yozing:\n"
+        "`/research O'zbekistonda 2026-yilda AI bozori tahlili`",
+        reply_markup=builder.as_markup(),
+    )
+
+
+@router.callback_query(ADMIN_FILTER, F.data == "menu:code_audit")
+async def cb_code_audit(cb: CallbackQuery) -> None:
+    await cb.answer()
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="◀️ Orqaga", callback_data="menu:cat_ai"))
+    await safe_edit_text(
+        cb,
+        "💻 **Kod Auditi & Shartnoma Tahlilchisi**\n\n"
+        "1. **Dasturiy Kod Auditi:** Chatga `/code [kodingiz]` deb yuboring.\n"
+        "2. **Hujjat & Shartnoma Auditi:** PDF yoki DOCX faylni botga yuboring!",
+        reply_markup=builder.as_markup(),
+    )
+
+
+@router.callback_query(ADMIN_FILTER, F.data == "menu:viral_smm")
+async def cb_viral_smm(cb: CallbackQuery) -> None:
+    await cb.answer()
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="◀️ Orqaga", callback_data="menu:cat_smm"))
+    await safe_edit_text(
+        cb,
+        "🎯 **Viral SMM & Content Strategy Agent**\n\n"
+        "Yuqori qamrovli postlar va 7 kunlik kontent-reja tuzadi!\n\n"
+        "📌 **Ishlatish:** Chatga yozing:\n"
+        "`/smm Yangi startap online ta'lim loyihasi uchun`",
+        reply_markup=builder.as_markup(),
+    )
+
+
+@router.callback_query(ADMIN_FILTER, F.data == "menu:video_dl")
+async def cb_video_dl(cb: CallbackQuery) -> None:
+    await cb.answer()
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="◀️ Orqaga", callback_data="menu:cat_ai"))
+    await safe_edit_text(
+        cb,
+        "🎬 **Video Yuklovchi Agenti**\n\n"
+        "Instagram Reels, TikTok (suvsiz HD), YouTube Shorts havolasini chatga shunchaki yuboring!",
+        reply_markup=builder.as_markup(),
+    )
+
+
+@router.callback_query(ADMIN_FILTER, F.data == "menu:competitors")
+async def cb_competitors(cb: CallbackQuery) -> None:
+    await cb.answer()
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="◀️ Orqaga", callback_data="menu:cat_smm"))
+    await safe_edit_text(
+        cb,
+        "🔍 **Raqobatchilar Tahlili**\n\n"
+        "Raqobatchi Telegram kanallarining yangi postlari va auditoriya trendlarini kuzatib boradi.\n\n"
+        "Yangi kanal qo'shish uchun: `raqobatchi: @kanal_username` deb yozing.",
+        reply_markup=builder.as_markup(),
+    )
+
+
+@router.callback_query(ADMIN_FILTER, F.data == "menu:sync_history")
+async def cb_sync_history(cb: CallbackQuery, ai_manager: AIManager) -> None:
+    await cb.answer()
+    from core.userbot import sync_chat_history_from_telegram, userbot
+    if userbot is None or not userbot.is_connected():
+        await cb.answer("⚠️ Userbot ulanmagan!", show_alert=True)
+        return
+    await cb.message.answer("🔄 **Telegram suhbati o'qilmoqda va bazaga saqlanmoqda...**", parse_mode="Markdown")
+    bot_user = await cb.bot.get_me()
+    target = bot_user.username or cb.message.chat.id
+    res = await sync_chat_history_from_telegram(target_username_or_id=target, ai_manager=ai_manager, limit=100)
+    await cb.message.answer(res.get("message", "Tayyor."), parse_mode="Markdown")
 
 
 @router.callback_query(ADMIN_FILTER, F.data.in_({"menu:image_studio", "menu:midjourney"}))
