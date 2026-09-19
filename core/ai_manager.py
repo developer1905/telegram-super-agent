@@ -547,15 +547,14 @@ class AIManager:
 
         fallback_free_models = [
             "deepseek/deepseek-v4-flash-0731:free",
-            "qwen/qwen3.8-27b:free",
-            "openrouter/free",
-            "nousresearch/hermes-3-llama-3.1-405b:free",
-            "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+            "nvidia/nemotron-3-super-120b-a12b:free",
             "poolside/laguna-s-2.1:free",
+            "dots-studio/dots-3-note-preview:free",
             "nex-agi/nex-n2.5-pro:free",
             "nex-agi/nex-n2.5-mini:free",
-            "dots-studio/dots-3-note-preview:free",
+            "liquid/lfm-2.5-2.6b:free",
             "cohere/north-mini-code:free",
+            "openrouter/free",
         ]
 
         target_model = OPENROUTER_MODELS.get(self.current_or_model, "openrouter/free")
@@ -570,8 +569,10 @@ class AIManager:
                     max_tokens=2048,
                 )
                 msg_obj = response.choices[0].message
-                answer = msg_obj.content or getattr(msg_obj, "reasoning", "") or ""
-                if answer and answer.strip():
+                ans_content = getattr(msg_obj, "content", "") or ""
+                ans_reasoning = getattr(msg_obj, "reasoning", "") or getattr(msg_obj, "reasoning_content", "") or ""
+                answer = ans_content.strip() if ans_content.strip() else ans_reasoning.strip()
+                if answer:
                     if save_history:
                         chat_h = self.chat_histories.setdefault(chat_id, [])
                         chat_h.append({"role": "user", "content": user_message, "sender_name": sender_name, "chat_id": chat_id})
