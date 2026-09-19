@@ -104,8 +104,14 @@ async def handle_second_bot_text(message: Message, bot: Bot) -> None:
         await message.answer("Salom! Sizga qanday yordam bera olaman?")
         return
 
+    # Typing ko'rsatkichini berish
+    try:
+        await bot.send_chat_action(message.chat.id, "typing")
+    except Exception:
+        pass
+
     # Shaxmat buyrug'i tekshiruvi
-    if "shaxmat" in clean_text.lower() or "chess" in clean_text.lower():
+    if clean_text.lower().startswith(("/chess", "/shaxmat")) or clean_text.lower() in ("shaxmat", "chess", "shaxmat o'ynaylik"):
         from core.bot_collab import handle_start_chess
         sec_bot = get_second_bot()
         await handle_start_chess(message, bot_white=bot, bot_black=sec_bot)
@@ -117,9 +123,12 @@ async def handle_second_bot_text(message: Message, bot: Bot) -> None:
         ans, thinking = await mistral_agent_client.send_message(
             clean_text,
             chat_id=str(message.chat.id),
-            system_instruction="Siz Telegramdagi Arxitektor Agent Botsiz. O'zbek tilida aniq, professional va do'stona javob bering."
+            system_instruction="Siz Telegramdagi Arxitektor Agent Botsiz (@architect7_bot). Foydalanuvchilar va SuperAgent bilan o'zbek tilida aniq, professional, do'stona va chuqur tahliliy tilda muloqot qiling."
         )
-        await wait_msg.edit_text(ans, parse_mode=None)
+        try:
+            await wait_msg.edit_text(ans, parse_mode="Markdown")
+        except Exception:
+            await wait_msg.edit_text(ans, parse_mode=None)
     except Exception as e:
         logger.error("Arxitektor bot xatosi: %s", e)
         try:
