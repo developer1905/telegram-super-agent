@@ -149,6 +149,7 @@ async def safe_edit_text(
     """
     Xabarni xavfsiz tahrirlash (Message yoki CallbackQuery).
     MessageNotModified xatosini xotirjam qabul qiladi.
+    Markdown parse xatosida avtomatik plain text fallback qiladi.
     """
     msg = target.message if isinstance(target, CallbackQuery) else target
     if not msg:
@@ -165,16 +166,83 @@ async def safe_edit_text(
         if "message is not modified" in err_str:
             return msg
         if "can't parse entities" in err_str or "unmatched" in err_str:
+            logger.debug("safe_edit_text: Markdown xatosi (%s), plain text bilan urinilmoqda.", e)
             try:
                 return await msg.edit_text(
                     text=text[:MAX_TG_TEXT_LEN],
                     reply_markup=reply_markup,
                     parse_mode=None,
                 )
-            except Exception:
-                pass
-        logger.debug("safe_edit_text TelegramBadRequest: %s", e)
+            except Exception as e2:
+                logger.debug("safe_edit_text plain text fallback ham xato berdi: %s", e2)
+        else:
+            logger.debug("safe_edit_text TelegramBadRequest: %s", e)
     except Exception as exc:
         logger.debug("safe_edit_text boshqa xato: %s", exc)
 
     return None
+
+
+async def safe_edit_or_send_long_message(
+    target: Union[Message, CallbackQuery],
+    text: str,
+    reply_markup: Optional[InlineKeyboardMarkup] = None,
+    parse_mode: Optional[str] = "Markdown",
+) -> Optional[Message]:
+    """
+    Xabarni xavfsiz tahrirlaydi yoki agar 4000 belgidan oshsa, qismlarga bo'lib yuboradi.
+    Markdown parse xatolarida (can't parse entities) avtomatik plain text fallback qiladi.
+    """
+    msg = target.message if isinstance(target, CallbackQuery) else target
+    if not msg:
+        return None
+
+    chunks = chunk_text(text, max_len=MAX_TG_TEXT_LEN)
+    if not chunks:
+        return msg
+
+    first_chunk = chunks[0]
+    markup_for_first = reply_markup if len(chunks) == 1 else None
+
+    last_msg = None
+    try:
+        last_msg = await msg.edit_text(
+            text=first_chunk,
+            reply_markup=markup_for_first,
+            parse_mode=parse_mode,
+        )
+    except TelegramBadRequest as e:
+        err_str = str(e).lower()
+        if "message is not modified" in err_str:
+            last_msg = msg
+        elif "can't parse entities" in err_str or "unmatched" in err_str:
+            logger.debug("safe_edit_or_send_long_message Markdown xatosi: %s. Plain text qo'llanilmoqda.", e)
+            try:
+                last_msg = await msg.edit_text(
+                    text=first_chunk,
+                    reply_markup=markup_for_first,
+                    parse_mode=None,
+                )
+            except Exception as e2:
+                logger.error("safe_edit_or_send_long_message plain text edit xatosi: %s", e2)
+        else:
+            logger.error("safe_edit_or_send_long_message TelegramBadRequest: %s", e)
+    except Exception as exc:
+        logger.error("safe_edit_or_send_long_message edit error: %s", exc)
+
+    # Agar matn 1 dan ortiq qismdan iborat bo'lsa, qolgan qismlarni ketma-ket yuboramiz
+    if len(chunks) > 1:
+        for i, extra_chunk in enumerate(chunks[1:]):
+            is_last = (i == len(chunks) - 2)
+            extra_markup = reply_markup if is_last else None
+            sent = await safe_send_message(
+                bot=msg.bot,
+                chat_id=msg.chat.id,
+                text=extra_chunk,
+                reply_markup=extra_markup,
+                parse_mode=parse_mode,
+            )
+            if sent:
+                last_msg = sent
+
+    return last_msg
