@@ -51,6 +51,7 @@ from core.midjourney_agent import (
 )
 from services.roles import ROLES, get_role_keyboard_data
 from services.scheduler import LogCollector
+from core.safe_send import safe_edit_text, safe_edit_or_send_long_message, safe_send_message
 
 logger = logging.getLogger(__name__)
 router = Router(name="menu")
@@ -597,10 +598,13 @@ async def cmd_natal_param(message: Message, command: CommandObject) -> None:
             f"• 🕊 **Part of Spirit (Ruh/Maqsad):** `{spirit}`\n\n"
             f"✅ **Karta xotiraga saqlandi!** Endi barcha AI modellar (Hermes, Gemini, DeepSeek) ushbu xaritaning xususiyatlarini biladi."
         )
-        await wait_msg.edit_text(res_text, reply_markup=build_astrology_menu(True), parse_mode="Markdown")
+        await safe_edit_or_send_long_message(wait_msg, res_text, reply_markup=build_astrology_menu(True), parse_mode="Markdown")
     except Exception as e:
         logger.error("cmd_natal xatosi: %s", e)
-        await wait_msg.edit_text(f"❌ Xatolik yuz berdi: {e}\nMisol: `/natal 1998-05-19 14:30 Toshkent`")
+        try:
+            await wait_msg.edit_text(f"❌ Xatolik yuz berdi: {e}\nMisol: `/natal 1998-05-19 14:30 Toshkent`", parse_mode=None)
+        except Exception:
+            pass
 
 
 @router.message(ADMIN_FILTER, Command("transit"))
@@ -852,7 +856,7 @@ async def rk_email(message: Message, ai_manager: AIManager) -> None:
 async def rk_tg_summary(message: Message, ai_manager: AIManager) -> None:
     wait_msg = await message.answer("⏳ Telegram akkauntingizdagi so'nggi suhbatlar yuklanmoqda va AI tahlili qilinmoqda...")
     summary = await summarize_telegram_activity(ai_manager)
-    await wait_msg.edit_text(summary[:4000], parse_mode="Markdown")
+    await safe_edit_or_send_long_message(wait_msg, summary, parse_mode="Markdown")
 
 
 @router.message(ADMIN_FILTER, F.text.in_({"⏰ Eslatmalar", "Eslatmalar", "eslatmalar", "eslatmalarim", "/reminders"}))
@@ -1227,10 +1231,15 @@ async def cb_astro_ai_report(cb: CallbackQuery, ai_manager: AIManager) -> None:
 
     try:
         report = await ai_manager.generate(prompt)
-        await wait_msg.edit_text(report[:4000], parse_mode="Markdown")
+        back_btn = InlineKeyboardBuilder()
+        back_btn.row(InlineKeyboardButton(text="◀️ Astrologiya Menyusiga Qaytish", callback_data="menu:astrology"))
+        await safe_edit_or_send_long_message(wait_msg, report, reply_markup=back_btn.as_markup(), parse_mode="Markdown")
     except Exception as e:
         logger.error("Astro AI report xatosi: %s", e)
-        await wait_msg.edit_text(f"❌ AI hisobot generatsiyasida xatolik: {e}")
+        try:
+            await wait_msg.edit_text(f"❌ AI hisobot generatsiyasida xatolik: {e}", parse_mode=None)
+        except Exception:
+            pass
 
 
 @router.callback_query(ADMIN_FILTER, F.data == "astro:setup")
