@@ -15,8 +15,8 @@ import html
 import logging
 import uuid
 
-from aiogram import Router, F
-from aiogram.filters import Command
+from aiogram import Router, F, Bot
+from aiogram.filters import Command, CommandObject
 from aiogram.types import (
     Message,
     CallbackQuery,
