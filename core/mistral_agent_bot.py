@@ -136,11 +136,11 @@ async def cmd_help_second_bot(message: Message) -> None:
 # ─── KO'P AGENTLI HAMKORLIK & ERKIN SUHBAT BUYRUQLARI ──────────
 
 @second_bot_router.message(Command("collab", "hamkorlik"))
-@second_bot_router.message(F.text == "🤝 CAMEL Hamkorlik")
+@second_bot_router.message(F.text.lower().startswith(("/collab", "/hamkorlik", "🤝 camel hamkorlik")))
 async def cmd_collab_trigger(message: Message, bot: Bot) -> None:
     """SuperAgent bilan birgalikda vazifa bajarish (CAMEL/MAPR)."""
     raw_text = message.text or ""
-    task_text = re.sub(r"^(?:/collab|/hamkorlik|🤝 CAMEL Hamkorlik)[:\s]*", "", raw_text, flags=re.IGNORECASE).strip()
+    task_text = re.sub(r"^(?:/collab|/hamkorlik|🤝 CAMEL Hamkorlik)(?:@\w+)?[:\s]*", "", raw_text, flags=re.IGNORECASE).strip()
 
     if not task_text and message.reply_to_message:
         task_text = message.reply_to_message.text or message.reply_to_message.caption or ""
@@ -165,11 +165,11 @@ async def cmd_collab_trigger(message: Message, bot: Bot) -> None:
 
 
 @second_bot_router.message(Command("suhbat", "chat", "gaplash"))
-@second_bot_router.message(F.text == "🗣️ Erkin Suhbat")
+@second_bot_router.message(F.text.lower().startswith(("/suhbat", "/chat", "/gaplash", "🗣️ erkin suhbat")))
 async def cmd_free_chat_trigger(message: Message, bot: Bot) -> None:
     """SuperAgent bilan erkin mavzuda jonli muloqot (AI Lounge)."""
     raw_text = message.text or ""
-    topic_text = re.sub(r"^(?:/suhbat|/chat|/gaplash|🗣️ Erkin Suhbat)[:\s]*", "", raw_text, flags=re.IGNORECASE).strip()
+    topic_text = re.sub(r"^(?:/suhbat|/chat|/gaplash|🗣️ Erkin Suhbat)(?:@\w+)?[:\s]*", "", raw_text, flags=re.IGNORECASE).strip()
 
     from core.bot_collab import handle_free_chit_chat
     main_bot = get_main_bot_instance() or bot
