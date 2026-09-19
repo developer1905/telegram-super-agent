@@ -7,28 +7,37 @@ jonli, ko'rgazmali va mantiqiy shaxmat bahslarini boshqaruvchi modul.
 import logging
 import random
 from typing import Optional, Tuple
-import chess
+
+try:
+    import chess
+    CHESS_AVAILABLE = True
+except ImportError:
+    chess = None
+    CHESS_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
 # Shaxmat donalari uchun chiroyli emojilar
-PIECE_EMOJIS = {
-    chess.PAWN:   {chess.WHITE: "♙", chess.BLACK: "♟"},
-    chess.KNIGHT: {chess.WHITE: "♘", chess.BLACK: "♞"},
-    chess.BISHOP: {chess.WHITE: "♗", chess.BLACK: "♝"},
-    chess.ROOK:   {chess.WHITE: "♖", chess.BLACK: "♜"},
-    chess.QUEEN:  {chess.WHITE: "♕", chess.BLACK: "♛"},
-    chess.KING:   {chess.WHITE: "♔", chess.BLACK: "♚"},
-}
-
-PIECE_VALUES = {
-    chess.PAWN: 100,
-    chess.KNIGHT: 320,
-    chess.BISHOP: 330,
-    chess.ROOK: 500,
-    chess.QUEEN: 900,
-    chess.KING: 20000,
-}
+if CHESS_AVAILABLE and chess:
+    PIECE_EMOJIS = {
+        chess.PAWN:   {chess.WHITE: "♙", chess.BLACK: "♟"},
+        chess.KNIGHT: {chess.WHITE: "♘", chess.BLACK: "♞"},
+        chess.BISHOP: {chess.WHITE: "♗", chess.BLACK: "♝"},
+        chess.ROOK:   {chess.WHITE: "♖", chess.BLACK: "♜"},
+        chess.QUEEN:  {chess.WHITE: "♕", chess.BLACK: "♛"},
+        chess.KING:   {chess.WHITE: "♔", chess.BLACK: "♚"},
+    }
+    PIECE_VALUES = {
+        chess.PAWN: 100,
+        chess.KNIGHT: 320,
+        chess.BISHOP: 330,
+        chess.ROOK: 500,
+        chess.QUEEN: 900,
+        chess.KING: 20000,
+    }
+else:
+    PIECE_EMOJIS = {}
+    PIECE_VALUES = {}
 
 
 class ChessGame:
