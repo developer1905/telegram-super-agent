@@ -18,9 +18,16 @@ import random
 from typing import Optional, List, Dict, Any
 from aiogram import Bot
 from aiogram.types import Message
-import chess
 
-from core.chess_engine import chess_manager, ChessGame
+try:
+    import chess
+    from core.chess_engine import chess_manager, ChessGame, CHESS_AVAILABLE
+except ImportError:
+    chess = None
+    chess_manager = None
+    ChessGame = None
+    CHESS_AVAILABLE = False
+
 from core.mistral_conversations import mistral_agent_client
 
 logger = logging.getLogger(__name__)
@@ -108,6 +115,10 @@ async def _generate_superagent_solution(prompt: str, chat_id: str) -> str:
 
 async def handle_start_chess(message: Message, bot_white: Bot, bot_black: Optional[Bot] = None) -> None:
     """Yangi shaxmat o'yinini boshlash."""
+    if not CHESS_AVAILABLE or not chess_manager:
+        await message.answer("⚠️ Shaxmat o'ynash uchun serverga <code>pip install python-chess</code> o'rnatilishi lozim.", parse_mode="HTML")
+        return
+
     chat_id = str(message.chat.id)
     game = chess_manager.start_game(chat_id, white_name="SuperAgent AI", black_name="Arxitektor Mistral (@architect7_bot)")
     ACTIVE_AUTO_CHESS[chat_id] = True
