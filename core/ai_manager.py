@@ -27,6 +27,10 @@ from config import (
     NVIDIA_API_KEY,
     NVIDIA_BASE_URL,
     NVIDIA_MODEL,
+    MISTRAL_API_KEY,
+    MISTRAL_BASE_URL,
+    MISTRAL_MODEL,
+    MISTRAL_FALLBACK_MODELS,
 )
 import asyncio
 
@@ -69,6 +73,12 @@ class AIManager:
             base_url=NVIDIA_BASE_URL,
         )
 
+        # Mistral AI client (https://console.mistral.ai)
+        self._mistral_client = AsyncOpenAI(
+            api_key=MISTRAL_API_KEY or "mistral-dummy",
+            base_url=MISTRAL_BASE_URL,
+        )
+
         # Joriy holat
         self.current_provider: str = "gemini"
         self.current_or_model: str = "auto"
@@ -109,8 +119,8 @@ class AIManager:
     # ─── Model / Rol Boshqaruvi ───────────────────────────────
 
     def switch_provider(self, provider: str) -> str:
-        """'gemini', 'openrouter', 'omniroute' yoki 'nvidia' ga o'tish."""
-        if provider not in ("gemini", "openrouter", "omniroute", "nvidia"):
+        """'gemini', 'openrouter', 'omniroute', 'nvidia' yoki 'mistral' ga o'tish."""
+        if provider not in ("gemini", "openrouter", "omniroute", "nvidia", "mistral"):
             return f"❌ Noto'g'ri provider: {provider}"
         self.current_provider = provider
         # Model o'zgarganda suhbat tarixi o'chirilmaydi!
@@ -118,6 +128,8 @@ class AIManager:
             name = "OmniRoute (350+ AI Gateway)"
         elif provider == "nvidia":
             name = "NVIDIA NIM (Nemotron Reasoning)"
+        elif provider == "mistral":
+            name = f"Mistral AI ({MISTRAL_MODEL})"
         else:
             name = provider.upper()
         return f"✅ Provider o'zgartirildi: **{name}**"
@@ -173,6 +185,10 @@ class AIManager:
             model_info = f"Gemini ({GEMINI_MODEL})"
         elif self.current_provider == "omniroute":
             model_info = f"OmniRoute Gateway ({OMNIROUTE_MODEL})"
+        elif self.current_provider == "nvidia":
+            model_info = f"NVIDIA NIM ({NVIDIA_MODEL})"
+        elif self.current_provider == "mistral":
+            model_info = f"Mistral AI ({MISTRAL_MODEL})"
         else:
             model_id = OPENROUTER_MODELS.get(self.current_or_model, self.current_or_model)
             model_info = f"OpenRouter ({model_id})"
@@ -204,6 +220,17 @@ class AIManager:
         """
         chat_id_str = str(chat_id or "0")
         await self.get_chat_history(chat_id=chat_id_str)
+
+        # -1. Mistral AI tanlangan bo'lsa
+        if self.current_provider == "mistral":
+            return await self._generate_mistral(
+                user_message,
+                save_history=save_history,
+                chat_id=chat_id_str,
+                user_id=user_id,
+                sender_name=sender_name,
+                chat_type=chat_type,
+            )
 
         # 0. NVIDIA NIM tanlangan bo'lsa
         if self.current_provider == "nvidia":
@@ -764,6 +791,85 @@ class AIManager:
                 continue
 
         # 3-Bosqich: Agar barchasi band bo'lsa, umumiy OpenRouter orqali
+        return await self._generate_openrouter(
+            user_message,
+            save_history=save_history,
+            chat_id=chat_id,
+            user_id=user_id,
+            sender_name=sender_name,
+            chat_type=chat_type,
+        )
+
+    # ─── Mistral AI ───────────────────────────────────────────
+
+    async def _generate_mistral(
+        self,
+        user_message: str,
+        save_history: bool = True,
+        chat_id: str = "0",
+        user_id: str = "",
+        sender_name: str = "Foydalanuvchi",
+        chat_type: str = "private",
+    ) -> str:
+        """Mistral AI (console.mistral.ai) orqali generatsiya qilish."""
+        system_prompt = ROLES[self.current_role]["prompt"]
+        if chat_type in ("group", "supergroup"):
+            system_prompt += "\n\nSiz Telegram guruhidasiz. Do'stona va aniq javob bering."
+        elif chat_type == "channel":
+            system_prompt += "\n\nSiz Telegram kanalidasiz. Mazmunli va professional formatda javob bering."
+
+        rag_context = await db.build_rag_context()
+        if rag_context:
+            system_prompt = f"{rag_context}\n\n{system_prompt}"
+
+        history_list = await self.get_chat_history(chat_id=chat_id, limit=30)
+        messages = [{"role": "system", "content": system_prompt}]
+        for msg in history_list:
+            role = "assistant" if msg.get("role") in ("model", "assistant") else "user"
+            content = msg.get("content") or ""
+            s_name = msg.get("sender_name") or ""
+            if role == "user" and s_name and chat_type in ("group", "supergroup", "channel") and not content.startswith("["):
+                content = f"[{s_name}]: {content}"
+            if content.strip():
+                messages.append({"role": role, "content": content})
+
+        cur_text = f"[{sender_name}]: {user_message}" if (sender_name and chat_type in ("group", "supergroup", "channel") and not user_message.startswith("[")) else user_message
+        messages.append({"role": "user", "content": cur_text})
+
+        models_to_try = [MISTRAL_MODEL] + [m for m in MISTRAL_FALLBACK_MODELS if m != MISTRAL_MODEL]
+
+        for m_id in models_to_try:
+            try:
+                response = await asyncio.wait_for(
+                    self._mistral_client.chat.completions.create(
+                        model=m_id,
+                        messages=messages,
+                        temperature=0.7,
+                        max_tokens=2048,
+                    ),
+                    timeout=20.0,
+                )
+                msg_obj = response.choices[0].message
+                ans = msg_obj.content or getattr(msg_obj, "reasoning", "") or ""
+                if ans.strip():
+                    if save_history:
+                        chat_h = self.chat_histories.setdefault(chat_id, [])
+                        chat_h.append({"role": "user", "content": user_message, "sender_name": sender_name, "chat_id": chat_id})
+                        chat_h.append({"role": "assistant", "content": ans, "sender_name": "Super-Agent", "chat_id": chat_id})
+                        if len(chat_h) > 40:
+                            self.chat_histories[chat_id] = chat_h[-40:]
+                        try:
+                            await db.add_chat_message("user", user_message, chat_id=chat_id, user_id=user_id, sender_name=sender_name, chat_type=chat_type)
+                            await db.add_chat_message("assistant", ans, chat_id=chat_id, user_id="", sender_name="Super-Agent", chat_type=chat_type)
+                        except Exception:
+                            pass
+                    return ans
+            except Exception as m_err:
+                logger.warning("Mistral AI model (%s) xatosi: %s. Zaxira modeli sinab ko'rilmoqda...", m_id, m_err)
+                continue
+
+        # Zaxira: agar barcha Mistral modellari band bo'lsa, OpenRouter ga o'tish
+        logger.info("Mistral modellari band, zaxira bepul modelga o'tilmoqda...")
         return await self._generate_openrouter(
             user_message,
             save_history=save_history,
