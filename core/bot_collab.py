@@ -1376,3 +1376,147 @@ async def run_night_autopilot_cycle(bot_white: Bot, bot_black: Optional[Bot] = N
             await asyncio.sleep(10.0)
         except Exception as exc:
             logger.error("Tungi avtopilot xatosi: %s", exc)
+
+
+# ─── 5. GURUHDA BUYRUQLARSIZ IKKALA BOT FIKR BILDIRISHI (DUAL OPINION) ───
+
+ACTIVE_GROUP_DUAL_OPINIONS: set[int] = set()
+GROUP_DUAL_OPINION_ENABLED: dict[int, bool] = {}
+
+
+def set_group_dual_opinion(chat_id: int, enabled: bool) -> None:
+    """Guruhda buyruqlarsiz ikkala bot fikr bildirishini yoqish yoki o'chirish."""
+    GROUP_DUAL_OPINION_ENABLED[chat_id] = enabled
+
+
+def is_group_dual_opinion_enabled(chat_id: int) -> bool:
+    """Guruhda erkin dual fikr bildirish yoqilganmi tekshiradi (sukut bo'yicha True)."""
+    return GROUP_DUAL_OPINION_ENABLED.get(chat_id, True)
+
+
+async def handle_group_dual_opinion(
+    message: Message,
+    bot_white: Bot,
+    ai_manager: Any = None,
+) -> None:
+    """
+    Guruhda hech qanday '/' buyrug'isiz yozilgan har qanday mavzu yoki xabarga
+    ikkala bot (SuperAgent va Arxitektor) navbatma-navbat o'z fikrini bildiradi.
+    """
+    if not message.from_user or message.from_user.is_bot:
+        return
+
+    chat_id = message.chat.id
+    chat_key = str(chat_id)
+
+    # Faol suhbat, bahs yoki kollaboratsiya davom etayotgan bo'lsa xalaqit bermaymiz
+    if ACTIVE_CHIT_CHATS.get(chat_key) or ACTIVE_DEBATES.get(chat_key) or ACTIVE_COLLABS.get(chat_key):
+        return
+
+    # Guruhda dual opinion rejimi o'chirilgan bo'lsa
+    if not is_group_dual_opinion_enabled(chat_id):
+        return
+
+    # Agar ayni paytda ushbu guruhda allaqachon fikr bildirish jarayoni ketayotgan bo'lsa
+    if chat_id in ACTIVE_GROUP_DUAL_OPINIONS:
+        return
+
+    raw_text = (message.text or message.caption or "").strip()
+    if not raw_text or raw_text.startswith("/"):
+        return
+
+    # Juda qisqa (masalan faqat 'ok', 'ha', '+', '👍') bo'lsa e'tibor bermaslik
+    words = raw_text.split()
+    if len(raw_text) < 4 and len(words) < 2:
+        return
+
+    ACTIVE_GROUP_DUAL_OPINIONS.add(chat_id)
+    try:
+        user_name = message.from_user.full_name or "A'zo"
+
+        # ── 1. SUPERAGENT FIKRI ──
+        try:
+            await bot_white.send_chat_action(chat_id, "typing")
+        except Exception:
+            pass
+
+        p_sa = (
+            f"Siz guruhdagi hozirjavob, samimiy, intellektual, quvnoq va o'tkir fikrli SuperAgent AIsiz.\n"
+            f"Guruh a'zosi {user_name} shunday yozdi: '{raw_text}'.\n\n"
+            f"Ushbu xabar, savol yoki fikrga o'zingizning samimiy, insondek tabiiy, "
+            f"emojilarga boy va mustaqil fikringizni bildiring (1-3 ta lo'nda jumla, o'zbek tilida). "
+            f"Ortiqcha qoliplar va rasmiyatchiliksiz, xuddi qadrdon do'stdek yozing."
+        )
+
+        raw_sa = await _generate_superagent_solution(
+            p_sa,
+            chat_key,
+            system_instruction="Siz SuperAgent — hozirjavob, quvnoq, intuitsiyali va samimiy AI do'stsiz. Emojilardan o'rnida foydalanasiz."
+        )
+        th_s, eu_s, sp_s = extract_thought_and_speech(raw_sa)
+        sa_opinion = sp_s if sp_s else raw_sa
+        sa_opinion = re.sub(r"^\[.*?\]\s*", "", sa_opinion).strip()
+
+        sa_text = f"🤖 <b>SuperAgent fikri:</b>\n{html.escape(sa_opinion)}"
+        await _send_agent_message(
+            chat_id=chat_id,
+            text=sa_text,
+            sender_role="superagent",
+            bot_white=bot_white,
+            bot_black=None,
+            is_group=True,
+            origin_bot=bot_white,
+        )
+
+        # ── 2. PAUZA (Arxitektor fikrlashi va javobga tayyorlanishi uchun) ──
+        await asyncio.sleep(2.5)
+
+        # ── 3. ARXITEKTOR FIKRI ──
+        from core.mistral_agent_bot import get_second_bot
+        sec_bot = get_second_bot()
+
+        if sec_bot:
+            try:
+                await sec_bot.send_chat_action(chat_id, "typing")
+            except Exception:
+                pass
+        else:
+            try:
+                await bot_white.send_chat_action(chat_id, "typing")
+            except Exception:
+                pass
+
+        p_arch = (
+            f"Siz Bosh Arxitektor botsiz (@architect7_bot) — teran tahlilchi, kuchli intuitsiya egasi, mantiqiy va do'stona ekspert.\n"
+            f"Guruh a'zosi {user_name} shunday yozdi: '{raw_text}'.\n"
+            f"Do'stingiz SuperAgent quyidagicha fikr bildirdi: '{sa_opinion}'.\n\n"
+            f"Do'stingiz SuperAgentning so'zlariga va {user_name}ning mavzusiga qarab o'zingizning mustaqil nuqtai nazaringiz, "
+            f"ichki sezgingiz yoki yangi mulohazangizni bildiring. "
+            f"SuperAgentning fikriga qo'shiling yoki unga yangi qirra qo'shing (1-3 ta lo'nda jumla, emojilar bilan, samimiy o'zbekcha)."
+        )
+
+        raw_arch, _ = await mistral_agent_client.send_message(
+            p_arch,
+            chat_id=f"group_opinion_{chat_id}",
+            system_instruction="Siz Bosh Arxitektor (@architect7_bot) — chuqur tahlilchi, teran sezgiga ega, do'stona va nozik hazilkash AI arxitektorsiz."
+        )
+        th_a, eu_a, sp_a = extract_thought_and_speech(raw_arch)
+        arch_opinion = sp_a if sp_a else raw_arch
+        arch_opinion = re.sub(r"^\[.*?\]\s*", "", arch_opinion).strip()
+
+        arch_text = f"🌪 <b>Arxitektor fikri:</b>\n{html.escape(arch_opinion)}"
+        await _send_agent_message(
+            chat_id=chat_id,
+            text=arch_text,
+            sender_role="architect",
+            bot_white=bot_white,
+            bot_black=sec_bot,
+            is_group=True,
+            origin_bot=bot_white,
+        )
+
+    except Exception as exc:
+        logger.error("Guruhda dual fikr bildirishda xatolik: %s", exc)
+    finally:
+        ACTIVE_GROUP_DUAL_OPINIONS.discard(chat_id)
+
