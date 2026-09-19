@@ -18,11 +18,14 @@ from aiogram.types import (
     Message,
     ReplyKeyboardMarkup,
     KeyboardButton,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
     BotCommand,
     MenuButtonCommands,
     CallbackQuery,
 )
 from aiogram.filters import Command
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from config import SECOND_BOT_TOKEN, BOT_TOKEN
 from core.mistral_conversations import mistral_agent_client
@@ -295,26 +298,32 @@ def build_architect_models_keyboard() -> InlineKeyboardMarkup:
 
 @second_bot_router.message(Command("models", "model", "modellar"))
 @second_bot_router.message(F.text == "🤖 AI Modellar")
-async def cmd_architect_models(message: Message) -> None:
+@second_bot_router.message(F.text.lower().in_(("ai modellar", "modellar", "models", "bepul modellar", "🤖 ai modellar", "ai model")))
+async def cmd_architect_models(message: Message, bot: Optional[Bot] = None) -> None:
     """Arxitektor AI bepul modellar menyusi va kaskad holati."""
-    from core.mistral_conversations import mistral_agent_client
-    mode_desc = "Avtomatik Kaskad (Bittasi limitga uchrasa, darhol keyingisiga o'tadi)" if not mistral_agent_client.forced_model_id else f"Qo'lda tanlangan: <b>{mistral_agent_client.forced_model_id}</b>"
-    text = (
-        "🤖 <b>Arxitektor AI Bepul Modellari & Avto-Failover Tizimi</b>\n\n"
-        f"🎯 <b>Joriy Faol Model:</b> <code>{mistral_agent_client.last_used_model}</code>\n"
-        f"⚙️ <b>Tanlangan Rejim:</b> <i>{mode_desc}</i>\n\n"
-        "💡 <b>Qanday ishlaydi?</b>\n"
-        "• Arxitektor doimiy ravishda 12 ta eng kuchli bepul AI modellar kaskadiga ulangan:\n"
-        "  — 🌪 Mistral Agent & Codestral (Dasturchi/Arxitektor);\n"
-        "  — 🧠 DeepSeek V4 Flash Free (1M kontekst);\n"
-        "  — 🌊 Poolside Laguna S 2.1 (Arxitektor modeli);\n"
-        "  — 🔬 NVIDIA Nemotron Super 120B;\n"
-        "  — 💎 Google Gemini 3.1 & 3.5 Flash Lite;\n"
-        "  — 🔥 Nex-AGI N2.5 Pro;\n"
-        "• Agar bitta model limiti tugasa (429/quota), tizim to'xtab qolmasdan <b>avtomatik ravishda keyingi modelga o'tadi</b>!\n\n"
-        "Kerakli modelni tanlang yoki avtomatik kaskad rejimida qoldiring:"
-    )
-    await safe_reply(message, text, reply_markup=build_architect_models_keyboard())
+    try:
+        from core.mistral_conversations import mistral_agent_client
+        mode_desc = "Avtomatik Kaskad (Bittasi limitga uchrasa, darhol keyingisiga o'tadi)" if not mistral_agent_client.forced_model_id else f"Qo'lda tanlangan: <b>{mistral_agent_client.forced_model_id}</b>"
+        text = (
+            "🤖 <b>Arxitektor AI Bepul Modellari & Avto-Failover Tizimi</b>\n\n"
+            f"🎯 <b>Joriy Faol Model:</b> <code>{mistral_agent_client.last_used_model}</code>\n"
+            f"⚙️ <b>Tanlangan Rejim:</b> <i>{mode_desc}</i>\n\n"
+            "💡 <b>Qanday ishlaydi?</b>\n"
+            "• Arxitektor doimiy ravishda 12 ta eng kuchli bepul AI modellar kaskadiga ulangan:\n"
+            "  — 🌪 Mistral Agent & Codestral (Dasturchi/Arxitektor);\n"
+            "  — 🧠 DeepSeek V4 Flash Free (1M kontekst);\n"
+            "  — 🌊 Poolside Laguna S 2.1 (Arxitektor modeli);\n"
+            "  — 🔬 NVIDIA Nemotron Super 120B;\n"
+            "  — 💎 Google Gemini 3.1 & 3.5 Flash Lite;\n"
+            "  — 🔥 Nex-AGI N2.5 Pro;\n"
+            "• Agar bitta model limiti tugasa (429/quota), tizim to'xtab qolmasdan <b>avtomatik ravishda keyingi modelga o'tadi</b>!\n\n"
+            "Kerakli modelni tanlang yoki avtomatik kaskad rejimida qoldiring:"
+        )
+        kb = build_architect_models_keyboard()
+        await safe_reply(message, text, reply_markup=kb)
+    except Exception as exc:
+        logger.error("cmd_architect_models xatosi: %s", exc, exc_info=True)
+        await safe_reply(message, f"⚠️ Modellar menyusini yuklashda xatolik yuz berdi: {exc}")
 
 
 @second_bot_router.callback_query(F.data.startswith("arch_model:"))
@@ -560,8 +569,8 @@ async def handle_second_bot_text(message: Message, bot: Bot) -> None:
         return
 
     # Modellar kaskadi menyusi
-    if clean_text.lower() in ("/models", "/model", "modellar", "ai modellar", "🤖 ai modellar"):
-        await cmd_architect_models(message)
+    if clean_text.lower() in ("/models", "/model", "modellar", "ai modellar", "🤖 ai modellar", "ai model", "bepul modellar") or any(w in clean_text.lower() for w in ["ai model", "modellar", "qaysi model"]):
+        await cmd_architect_models(message, bot)
         return
 
     # Foydalanuvchi bilimlari profili (Mem0)
