@@ -65,14 +65,23 @@ async def _send_agent_message(
         else:
             target_bot = origin_bot
 
-    try:
-        await target_bot.send_message(chat_id, text, parse_mode="HTML")
-    except Exception as exc:
-        logger.warning("target_bot (%s) xabar yuborishda xato: %s. origin_bot ga fallback...", target_bot.id, exc)
+    async def _do_send(b: Bot) -> bool:
         try:
-            await origin_bot.send_message(chat_id, text, parse_mode="HTML")
-        except Exception as exc2:
-            logger.error("Xabarni yetkazib bo'lmadi: %s", exc2)
+            await b.send_message(chat_id, text, parse_mode="HTML")
+            return True
+        except Exception as err_html:
+            try:
+                # Agar HTML parser (masalan < yoki > belgilari sababli) xato bersa
+                await b.send_message(chat_id, text, parse_mode=None)
+                return True
+            except Exception as err_plain:
+                logger.warning("Bot orqali yuborish xatosi: %s", err_plain)
+                return False
+
+    sent = await _do_send(target_bot)
+    if not sent and target_bot != origin_bot:
+        logger.info("origin_bot orqali qayta urinish...")
+        await _do_send(origin_bot)
 
 
 async def _generate_superagent_solution(prompt: str, chat_id: str) -> str:
