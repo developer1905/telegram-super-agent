@@ -789,6 +789,7 @@ async def api_astrology_interpret_handler(request: web.Request) -> web.Response:
         custom_lots = profile.get("custom_lots", [])
         from core.astrology_agent import build_grandmaster_astrology_prompt
         prompt = build_grandmaster_astrology_prompt(profile, custom_lots, question=question, target_year=2026)
+        prompt += "\n\n[QAT'IY TALAB: BARCHA TAHLIL VA XULOSALARINGIZNI FAQAT O'ZBEK TILIDA (LOTIN ALIFBOSIDA) YOZING! INGLIZ YOKI RUS TILIDA SO'Z ISHLATMANG!]"
 
         # Modelni dinamik almashtirish (Hermes 3, Gemini va hk)
         prev_provider = ai_manager.current_provider
