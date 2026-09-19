@@ -31,6 +31,7 @@ from config import BOT_TOKEN, ADMIN_ID, validate_config, WEBAPP_URL, get_clean_w
 from core.ai_manager import AIManager
 from core.database import db
 from core.inbox_triage import init_inbox_triage
+from core.mistral_agent_bot import get_second_bot, second_bot_router
 from core.userbot import create_userbot_client
 import core.userbot as userbot_module
 from services.scheduler import setup_scheduler
@@ -1029,6 +1030,13 @@ async def main() -> None:
     dp.include_router(photo_handler.router)
     dp.include_router(voice_handler.router)    # Voice-to-Task
     dp.include_router(group_handler.router)    # Guruhlar, kanallar va my_chat_member
+
+    # 2-Bot (Mistral Arxitektor Agent Bot @architect7_bot)
+    second_bot = get_second_bot()
+    if second_bot:
+        dp.include_router(second_bot_router)
+        logger.info("✅ 2-Bot: Mistral Arxitektor Agent Bot (@architect7_bot) routeri ulandi")
+
     dp.include_router(message_handler.router)  # Oxirida (catch-all)
 
     logger.info("✅ Barcha handlerlar ulandi (Guruhlar va Kanallar avtopiloti qo'shildi)")
@@ -1063,6 +1071,15 @@ async def main() -> None:
         logger.warning("Adminga xabar yuborilmadi: %s", exc)
 
     # 9. Polling boshlash (Webhook to'qnashuvining oldini olish)
+    bots_to_poll = [bot]
+    if second_bot:
+        try:
+            await second_bot.delete_webhook(drop_pending_updates=False)
+            bots_to_poll.append(second_bot)
+            logger.info("✅ 2-Bot (@architect7_bot) polling ro'yxatiga qo'shildi")
+        except Exception as e:
+            logger.warning("2-Bot delete_webhook xatosi: %s", e)
+
     try:
         await bot.delete_webhook(drop_pending_updates=False)
     except Exception as exc:
@@ -1074,7 +1091,7 @@ async def main() -> None:
         while True:
             try:
                 await dp.start_polling(
-                    bot,
+                    *bots_to_poll,
                     allowed_updates=[
                         "message",
                         "edited_message",
