@@ -24,6 +24,9 @@ from config import (
     OMNIROUTE_BASE_URL,
     OMNIROUTE_API_KEY,
     OMNIROUTE_MODEL,
+    NVIDIA_API_KEY,
+    NVIDIA_BASE_URL,
+    NVIDIA_MODEL,
 )
 import asyncio
 
@@ -58,6 +61,12 @@ class AIManager:
         self._omniroute_client = AsyncOpenAI(
             api_key=OMNIROUTE_API_KEY or "omniroute",
             base_url=OMNIROUTE_BASE_URL,
+        )
+
+        # NVIDIA NIM / Nemotron client (https://build.nvidia.com)
+        self._nvidia_client = AsyncOpenAI(
+            api_key=NVIDIA_API_KEY or "nvapi-dummy",
+            base_url=NVIDIA_BASE_URL,
         )
 
         # Joriy holat
@@ -100,12 +109,17 @@ class AIManager:
     # ─── Model / Rol Boshqaruvi ───────────────────────────────
 
     def switch_provider(self, provider: str) -> str:
-        """'gemini', 'openrouter' yoki 'omniroute' ga o'tish."""
-        if provider not in ("gemini", "openrouter", "omniroute"):
+        """'gemini', 'openrouter', 'omniroute' yoki 'nvidia' ga o'tish."""
+        if provider not in ("gemini", "openrouter", "omniroute", "nvidia"):
             return f"❌ Noto'g'ri provider: {provider}"
         self.current_provider = provider
         # Model o'zgarganda suhbat tarixi o'chirilmaydi!
-        name = "OmniRoute (350+ AI Gateway)" if provider == "omniroute" else provider.upper()
+        if provider == "omniroute":
+            name = "OmniRoute (350+ AI Gateway)"
+        elif provider == "nvidia":
+            name = "NVIDIA NIM (Nemotron Reasoning)"
+        else:
+            name = provider.upper()
         return f"✅ Provider o'zgartirildi: **{name}**"
 
     def switch_openrouter_model(self, model_key: str) -> str:
@@ -190,6 +204,17 @@ class AIManager:
         """
         chat_id_str = str(chat_id or "0")
         await self.get_chat_history(chat_id=chat_id_str)
+
+        # 0. NVIDIA NIM tanlangan bo'lsa
+        if self.current_provider == "nvidia":
+            return await self._generate_nvidia(
+                user_message,
+                save_history=save_history,
+                chat_id=chat_id_str,
+                user_id=user_id,
+                sender_name=sender_name,
+                chat_type=chat_type,
+            )
 
         # 1. OmniRoute tanlangan bo'lsa
         if self.current_provider == "omniroute":
@@ -630,5 +655,121 @@ class AIManager:
         except Exception as exc:
             logger.warning("OmniRoute gateway xatosi: %s", exc)
             return f"❌ OmniRoute xatosi: {exc}"
+
+    # ─── NVIDIA NIM / Nemotron Direct & Fallback Engine ───────────
+
+    async def _generate_nvidia(
+        self,
+        user_message: str,
+        save_history: bool = True,
+        chat_id: str = "0",
+        user_id: str = "",
+        sender_name: str = "Foydalanuvchi",
+        chat_type: str = "private",
+    ) -> str:
+        """
+        NVIDIA NIM API (https://build.nvidia.com) orqali to'g'ridan-to'g'ri yoki
+        OpenRouter'dagi Nemotron bepul modellari orqali xatosiz generatsiya.
+        """
+        system_prompt = ROLES[self.current_role]["prompt"]
+        if chat_type in ("group", "supergroup"):
+            system_prompt += "\n\nSiz Telegram guruhidasiz. Do'stona va aniq javob bering."
+        elif chat_type == "channel":
+            system_prompt += "\n\nSiz Telegram kanalidasiz. Mazmunli va professional formatda javob bering."
+
+        rag_context = await db.build_rag_context()
+        if rag_context:
+            system_prompt = f"{rag_context}\n\n{system_prompt}"
+
+        history_list = await self.get_chat_history(chat_id=chat_id, limit=30)
+        messages = [{"role": "system", "content": system_prompt}]
+        for msg in history_list:
+            role = "assistant" if msg.get("role") in ("model", "assistant") else "user"
+            content = msg.get("content") or ""
+            s_name = msg.get("sender_name") or ""
+            if role == "user" and s_name and chat_type in ("group", "supergroup", "channel") and not content.startswith("["):
+                content = f"[{s_name}]: {content}"
+            if content.strip():
+                messages.append({"role": role, "content": content})
+
+        cur_text = f"[{sender_name}]: {user_message}" if (sender_name and chat_type in ("group", "supergroup", "channel") and not user_message.startswith("[")) else user_message
+        messages.append({"role": "user", "content": cur_text})
+
+        # 1-Bosqich: Agar NVIDIA_API_KEY bo'lsa, rasmiy NVIDIA NIM API ga ulanish
+        if NVIDIA_API_KEY and not NVIDIA_API_KEY.startswith("nvapi-dummy"):
+            try:
+                response = await asyncio.wait_for(
+                    self._nvidia_client.chat.completions.create(
+                        model=NVIDIA_MODEL,
+                        messages=messages,
+                        temperature=0.6,
+                        max_tokens=2048,
+                    ),
+                    timeout=20.0,
+                )
+                ans = response.choices[0].message.content or ""
+                if ans.strip():
+                    if save_history:
+                        chat_h = self.chat_histories.setdefault(chat_id, [])
+                        chat_h.append({"role": "user", "content": user_message, "sender_name": sender_name, "chat_id": chat_id})
+                        chat_h.append({"role": "assistant", "content": ans, "sender_name": "Super-Agent", "chat_id": chat_id})
+                        if len(chat_h) > 40:
+                            self.chat_histories[chat_id] = chat_h[-40:]
+                        try:
+                            await db.add_chat_message("user", user_message, chat_id=chat_id, user_id=user_id, sender_name=sender_name, chat_type=chat_type)
+                            await db.add_chat_message("assistant", ans, chat_id=chat_id, user_id="", sender_name="Super-Agent", chat_type=chat_type)
+                        except Exception:
+                            pass
+                    return ans
+            except Exception as n_err:
+                logger.warning("NVIDIA NIM to'g'ridan-to'g'ri API xatosi: %s. OpenRouter Nemotron zaxirasiga o'tilmoqda...", n_err)
+
+        # 2-Bosqich: OpenRouter dagi Nemotron zaxira modellari (100% kafolatli)
+        nemotron_models = [
+            "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+            "nvidia/llama-3.1-nemotron-70b-instruct",
+            "nvidia/nemotron-3-ultra-550b-a55b:free",
+            "nvidia/nemotron-3.5-lightning:free",
+        ]
+
+        for n_model in nemotron_models:
+            try:
+                response = await asyncio.wait_for(
+                    self._openrouter_client.chat.completions.create(
+                        model=n_model,
+                        messages=messages,
+                        temperature=0.6,
+                        max_tokens=2048,
+                    ),
+                    timeout=18.0,
+                )
+                msg_obj = response.choices[0].message
+                ans = msg_obj.content or getattr(msg_obj, "reasoning", "") or ""
+                if ans.strip():
+                    if save_history:
+                        chat_h = self.chat_histories.setdefault(chat_id, [])
+                        chat_h.append({"role": "user", "content": user_message, "sender_name": sender_name, "chat_id": chat_id})
+                        chat_h.append({"role": "assistant", "content": ans, "sender_name": "Super-Agent", "chat_id": chat_id})
+                        if len(chat_h) > 40:
+                            self.chat_histories[chat_id] = chat_h[-40:]
+                        try:
+                            await db.add_chat_message("user", user_message, chat_id=chat_id, user_id=user_id, sender_name=sender_name, chat_type=chat_type)
+                            await db.add_chat_message("assistant", ans, chat_id=chat_id, user_id="", sender_name="Super-Agent", chat_type=chat_type)
+                        except Exception:
+                            pass
+                    return ans
+            except Exception as or_err:
+                logger.debug("Nemotron (%s) xatosi: %s", n_model, or_err)
+                continue
+
+        # 3-Bosqich: Agar barchasi band bo'lsa, umumiy OpenRouter orqali
+        return await self._generate_openrouter(
+            user_message,
+            save_history=save_history,
+            chat_id=chat_id,
+            user_id=user_id,
+            sender_name=sender_name,
+            chat_type=chat_type,
+        )
 
 
