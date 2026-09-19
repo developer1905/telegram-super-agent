@@ -76,21 +76,21 @@ async def _send_agent_message(
 
 
 async def _generate_superagent_solution(prompt: str, chat_id: str) -> str:
-    """SuperAgent yechimini generatsiya qilish (AIManager -> Mistral Fallback)."""
+    """SuperAgent yechimini tezkor generatsiya qilish (AIManager -> Mistral Fallback)."""
     try:
         from core.ai_manager import AIManager
         ai_mgr = AIManager()
-        resp = await ai_mgr.generate(prompt, save_history=False)
+        resp = await asyncio.wait_for(ai_mgr.generate(prompt, save_history=False), timeout=8.0)
         if resp and not resp.startswith("❌") and not resp.startswith("⚠️"):
             return resp
     except Exception as e:
-        logger.warning("AIManager xatosi: %s, Mistral fallback qo'llanadi", e)
+        logger.warning("AIManager kutish/xato (%s), Mistral tezkor fallback qo'llanadi", e)
 
-    # Mistral AI orqali SuperAgent personasi bilan generatsiya qilish
+    # Mistral AI orqali SuperAgent personasi bilan tezkor generatsiya
     ans, _ = await mistral_agent_client.send_message(
         prompt,
         chat_id=f"collab_dev_{chat_id}",
-        system_instruction="Siz SuperAgent AI — Katta muhandis va dasturchisiz. Talablarga 100% mos keluvchi toza, to'liq ishlovchi kod va amaliy yechimni o'zbek tilida yozing."
+        system_instruction="Siz SuperAgent AI — Katta muhandis va dasturchisiz. Qisqa, aniq va professional yechimni o'zbek tilida yozing."
     )
     return ans
 
@@ -321,7 +321,12 @@ async def handle_free_chit_chat(
     """
     cur_origin = origin_bot or bot_white
     is_group = chat_id < 0
-    selected_topic = topic.strip() if topic and len(topic.strip()) > 3 else random.choice(CHIT_CHAT_TOPICS)
+    clean_t = ""
+    if topic:
+        clean_t = re.sub(r"^(?:/suhbat|/chat|/gaplash|/collab|🗣️ Erkin Suhbat)\b", "", topic.strip(), flags=re.IGNORECASE).strip()
+        clean_t = re.sub(r"@\w+bot\b", "", clean_t, flags=re.IGNORECASE).strip()
+        clean_t = re.sub(r"^[:\s\-]+", "", clean_t).strip()
+    selected_topic = clean_t if len(clean_t) > 3 else random.choice(CHIT_CHAT_TOPICS)
 
     logger.info("🎙 handle_free_chit_chat boshlandi: chat_id=%s, topic='%s'", chat_id, selected_topic)
 
