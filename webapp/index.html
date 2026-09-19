@@ -940,6 +940,9 @@
         <div class="subtab-pill" data-tool="smm" onclick="switchToolSubTab('smm', this)">
           <i class="bi bi-rocket-takeoff-fill me-1"></i> 🎯 Viral SMM
         </div>
+        <div class="subtab-pill" data-tool="astrology" onclick="switchToolSubTab('astrology', this)">
+          <i class="bi bi-stars me-1"></i> 🔮 Astrologiya & Natal
+        </div>
         <div class="subtab-pill" data-tool="uptime" onclick="switchToolSubTab('uptime', this)">
           <i class="bi bi-activity me-1"></i> Uptime Monitor
         </div>
@@ -1340,6 +1343,144 @@
           </div>
           <div class="p-3 bg-light rounded-3 small text-dark" id="smm-report-content" style="white-space: pre-wrap; max-height: 480px; overflow-y: auto; line-height: 1.6;">
             <!-- SMM report -->
+          </div>
+        </div>
+      </div>
+
+      <!-- 9. Astrologiya & Natal Karta Subtab -->
+      <div class="tool-content-pane" id="tool-pane-astrology" style="display: none;">
+        <div class="neon-card p-3 mb-3">
+          <div class="neon-card-header">
+            <span><i class="bi bi-stars me-2 text-primary"></i>Astrologiya & Natal Karta</span>
+            <span class="badge bg-primary text-white">Natal • Lots • Tranzitlar</span>
+          </div>
+          <p class="text-muted small mb-3">
+            Tug'ilgan sana, vaqt va shahringizni kiriting — tizim 13 ta sayyora, Placidus uylari, 5 ta qadimiy Arab nuqtalari (Pars Fortuna, Ruh, Eros) va joriy tranzitlarni aniq hisoblab beradi:
+          </p>
+          <div class="row g-2 mb-2">
+            <div class="col-12 col-md-4">
+              <label class="form-label small fw-bold text-dark mb-1">📅 Tug'ilgan sana:</label>
+              <input type="date" class="form-control" id="astro-birth-date" />
+            </div>
+            <div class="col-6 col-md-4">
+              <label class="form-label small fw-bold text-dark mb-1">⏰ Aniq vaqt:</label>
+              <input type="time" class="form-control" id="astro-birth-time" value="12:00" />
+            </div>
+            <div class="col-6 col-md-4">
+              <label class="form-label small fw-bold text-dark mb-1">📍 Shahar / Joylashuv:</label>
+              <input type="text" class="form-control" id="astro-birth-city" placeholder="Tashkent" value="Tashkent" />
+            </div>
+          </div>
+          <div class="d-flex gap-1 overflow-x-auto text-nowrap mb-3">
+            <span class="quick-chip" onclick="setQuickAstroCity('Tashkent')">📍 Toshkent</span>
+            <span class="quick-chip" onclick="setQuickAstroCity('Samarkand')">📍 Samarqand</span>
+            <span class="quick-chip" onclick="setQuickAstroCity('Bukhara')">📍 Buxoro</span>
+            <span class="quick-chip" onclick="setQuickAstroCity('Andijan')">📍 Andijon</span>
+            <span class="quick-chip" onclick="setQuickAstroCity('Fergana')">📍 Farg'ona</span>
+            <span class="quick-chip" onclick="setQuickAstroCity('Moscow')">📍 Moskva</span>
+            <span class="quick-chip" onclick="setQuickAstroCity('Istanbul')">📍 Istanbul</span>
+            <span class="quick-chip" onclick="setQuickAstroCity('Dubai')">📍 Dubay</span>
+            <span class="quick-chip" onclick="setQuickAstroCity('New York')">📍 Nyu-York</span>
+          </div>
+          <button class="btn btn-neon-primary w-100 py-2" id="btn-calc-astro" onclick="handleCalculateAstro()">
+            <i class="bi bi-compass me-1"></i> ✨ Natal Kartani Hisoblash & Saqlash
+          </button>
+        </div>
+
+        <!-- Astrologiya natijalari bloki -->
+        <div id="astro-result-box" style="display: none;">
+          <!-- 4 Asosiy Ustun (Quyosh, Oy, Ascendant, Midheaven) -->
+          <div class="row g-2 mb-3" id="astro-core-cards">
+            <!-- Dinamik to'ldiriladi -->
+          </div>
+
+          <!-- Sayyoralar va Arab Nuqtalari Kartasi -->
+          <div class="neon-card p-3 mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="fw-bold small text-dark"><i class="bi bi-diagram-3 me-1 text-primary"></i>Sayyoralar & Arab Nuqtalari</span>
+              <span class="badge bg-secondary text-white" id="astro-chart-meta">Placidus</span>
+            </div>
+            
+            <div class="table-responsive mb-3" style="max-height: 280px; overflow-y: auto;">
+              <table class="table table-sm table-hover align-middle mb-0" style="font-size: 0.8rem;">
+                <thead class="table-light">
+                  <tr>
+                    <th>Sayyora / Nuqta</th>
+                    <th>Burj</th>
+                    <th>Daraja</th>
+                    <th>Uy</th>
+                    <th>Holat</th>
+                  </tr>
+                </thead>
+                <tbody id="astro-planets-tbody">
+                  <!-- Dinamik satrlar -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Arab Nuqtalari (Lots) -->
+            <div class="p-2 bg-light rounded-3 mb-2">
+              <div class="fw-bold small text-dark mb-1"><i class="bi bi-gem me-1 text-warning"></i>Qadimiy Arab Nuqtalari (Lots):</div>
+              <div class="row g-2" id="astro-arabic-lots-box">
+                <!-- Dinamik kartalar -->
+              </div>
+            </div>
+
+            <!-- Bugungi Tranzitlar -->
+            <div class="p-2 bg-light rounded-3">
+              <div class="fw-bold small text-dark mb-1"><i class="bi bi-clock-history me-1 text-info"></i>Bugungi Faol Tranzitlar:</div>
+              <div id="astro-transits-summary" class="small text-muted" style="line-height: 1.5;">
+                <!-- Tranzitlar -->
+              </div>
+            </div>
+          </div>
+
+          <!-- AI Munajjim Tahlilchi Bo'limi -->
+          <div class="neon-card p-3 mb-3">
+            <div class="neon-card-header">
+              <span><i class="bi bi-robot me-2 text-primary"></i>AI Munajjim Shaxsiy Tahlili</span>
+              <span class="badge bg-success text-white">Nous Hermes & Gemini</span>
+            </div>
+            <p class="text-muted small mb-2">
+              Sizning shaxsiy natal kartangiz, uylar, arab nuqtalari va bugungi tranzitlaringiz asosida sun'iy intellektdan aniq prognoz oling:
+            </p>
+            <div class="mb-2">
+              <textarea class="form-control" id="astro-ai-question" rows="2" placeholder="Savolingiz: Masalan: Yaqin oylarda moliyaviy va karyera taraqqiyotim qanday bo'ladi?"></textarea>
+            </div>
+            <div class="d-flex gap-1 overflow-x-auto text-nowrap mb-3">
+              <span class="quick-chip" onclick="setQuickAstroQuestion('Mening moliyaviy va boylik potentsialim, eng daromadli sohalarim qaysilar?')">💰 Moliyaviy potentsial</span>
+              <span class="quick-chip" onclick="setQuickAstroQuestion('Muhabbat, juftim bilan munosabatlar va shaxsiy hayotim tahlili')">❤️ Muhabbat & Oila</span>
+              <span class="quick-chip" onclick="setQuickAstroQuestion('Hayotiy missiyam, karyeram va 10-uyim bo\'yicha eng katta yutuqlarim')">💼 Karyera & Missiya</span>
+              <span class="quick-chip" onclick="setQuickAstroQuestion('Bugungi faol tranzitlar menga qanday ta\'sir qilmoqda va nimalarga e\'tibor berishim kerak?')">⚡ Bugungi Tranzitlar</span>
+              <span class="quick-chip" onclick="setQuickAstroQuestion('Natal kartam, Arab nuqtalarim va karmik darslarim bo\'yicha to\'liq chuqur tahlil bering')">🔮 To'liq Tahlil</span>
+            </div>
+            <div class="row g-2 align-items-center mb-2">
+              <div class="col-7">
+                <select class="form-select form-select-sm" id="astro-ai-model-select">
+                  <option value="gemini-2.5-flash">⚡ Gemini 2.5 Flash</option>
+                  <option value="nousresearch/hermes-3-llama-3.1-405b:free">🧠 Nous Hermes 3 (405B)</option>
+                  <option value="deepseek/deepseek-r1:free">🔬 DeepSeek R1 Reasoning</option>
+                </select>
+              </div>
+              <div class="col-5">
+                <button class="btn btn-neon-primary w-100 py-1" id="btn-run-astro-ai" onclick="handleAstroAiReport()">
+                  <i class="bi bi-stars me-1"></i> Tahlil Olish
+                </button>
+              </div>
+            </div>
+
+            <!-- AI Tahlil Javobi -->
+            <div id="astro-ai-report-box" class="mt-3" style="display: none;">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="fw-bold small text-dark"><i class="bi bi-chat-heart me-1 text-primary"></i>Munajjim AI Xulosasi</span>
+                <button class="btn btn-sm btn-outline-secondary py-1 px-2" onclick="copyAstroAiResult()">
+                  <i class="bi bi-clipboard me-1"></i> Nusxa olish
+                </button>
+              </div>
+              <div class="p-3 bg-light rounded-3 small text-dark" id="astro-ai-report-content" style="white-space: pre-wrap; max-height: 480px; overflow-y: auto; line-height: 1.6;">
+                <!-- AI report -->
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -2242,6 +2383,7 @@
       if (subId === 'uptime') loadUptime();
       if (subId === 'profile') loadMem0Profile();
       if (subId === 'cleaner') loadCleanerInfo();
+      if (subId === 'astrology') loadAstroProfile();
     }
 
     // Midjourney / FLUX.1 Studio In-App Generator
@@ -2847,6 +2989,256 @@
       } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="bi bi-broom-fill me-1"></i> Serverni Xavfsiz Tozalash';
+      }
+    }
+
+    // ══════════════════════════════════════════════════════
+    // Astrologiya & Natal Karta Logic
+    // ══════════════════════════════════════════════════════
+    let currentAstroChart = null;
+    let lastAstroAiReport = '';
+
+    function getActiveUserId() {
+      if (window.Telegram?.WebApp?.initDataUnsafe?.user?.id) {
+        return window.Telegram.WebApp.initDataUnsafe.user.id;
+      }
+      return '1905_web_user';
+    }
+
+    function setQuickAstroCity(city) {
+      const input = document.getElementById('astro-birth-city');
+      if (input) {
+        input.value = city;
+        haptic('light');
+      }
+    }
+
+    function setQuickAstroQuestion(q) {
+      const input = document.getElementById('astro-ai-question');
+      if (input) {
+        input.value = q;
+        input.focus();
+        haptic('light');
+      }
+    }
+
+    async function loadAstroProfile() {
+      const userId = getActiveUserId();
+      try {
+        const res = await fetch(`/api/astrology/profile?user_id=${userId}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status === 'ok' && data.profile) {
+            const p = data.profile;
+            if (p.birth_date) document.getElementById('astro-birth-date').value = p.birth_date;
+            if (p.birth_time) document.getElementById('astro-birth-time').value = p.birth_time;
+            if (p.city) document.getElementById('astro-birth-city').value = p.city;
+            if (p.chart) {
+              currentAstroChart = p.chart;
+              renderAstroChart(p.chart);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Astro profile load error:', err);
+      }
+    }
+
+    async function handleCalculateAstro() {
+      const date = document.getElementById('astro-birth-date')?.value;
+      const time = document.getElementById('astro-birth-time')?.value || '12:00';
+      const city = document.getElementById('astro-birth-city')?.value?.trim() || 'Tashkent';
+      const btn = document.getElementById('btn-calc-astro');
+
+      if (!date) {
+        showToast("Iltimos, tug'ilgan sanangizni tanlang", true);
+        return;
+      }
+
+      haptic('medium');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Ephemeris hisoblanmoqda...';
+
+      try {
+        const res = await fetch('/api/astrology/calculate', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            user_id: getActiveUserId(),
+            birth_date: date,
+            birth_time: time,
+            city: city
+          })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status === 'ok' && data.chart) {
+            currentAstroChart = data.chart;
+            renderAstroChart(data.chart);
+            showToast('Natal karta hisoblandi va saqlandi! ✨');
+            haptic('success');
+          } else {
+            showToast('Xatolik: ' + (data.error || 'Hisoblab bo\'lmadi'), true);
+          }
+        } else {
+          showToast('Serverda xatolik yuz berdi', true);
+        }
+      } catch (err) {
+        showToast('Tarmoq xatosi', true);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-compass me-1"></i> ✨ Natal Kartani Hisoblash & Saqlash';
+      }
+    }
+
+    function renderAstroChart(chart) {
+      const resultBox = document.getElementById('astro-result-box');
+      if (!resultBox || !chart) return;
+      resultBox.style.display = 'block';
+
+      // 1. Asosiy 4 ustun kartasi (Quyosh, Oy, Ascendant, Midheaven)
+      const coreCards = document.getElementById('astro-core-cards');
+      const sun = chart.planets?.Sun || {};
+      const moon = chart.planets?.Moon || {};
+      const asc = chart.houses?.ascendant || {};
+      const mc = chart.houses?.midheaven || {};
+
+      coreCards.innerHTML = `
+        <div class="col-6 col-md-3">
+          <div class="p-2 bg-warning-subtle border border-warning-subtle rounded-3 text-center">
+            <div class="small text-muted mb-1">☀️ Quyosh (Burj)</div>
+            <div class="fw-bold text-dark fs-6">${sun.sign_symbol || '♈'} ${sun.sign || 'Noma\'lum'}</div>
+            <div class="badge bg-warning text-dark mt-1">${sun.degrees_in_sign ? sun.degrees_in_sign.toFixed(1) + '°' : ''} • Uy ${sun.house || 1}</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="p-2 bg-info-subtle border border-info-subtle rounded-3 text-center">
+            <div class="small text-muted mb-1">🌙 Oy (Hissiyot)</div>
+            <div class="fw-bold text-dark fs-6">${moon.sign_symbol || '♋'} ${moon.sign || 'Noma\'lum'}</div>
+            <div class="badge bg-info text-white mt-1">${moon.degrees_in_sign ? moon.degrees_in_sign.toFixed(1) + '°' : ''} • Uy ${moon.house || 1}</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="p-2 bg-success-subtle border border-success-subtle rounded-3 text-center">
+            <div class="small text-muted mb-1">⬆️ Ascendant (1-uy)</div>
+            <div class="fw-bold text-dark fs-6">${asc.sign_symbol || '✨'} ${asc.sign || 'Noma\'lum'}</div>
+            <div class="badge bg-success text-white mt-1">${asc.degrees_in_sign ? asc.degrees_in_sign.toFixed(1) + '°' : ''}</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="p-2 bg-danger-subtle border border-danger-subtle rounded-3 text-center">
+            <div class="small text-muted mb-1">👑 Midheaven (MC)</div>
+            <div class="fw-bold text-dark fs-6">${mc.sign_symbol || '🎯'} ${mc.sign || 'Noma\'lum'}</div>
+            <div class="badge bg-danger text-white mt-1">${mc.degrees_in_sign ? mc.degrees_in_sign.toFixed(1) + '°' : ''}</div>
+          </div>
+        </div>
+      `;
+
+      // 2. Sayyoralar jadvali
+      const tbody = document.getElementById('astro-planets-tbody');
+      let tbodyHtml = '';
+      const planetKeys = [
+        'Sun', 'Moon', 'Mercury', 'Venus', 'Mars',
+        'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto',
+        'NorthNode', 'Lilith', 'Chiron'
+      ];
+      planetKeys.forEach(pk => {
+        const p = chart.planets?.[pk];
+        if (p) {
+          const rxBadge = p.retrograde ? '<span class="badge bg-danger-subtle text-danger border border-danger-subtle">℞ Retro</span>' : '<span class="badge bg-light text-muted">To\'g\'ri</span>';
+          tbodyHtml += `
+            <tr>
+              <td><strong>${p.symbol || '🪐'} ${p.name_uz || p.name}</strong></td>
+              <td>${p.sign_symbol || ''} ${p.sign}</td>
+              <td><code>${p.degrees_in_sign ? p.degrees_in_sign.toFixed(1) + '°' : ''}</code></td>
+              <td><span class="badge bg-primary-subtle text-primary">${p.house}-uy</span></td>
+              <td>${rxBadge}</td>
+            </tr>
+          `;
+        }
+      });
+      tbody.innerHTML = tbodyHtml;
+
+      // 3. Arab Nuqtalari (Lots)
+      const lotsBox = document.getElementById('astro-arabic-lots-box');
+      let lotsHtml = '';
+      const arabicLots = chart.arabic_lots || {};
+      for (const [key, val] of Object.entries(arabicLots)) {
+        lotsHtml += `
+          <div class="col-6 col-md-4">
+            <div class="p-2 border rounded-2 bg-white">
+              <div class="small fw-bold text-primary mb-1">${escapeHtml(val.name_uz || val.name)}</div>
+              <div class="small text-dark fw-bold">${val.sign_symbol || '✨'} ${val.sign} ${val.degrees_in_sign ? val.degrees_in_sign.toFixed(1) + '°' : ''}</div>
+              <div class="text-muted" style="font-size: 11px;">Uy: ${val.house}-uy</div>
+            </div>
+          </div>
+        `;
+      }
+      lotsBox.innerHTML = lotsHtml;
+
+      // 4. Tranzitlar xulosasi
+      const transitsBox = document.getElementById('astro-transits-summary');
+      if (chart.active_transits && chart.active_transits.length > 0) {
+        let tText = chart.active_transits.slice(0, 8).map(t => `• <b>${t.transit_planet}</b> ➔ ${t.aspect_name} ➔ <b>${t.natal_planet}</b> (Orb: ${t.orb ? t.orb.toFixed(1) : 0}°)`).join('<br>');
+        transitsBox.innerHTML = tText;
+      } else {
+        transitsBox.innerHTML = 'Bugungi kunda natal sayyoralar bilan kuchli keskin orbisli tranzitlar kuzatilmadi (barqaror davr).';
+      }
+    }
+
+    async function handleAstroAiReport() {
+      const qInput = document.getElementById('astro-ai-question');
+      const modelSelect = document.getElementById('astro-ai-model-select');
+      const question = qInput ? qInput.value.trim() : '';
+      const model = modelSelect ? modelSelect.value : 'gemini-2.5-flash';
+      const btn = document.getElementById('btn-run-astro-ai');
+      const box = document.getElementById('astro-ai-report-box');
+      const content = document.getElementById('astro-ai-report-content');
+
+      if (!question) {
+        showToast('Munajjimga savolingizni kiriting yoki tezkor tugmalardan tanlang', true);
+        return;
+      }
+
+      haptic('medium');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Tahlil qilinmoqda...';
+
+      try {
+        const res = await fetch('/api/astrology/interpret', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            user_id: getActiveUserId(),
+            question: question,
+            model: model
+          })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          lastAstroAiReport = data.response || 'Munajjim tahlili tayyor.';
+          content.innerText = lastAstroAiReport;
+          box.style.display = 'block';
+          showToast('Munajjim tahlili tayyor! ✨');
+          haptic('success');
+        } else {
+          showToast('Tahlil olishda xatolik yuz berdi', true);
+        }
+      } catch (err) {
+        showToast('Tarmoq xatosi', true);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-stars me-1"></i> Tahlil Olish';
+      }
+    }
+
+    function copyAstroAiResult() {
+      if (lastAstroAiReport) {
+        navigator.clipboard.writeText(lastAstroAiReport);
+        showToast('AI Tahlil nusxalandi! 📋');
+        haptic('light');
       }
     }
 
