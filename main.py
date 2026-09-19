@@ -1037,6 +1037,7 @@ async def main() -> None:
 
     # 2-Botni (Mistral Arxitektor @architect7_bot) mustaqil fonda ishga tushirish
     second_bot = get_second_bot()
+    second_bot_task: Optional[asyncio.Task] = None
     if second_bot:
         async def _run_second_bot_isolated():
             try:
@@ -1057,9 +1058,9 @@ async def main() -> None:
                     ],
                 )
             except Exception as sec_err:
-                logger.error("2-Bot polling xatosi: %s", sec_err)
+                logger.error("2-Bot polling xatosi: %s", sec_err, exc_info=True)
 
-        asyncio.create_task(_run_second_bot_isolated())
+        second_bot_task = asyncio.create_task(_run_second_bot_isolated())
 
     # 6. Smart Inbox Triage kuzatuvchisini faollashtirish
     if userbot_module.userbot and userbot_module.userbot.is_connected():
@@ -1156,6 +1157,8 @@ async def main() -> None:
             await bot.session.close()
         except Exception as bot_err:
             logger.debug("Bot sessiyasini yopishda xatolik: %s", bot_err)
+        if second_bot_task and not second_bot_task.done():
+            second_bot_task.cancel()
         if second_bot:
             try:
                 await second_bot.session.close()
