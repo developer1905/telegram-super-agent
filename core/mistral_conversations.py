@@ -46,28 +46,28 @@ MISTRAL_CONVERSATIONS_URL = f"{MISTRAL_BASE_URL.rstrip('/')}/conversations"
 # ─── Bepul Modellar Katalogi va Prioritet Kaskadi ────────────
 
 ARCHITECT_CASCADE_MODELS = [
-    # 1. Asosiy Mistral Agent (Conversations API)
+    # 1. Google Gemini 3.5 Flash Lite (Ultra-Tezkor va 100% Faol Bepul Model)
+    {
+        "id": "gemini_35_flash_lite",
+        "provider": "Google Gemini",
+        "model": "gemini-3.5-flash-lite",
+        "name": "💎 Gemini 3.5 Flash Lite",
+        "type": "gemini",
+    },
+    # 2. Google Gemini 3.1 Flash Lite
+    {
+        "id": "gemini_31_flash_lite",
+        "provider": "Google Gemini",
+        "model": "gemini-3.1-flash-lite",
+        "name": "💎 Gemini 3.1 Flash Lite",
+        "type": "gemini",
+    },
+    # 3. Asosiy Mistral Agent (Conversations API)
     {
         "id": "mistral_agent",
         "provider": "Mistral Agent",
         "name": "🌪 Mistral Agent (Maxsus Arxitektor)",
         "type": "agent",
-    },
-    # 2. Mistral Direct Codestral
-    {
-        "id": "codestral_latest",
-        "provider": "Mistral AI",
-        "model": "codestral-latest",
-        "name": "💻 Codestral Latest (Dasturlash)",
-        "type": "mistral_chat",
-    },
-    # 3. Mistral Ministral 8B
-    {
-        "id": "ministral_8b",
-        "provider": "Mistral AI",
-        "model": "ministral-8b-latest",
-        "name": "⚡ Ministral 8B (Tezkor tahlil)",
-        "type": "mistral_chat",
     },
     # 4. OpenRouter Free: DeepSeek V4 Flash
     {
@@ -77,7 +77,15 @@ ARCHITECT_CASCADE_MODELS = [
         "name": "🧠 DeepSeek V4 Flash Free (1M)",
         "type": "openrouter",
     },
-    # 5. OpenRouter Free: Poolside Laguna (Arxitektor modeli)
+    # 5. Mistral Direct Codestral
+    {
+        "id": "codestral_latest",
+        "provider": "Mistral AI",
+        "model": "codestral-latest",
+        "name": "💻 Codestral Latest (Dasturlash)",
+        "type": "mistral_chat",
+    },
+    # 6. OpenRouter Free: Poolside Laguna (Arxitektor modeli)
     {
         "id": "or_laguna",
         "provider": "OpenRouter (Free)",
@@ -85,7 +93,15 @@ ARCHITECT_CASCADE_MODELS = [
         "name": "🌊 Poolside Laguna S 2.1 (Arxitektor)",
         "type": "openrouter",
     },
-    # 6. OpenRouter Free: NVIDIA Nemotron Super 120B
+    # 7. Google Gemini 3.6 Flash
+    {
+        "id": "gemini_36_flash",
+        "provider": "Google Gemini",
+        "model": "gemini-3.6-flash",
+        "name": "💎 Gemini 3.6 Flash",
+        "type": "gemini",
+    },
+    # 8. OpenRouter Free: NVIDIA Nemotron Super 120B
     {
         "id": "or_nemotron_super",
         "provider": "OpenRouter (Free)",
@@ -93,7 +109,7 @@ ARCHITECT_CASCADE_MODELS = [
         "name": "🔬 Nemotron Super 120B Free",
         "type": "openrouter",
     },
-    # 7. OpenRouter Free: Nex-AGI Pro
+    # 9. OpenRouter Free: Nex-AGI Pro
     {
         "id": "or_nex_pro",
         "provider": "OpenRouter (Free)",
@@ -101,7 +117,7 @@ ARCHITECT_CASCADE_MODELS = [
         "name": "🔥 Nex-AGI N2.5 Pro Free",
         "type": "openrouter",
     },
-    # 8. OpenRouter Auto Free Router
+    # 10. OpenRouter Auto Free Router
     {
         "id": "or_auto_free",
         "provider": "OpenRouter (Free)",
@@ -109,29 +125,13 @@ ARCHITECT_CASCADE_MODELS = [
         "name": "🌐 OpenRouter Auto Free Router",
         "type": "openrouter",
     },
-    # 9. Google Gemini 2.5 Flash
+    # 11. Mistral Ministral 8B
     {
-        "id": "gemini_25_flash",
-        "provider": "Google Gemini",
-        "model": "gemini-2.5-flash",
-        "name": "💎 Gemini 2.5 Flash Free",
-        "type": "gemini",
-    },
-    # 10. Google Gemini 2.0 Flash
-    {
-        "id": "gemini_20_flash",
-        "provider": "Google Gemini",
-        "model": "gemini-2.0-flash",
-        "name": "💎 Gemini 2.0 Flash",
-        "type": "gemini",
-    },
-    # 11. Google Gemini 1.5 Flash
-    {
-        "id": "gemini_15_flash",
-        "provider": "Google Gemini",
-        "model": "gemini-1.5-flash",
-        "name": "💎 Gemini 1.5 Flash",
-        "type": "gemini",
+        "id": "ministral_8b",
+        "provider": "Mistral AI",
+        "model": "ministral-8b-latest",
+        "name": "⚡ Ministral 8B (Tezkor tahlil)",
+        "type": "mistral_chat",
     },
     # 12. NVIDIA NIM Nemotron
     {
@@ -280,7 +280,7 @@ class MistralAgentClient:
             try:
                 # ── 1. Mistral Agent Conversations API ──
                 if m_type == "agent":
-                    ans, th = await self._call_mistral_agent(prompt, chat_id, system_instruction)
+                    ans, th = await asyncio.wait_for(self._call_mistral_agent(prompt, chat_id, system_instruction), timeout=9.0)
                     if ans:
                         self.last_used_model = m_name
                         return ans, th
@@ -288,7 +288,7 @@ class MistralAgentClient:
 
                 # ── 2. Mistral Direct Chat API (Codestral, Ministral) ──
                 elif m_type == "mistral_chat":
-                    ans = await self._call_mistral_chat(model_cfg["model"], prompt, system_instruction)
+                    ans = await asyncio.wait_for(self._call_mistral_chat(model_cfg["model"], prompt, system_instruction), timeout=9.0)
                     if ans:
                         self.last_used_model = m_name
                         return ans, ""
@@ -296,7 +296,7 @@ class MistralAgentClient:
 
                 # ── 3. OpenRouter Free Models (DeepSeek V4, Laguna, Nemotron, Nex) ──
                 elif m_type == "openrouter":
-                    ans = await self._call_openrouter(model_cfg["model"], prompt, system_instruction)
+                    ans = await asyncio.wait_for(self._call_openrouter(model_cfg["model"], prompt, system_instruction), timeout=9.0)
                     if ans:
                         self.last_used_model = m_name
                         return ans, ""
@@ -304,7 +304,7 @@ class MistralAgentClient:
 
                 # ── 4. Google Gemini Free Models ──
                 elif m_type == "gemini":
-                    ans = await self._call_gemini(model_cfg["model"], prompt, system_instruction)
+                    ans = await asyncio.wait_for(self._call_gemini(model_cfg["model"], prompt, system_instruction), timeout=9.0)
                     if ans:
                         self.last_used_model = m_name
                         return ans, ""
@@ -312,7 +312,7 @@ class MistralAgentClient:
 
                 # ── 5. NVIDIA NIM Nemotron ──
                 elif m_type == "nvidia":
-                    ans = await self._call_nvidia(model_cfg["model"], prompt, system_instruction)
+                    ans = await asyncio.wait_for(self._call_nvidia(model_cfg["model"], prompt, system_instruction), timeout=9.0)
                     if ans:
                         self.last_used_model = m_name
                         return ans, ""
@@ -320,16 +320,19 @@ class MistralAgentClient:
 
             except Exception as exc:
                 last_error = str(exc)
-                logger.warning("⚠️ [Arxitektor AI] %s modelida xato: %s. Navbatdagi modelga o'tilmoqda...", m_name, exc)
+                try:
+                    logger.warning("⚠️ [Arxitektor AI] %s modelida xato: %s. Navbatdagi modelga o'tilmoqda...", m_name, exc)
+                except Exception:
+                    pass
                 self.mark_cooldown(m_id, f"Exception: {exc}")
-                await asyncio.sleep(0.3)
+                await asyncio.sleep(0.2)
 
         # ── 6. O'ta Mustahkam Favqulodda Zaxira (AIManager orqali Arxitektor nomidan) ──
         try:
             from core.ai_manager import AIManager
             ai_mgr = AIManager()
             full_prompt = f"{system_instruction}\n\n{prompt}" if system_instruction else prompt
-            emergency_ans = await asyncio.wait_for(ai_mgr.generate(full_prompt, save_history=False), timeout=25.0)
+            emergency_ans = await asyncio.wait_for(ai_mgr.generate(full_prompt, save_history=False), timeout=10.0)
             if emergency_ans and not emergency_ans.startswith("❌") and not emergency_ans.startswith("⚠️"):
                 self.last_used_model = "Zaxira AI Dvigateli"
                 return emergency_ans, ""
@@ -360,12 +363,15 @@ class MistralAgentClient:
         inputs = [{"role": "user", "content": user_content}]
         conv_id = self.sessions.get(str(chat_id))
 
-        async with httpx.AsyncClient(timeout=35.0) as client:
+        async with httpx.AsyncClient(timeout=8.0) as client:
             if conv_id:
                 target_url = f"{MISTRAL_CONVERSATIONS_URL}/{conv_id}"
                 payload = {"inputs": inputs}
-                resp = await client.post(target_url, json=payload, headers=headers)
-                if resp.status_code != 200:
+                try:
+                    resp = await client.post(target_url, json=payload, headers=headers)
+                    if resp.status_code != 200:
+                        conv_id = None
+                except Exception:
                     conv_id = None
 
             if not conv_id:
@@ -429,7 +435,7 @@ class MistralAgentClient:
             "messages": messages,
             "temperature": 0.3
         }
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=8.0) as client:
             r = await client.post(url, json=payload, headers=headers)
             if r.status_code == 200:
                 d = r.json()
@@ -465,7 +471,7 @@ class MistralAgentClient:
             "temperature": 0.4,
             "max_tokens": 2048
         }
-        async with httpx.AsyncClient(timeout=35.0) as client:
+        async with httpx.AsyncClient(timeout=8.0) as client:
             r = await client.post(url, json=payload, headers=headers)
             if r.status_code == 200:
                 d = r.json()
@@ -490,11 +496,10 @@ class MistralAgentClient:
             return None
 
         sys_msg = system_instruction or "Siz Bosh Arxitektor (@architect7_bot) — chuqur tahlilchi, aqlli va samimiy AI muhandissiz."
-        # google-genai 2.x SDK (aio yoki to_thread)
         try:
             if hasattr(client, "aio") and hasattr(client.aio, "models"):
                 from google.genai import types as genai_types
-                resp = await client.aio.models.generate_content(
+                call_coro = client.aio.models.generate_content(
                     model=model_name,
                     contents=prompt,
                     config=genai_types.GenerateContentConfig(
@@ -503,12 +508,16 @@ class MistralAgentClient:
                         max_output_tokens=2048,
                     )
                 )
+                resp = await asyncio.wait_for(call_coro, timeout=8.0)
             else:
-                resp = await asyncio.to_thread(
-                    client.models.generate_content,
-                    model=model_name,
-                    contents=prompt,
-                    config={"system_instruction": sys_msg, "temperature": 0.4}
+                resp = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        client.models.generate_content,
+                        model=model_name,
+                        contents=prompt,
+                        config={"system_instruction": sys_msg, "temperature": 0.4}
+                    ),
+                    timeout=8.0
                 )
             if resp and resp.text:
                 return resp.text.strip()
