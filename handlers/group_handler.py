@@ -437,6 +437,21 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
         asyncio.create_task(handle_project_generation(proj_text, message.chat.id, bot_white=bot, bot_black=sec_bot, origin_bot=bot))
         return
 
+    # 1.6. /models yoki /model (Arxitektor AI bepul modellar kaskadi va failover)
+    if clean_lower.startswith(("/models", "/model", "/modellar")):
+        from core.mistral_conversations import mistral_agent_client
+        from core.mistral_agent_bot import build_architect_models_keyboard
+        mode_desc = "Avtomatik Kaskad (Failover)" if not mistral_agent_client.forced_model_id else f"Qo'lda: {mistral_agent_client.forced_model_id}"
+        m_text = (
+            "🤖 <b>Arxitektor AI Bepul Modellari & Avto-Failover Tizimi</b>\n\n"
+            f"🎯 <b>Faol Model:</b> <code>{mistral_agent_client.last_used_model}</code>\n"
+            f"⚙️ <b>Rejim:</b> <i>{mode_desc}</i>\n"
+            "⚡ <b>Holat:</b> 12 ta bepul model kaskadga ulangan. Bitta model limiti tugasa, darhol keyingisiga o'tadi!\n\n"
+            "Kerakli modelni tanlang yoki avtomatik kaskad rejimida qoldiring:"
+        )
+        await safe_message_reply(message, m_text, reply_markup=build_architect_models_keyboard(), parse_mode="HTML")
+        return
+
     # 1.8. /profile yoki /profil (Mem0 Shaxsiy foydalanuvchi bilimlari)
     if clean_lower.startswith(("/profile", "/profil", "/memory")):
         from core.mem0_agent import get_user_profile_report
@@ -924,3 +939,24 @@ async def cb_group_collab_vote(callback: CallbackQuery) -> None:
 
     target_name = "SuperAgent" if choice == "superagent" else ("Arxitektor" if choice == "architect" else "Durang")
     await callback.answer(f"✅ Ovozingiz qabul qilindi: {target_name} ({total} ta ovoz berildi)!", show_alert=False)
+
+
+@router.callback_query(F.data.startswith("arch_model:"))
+async def cb_group_architect_select_model(callback: CallbackQuery) -> None:
+    """Guruhda Arxitektor AI modelini almashtirish callbacki."""
+    selected_id = callback.data.split(":", 1)[1]
+    from core.mistral_conversations import mistral_agent_client
+    from core.mistral_agent_bot import build_architect_models_keyboard
+    ok = mistral_agent_client.set_forced_model(selected_id)
+    if ok:
+        if selected_id == "auto":
+            alert_text = "🔄 Avtomatik kaskad yoqildi! Bepul modellar o'zaro navbatlashadi."
+        else:
+            alert_text = f"✅ Model tanlandi: {selected_id}"
+        await callback.answer(alert_text, show_alert=True)
+        try:
+            await callback.message.edit_reply_markup(reply_markup=build_architect_models_keyboard())
+        except Exception:
+            pass
+    else:
+        await callback.answer("⚠️ Model topilmadi.", show_alert=True)
