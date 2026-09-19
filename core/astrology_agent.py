@@ -819,3 +819,43 @@ MIJOZ SHAXSIY NATAL KOORDINATALARI:
 Butun hisobotni to'liq O'zbek tilida yozing! Hech qanday inglizcha so'z yoki jumla qo'shmang. Lot nomlarini o'zbekcha ma'nosi bilan keltiring (masalan: Part of Commerce — Savdo va Moliya loti)."""
 
     return prompt
+
+
+async def ensure_uzbek_astrology_report(text: str, ai_manager: Any) -> str:
+    """
+    Agar AI tahlili ingliz tilida chiqib qolsa, uni avtomatik ravishda
+    100% adabiy va chiroyli o'zbek tiliga o'girish.
+    """
+    if not text or len(text.strip()) < 40:
+        return text
+
+    english_words = {
+        "the", "and", "is", "in", "to", "of", "you", "your", "this", "that",
+        "with", "for", "are", "from", "will", "have", "not", "chart", "planets",
+        "house", "natal", "sign", "degree", "astrology", "future", "career",
+        "love", "wealth", "destiny", "transits", "horoscope"
+    }
+    words = [w.strip(".,!?:;\"'()[]{}").lower() for w in text.split()]
+    eng_count = sum(1 for w in words if w in english_words)
+
+    # Agar 3% dan ortiq inglizcha asosiy so'zlar bo'lsa -> zudlik bilan o'zbekchaga o'giramiz
+    if len(words) > 0 and (eng_count / len(words)) > 0.03:
+        try:
+            trans_prompt = (
+                "Quyidagi astrologik bashorat va munajjim-olim tahlilini 100% TOZA, ADABIY VA TA'SIRCHAN O'ZBEK TILIGA (lotin alifbosida) o'giring. "
+                "Barcha formatlash, emojilar, paragraflar, yillar va tuzilmani to'liq saqlang. "
+                "Hech bir jumla inglizcha qolmasin:\n\n"
+                f"{text}"
+            )
+            if hasattr(ai_manager, "_generate_gemini"):
+                uzbek_text = await ai_manager._generate_gemini(trans_prompt, save_history=False)
+                if uzbek_text and not uzbek_text.startswith("❌") and len(uzbek_text) > 80:
+                    return uzbek_text
+            else:
+                uzbek_text = await ai_manager.generate(trans_prompt, save_history=False)
+                if uzbek_text and not uzbek_text.startswith("❌") and len(uzbek_text) > 80:
+                    return uzbek_text
+        except Exception:
+            pass
+
+    return text
