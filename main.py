@@ -802,6 +802,8 @@ async def api_astrology_interpret_handler(request: web.Request) -> web.Response:
 
         try:
             report = await ai_manager.generate(prompt, save_history=False, chat_id=f"astro_{user_id}")
+            from core.astrology_agent import ensure_uzbek_astrology_report
+            report = await ensure_uzbek_astrology_report(report, ai_manager)
         finally:
             ai_manager.current_provider = prev_provider
             ai_manager.current_or_model = prev_model
