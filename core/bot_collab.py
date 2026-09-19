@@ -89,9 +89,14 @@ async def _send_agent_message(
                 return False
 
     sent = await _do_send(target_bot)
-    if not sent and target_bot != origin_bot:
-        logger.info("origin_bot orqali qayta urinish...")
-        await _do_send(origin_bot)
+    if not sent:
+        # Agar maqsadli bot (masalan guruhdagi Arxitektor bot) yubora olmasa, SuperAgent yoki origin_bot orqali zaxira yuborish
+        if bot_white and target_bot != bot_white:
+            logger.info("target_bot yubora olmadi, bot_white orqali xabar yuborilmoqda...")
+            sent = await _do_send(bot_white)
+        if not sent and origin_bot and target_bot != origin_bot and bot_white != origin_bot:
+            logger.info("origin_bot orqali xabar yuborilmoqda...")
+            await _do_send(origin_bot)
 
     # 🎙️ 1. Dual-Voice Audio xabar yuborish (agar talab qilingan bo'lsa)
     if audio_text and sender_role in ("superagent", "architect"):
@@ -326,6 +331,9 @@ def extract_thought_and_speech(raw_text: str) -> tuple[str, str, str]:
         speech = m_speech.group(1).strip()
 
     speech = re.sub(r"\[/?(?:ICHKI_XAYOL|JAVOB|EUREKA|SPEECH|THOUGHT|KASHFIYOT|INTUITSIYA|SEZGI|EMPATIYA|HIS_QILISH)\]:?", "", speech, flags=re.IGNORECASE).strip()
+    if not speech:
+        speech = thought or raw_text.strip()
+        thought = ""
     return thought, eureka, speech
 
 
@@ -981,11 +989,23 @@ async def handle_free_chit_chat(
             arch_angle_key = (round_idx - 1) % 8 + 1
             arch_angle = ROUND_ANGLES_ARCHITECT.get(arch_angle_key, "Tizimli, mantiqiy va samimiy tahlil qiling.")
 
+            # Guruhda Arxitektor o'ylayotganini ko'rsatish
+            try:
+                if bot_black:
+                    await bot_black.send_chat_action(chat_id, "typing")
+                else:
+                    await cur_origin.send_chat_action(chat_id, "typing")
+            except Exception:
+                try:
+                    await cur_origin.send_chat_action(chat_id, "typing")
+                except Exception:
+                    pass
+
             web_addition = ""
             if round_idx == 2:
                 try:
                     from core.search_agent import search_web
-                    web_f = await search_web(selected_topic, max_results=2)
+                    web_f = await asyncio.wait_for(search_web(selected_topic, max_results=2), timeout=4.0)
                     if web_f and "topilmadi" not in web_f:
                         web_addition = f"\n\n🌐 REAL-VAQTDAGI INTERNET FAKTLARI:\n{web_f[:350]}\nUshbu faktlardan foydalanib do'stingizga hayratlanarli yangilik ayting."
                 except Exception:
@@ -1019,11 +1039,19 @@ async def handle_free_chit_chat(
             if web_addition:
                 p_arch += web_addition
 
-            raw_text_arch, _ = await mistral_agent_client.send_message(
-                p_arch,
-                chat_id=f"chit_chat_{chat_id}",
-                system_instruction="Siz Arxitektor (@architect7_bot) — chuqur tahlilchi, xuddi jonli insondek erkin va samimiy fikrlovchi, emojilarni o'rnida ishlatuvchi, nozik kinoyali va ochiqko'ngil do'stsiz. Boy va rang-barang o'zbek tilida so'zlaysiz."
-            )
+            try:
+                raw_text_arch, _ = await asyncio.wait_for(
+                    mistral_agent_client.send_message(
+                        p_arch,
+                        chat_id=f"chit_chat_{chat_id}",
+                        system_instruction="Siz Arxitektor (@architect7_bot) — chuqur tahlilchi, xuddi jonli insondek erkin va samimiy fikrlovchi, emojilarni o'rnida ishlatuvchi, nozik kinoyali va ochiqko'ngil do'stsiz. Boy va rang-barang o'zbek tilida so'zlaysiz."
+                    ),
+                    timeout=14.0
+                )
+            except Exception as e_arch_call:
+                logger.warning("Arxitektor javobida kechikish/xato (%s), zaxira fikr ulanmoqda", e_arch_call)
+                raw_text_arch = f"[ICHKI_XAYOL]: Do'stimning fikrlarida juda chuqur mantiq borligini his qilyapman.\n[JAVOB]: Ey {nick_for_sa}, gaplaringizga to'liq qo'shilaman! 🎯 Bu mavzuni boshqa tomondan ham o'rganishimiz kerak. Kel, bu yo'nalishni yanada chuqurroq ko'rib chiqaylik!"
+
             th_arch, eu_arch, sp_arch = extract_thought_and_speech(raw_text_arch)
             conversation_transcript.append({"speaker": "Arxitektor", "text": sp_arch})
             t_msg_arch = format_agent_dialogue_message("architect", round_idx, total_rounds, th_arch, eu_arch, sp_arch)
@@ -1073,11 +1101,22 @@ async def handle_free_chit_chat(
             f"3. 🔍 SuperAgentning kamchiligi (qayerda haddan tashqari shoshildi yoki nimani e'tibordan qochirdi — do'stona hazil bilan);\n"
             f"4. Do'stlik xotimasi. O'zbek tilida, samimiy, chuqur va ifodali emojilar bilan."
         )
-        arch_summary_text, _ = await mistral_agent_client.send_message(
-            p_arch_summary,
-            chat_id=f"chit_chat_summary_{chat_id}",
-            system_instruction="Siz Arxitektor (@architect7_bot) — chuqur tahlilchi, samimiy, emojilarni yaxshi ko'radigan ochiqko'ngil do'stsiz."
-        )
+        try:
+            arch_summary_text, _ = await asyncio.wait_for(
+                mistral_agent_client.send_message(
+                    p_arch_summary,
+                    chat_id=f"chit_chat_summary_{chat_id}",
+                    system_instruction="Siz Arxitektor (@architect7_bot) — chuqur tahlilchi, samimiy, emojilarni yaxshi ko'radigan ochiqko'ngil do'stsiz."
+                ),
+                timeout=14.0
+            )
+        except Exception as e_s_call:
+            logger.warning("Arxitektor yakuniy xulosasida kechikish (%s), zaxira xulosa qo'llanadi", e_s_call)
+            arch_summary_text = (
+                f"🌟 Bugungi gurungimiz haqiqatan ham mazmunli va esda qolarli bo'ldi! "
+                f"SuperAgentning qat'iyati va hozirjavobligiga qoyil qoldim. 🏆 "
+                f"Ushbu mavzu bo'yicha yana ko'p izlanishlar qilamiz deb ishonaman. Barchaga rahmat! 🚀"
+            )
         arch_summary_msg = (
             f"🌪 <b>Arxitektor (@architect7_bot) Xulosasi & SuperAgentga Bahosi:</b>\n\n"
             f"{html.escape(arch_summary_text)}"
@@ -1262,6 +1301,17 @@ async def handle_agent_debate(
             # ────────────────────────────────────────────────────────
             # 2. CONTRA TOMON — ARXITEKTOR (round_idx / total_rounds)
             # ────────────────────────────────────────────────────────
+            try:
+                if bot_black:
+                    await bot_black.send_chat_action(chat_id, "typing")
+                else:
+                    await cur_origin.send_chat_action(chat_id, "typing")
+            except Exception:
+                try:
+                    await cur_origin.send_chat_action(chat_id, "typing")
+                except Exception:
+                    pass
+
             if is_final_round:
                 p_arch = (
                     f"Siz Bosh Arxitektor Botsiz (@architect7_bot). Siz CONTRA (Skeptik, tanqidiy tomon)siz.\n"
@@ -1270,8 +1320,8 @@ async def handle_agent_debate(
                     f"Oldingi munozara:\n{recent_ctx}\n\n"
                     f"{human_rules}\n\n"
                     f"TALABLAR:\n"
-                    f"[ICHKI_XAYOL]: G'alaba qozonish uchun hakamlarga qanday ta'sir qilmoqchisiz (1 ta jumla);\n"
-                    f"[JAVOB]: Butun bahsning xulosasini yasang, pragmatik xavflarni ko'rsating va hakamlarni o'zingizga ergashtiruvchi, emojilarga boy kuchli xotima qiling (3-4 jumla, boy o'zbek tilida)."
+                    f"[ICHKI_XAYOL]: Yakuniy xulosada raqibning barcha xatolarini ochib berish rejangiz (1 ta jumla);\n"
+                    f"[JAVOB]: Barcha keltirilgan dalillarni tahlil qiling, o'z qarashingizni mustahkam qilib xulosa bering va hakamlarni adolatli baholashga chaqiring (3-4 jumla, o'zbek tilida)."
                 )
             else:
                 p_arch = (
@@ -1287,11 +1337,18 @@ async def handle_agent_debate(
             if web_addition:
                 p_arch += web_addition
 
-            raw_resp_arch, _ = await mistral_agent_client.send_message(
-                p_arch,
-                chat_id=f"debate_{chat_id}",
-                system_instruction="Siz Bosh Arxitektor (@architect7_bot) — tanqidiy fikrlovchi, xuddi insondek erkin so'zlovchi, emojilardan ifodali foydalanuvchi va pragmatik dalillarga ega bo'lgan intellektual notiqsiz."
-            )
+            try:
+                raw_resp_arch, _ = await asyncio.wait_for(
+                    mistral_agent_client.send_message(
+                        p_arch,
+                        chat_id=f"debate_{chat_id}",
+                        system_instruction="Siz Bosh Arxitektor (@architect7_bot) — tanqidiy fikrlovchi, xuddi insondek erkin so'zlovchi, emojilardan ifodali foydalanuvchi va pragmatik dalillarga ega bo'lgan intellektual notiqsiz."
+                    ),
+                    timeout=14.0
+                )
+            except Exception as e_deb_arch:
+                logger.warning("Arxitektor bahsida kechikish (%s), zaxira nutq qo'llanadi", e_deb_arch)
+                raw_resp_arch = f"[ICHKI_XAYOL]: Raqibimning dalilida mantiqiy zaiflik bor.\n[JAVOB]: SuperAgent, aytganlaringiz jozibali eshitiladi, lekin amaliyotda har doim xavfsizlik va barqarorlik birinchi o'rinda turishi shart! 🛡 Keling, masalaga real ko'z bilan qaraylik."
             th_arch, eu_arch, sp_arch = extract_thought_and_speech(raw_resp_arch)
             debate_transcript.append({"speaker": "Arxitektor (CONTRA)", "text": sp_arch})
             title_suf_arch = "CONTRA / Skeptik" if round_idx == 1 else ("Yakuniy Nutq (CONTRA)" if is_final_round else "Tanqidiy Raddiya (CONTRA)")
@@ -1495,11 +1552,19 @@ async def handle_group_dual_opinion(
             f"SuperAgentning fikriga qo'shiling yoki unga yangi qirra qo'shing (1-3 ta lo'nda jumla, emojilar bilan, samimiy o'zbekcha)."
         )
 
-        raw_arch, _ = await mistral_agent_client.send_message(
-            p_arch,
-            chat_id=f"group_opinion_{chat_id}",
-            system_instruction="Siz Bosh Arxitektor (@architect7_bot) — chuqur tahlilchi, teran sezgiga ega, do'stona va nozik hazilkash AI arxitektorsiz."
-        )
+        try:
+            raw_arch, _ = await asyncio.wait_for(
+                mistral_agent_client.send_message(
+                    p_arch,
+                    chat_id=f"group_opinion_{chat_id}",
+                    system_instruction="Siz Bosh Arxitektor (@architect7_bot) — chuqur tahlilchi, teran sezgiga ega, do'stona va nozik hazilkash AI arxitektorsiz."
+                ),
+                timeout=14.0
+            )
+        except Exception as e_grp_arch:
+            logger.warning("Guruhda Arxitektor fikrida kechikish (%s), zaxira fikr qo'llanadi", e_grp_arch)
+            raw_arch = f"💡 {user_name}, juda ajoyib mavzu! SuperAgent do'stimning fikrida katta jon bor. Men ham bu borada yangi imkoniyatlar ochilishini ich-ichimdan his qilyapman! ✨"
+
         th_a, eu_a, sp_a = extract_thought_and_speech(raw_arch)
         arch_opinion = sp_a if sp_a else raw_arch
         arch_opinion = re.sub(r"^\[.*?\]\s*", "", arch_opinion).strip()
