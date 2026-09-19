@@ -234,6 +234,13 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
     if not should_process:
         return
 
+    # Agar buyruq aniq boshqa bot nomiga yuborilgan bo'lsa (masalan, /suhbat@architect7_bot), bu bot aralashmaydi
+    cmd_mention = re.match(r"^/\w+@(\w+)", raw_text)
+    if cmd_mention:
+        target_name = cmd_mention.group(1).lower()
+        if bot_username and target_name != bot_username:
+            return
+
     # Prefikslardan tozalangan matn
     clean_text = raw_text
     if starts_with_bot:
@@ -374,7 +381,7 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
     # ── AI DUAL-AGENT HAMKORLIK & CHATDEV PEER REVIEW (CAMEL/AutoGen) ──
     # 1. /collab yoki /hamkorlik
     if clean_lower.startswith(("/collab", "/hamkorlik", "/vazifa")):
-        task_text = re.sub(r"^(?:/collab|/hamkorlik|/vazifa)[:\s]*", "", clean_text, flags=re.IGNORECASE).strip()
+        task_text = re.sub(r"^(?:/collab|/hamkorlik|/vazifa)(?:@\w+)?[:\s]*", "", clean_text, flags=re.IGNORECASE).strip()
         if not task_text and message.reply_to_message:
             task_text = message.reply_to_message.text or message.reply_to_message.caption or ""
         if not task_text:
@@ -393,7 +400,7 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
 
     # 2. /suhbat yoki /chat (Erkin muloqot / AI Lounge)
     if clean_lower.startswith(("/suhbat", "/chat", "/gaplashing", "/fikr")):
-        topic_text = re.sub(r"^(?:/suhbat|/chat|/gaplashing|/fikr)[:\s]*", "", clean_text, flags=re.IGNORECASE).strip()
+        topic_text = re.sub(r"^(?:/suhbat|/chat|/gaplashing|/fikr)(?:@\w+)?[:\s]*", "", clean_text, flags=re.IGNORECASE).strip()
         from core.bot_collab import handle_free_chit_chat
         from core.mistral_agent_bot import get_second_bot
         sec_bot = get_second_bot()
