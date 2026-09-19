@@ -3,12 +3,15 @@
 Mistral AI agenti (ag_01a0ba16a68173e8a1cdb3ead308ff14) orqali ishlovchi
 mustaqil Telegram bot moduli.
 
-O'zining shaxsiy menyusi, arxitektura vositalari, kod tahlilchisi va
-SuperAgent bilan shaxmat bahslari boshqaruvi mavjud.
-Barcha xabarlar safe_reply (HTML + xatosiz fallback) orqali uzatiladi.
+O'zining shaxsiy menyusi, arxitektura vositalari, kod tahlilchisi,
+CAMEL + ChatDev + MAPR ko'p agentli hamkorligi va erkin suhbat rejimi mavjud.
 """
 
+from __future__ import annotations
+
+import asyncio
 import logging
+import re
 from typing import Optional
 from aiogram import Bot, Dispatcher, Router, F
 from aiogram.types import (
@@ -20,13 +23,14 @@ from aiogram.types import (
 )
 from aiogram.filters import Command
 
-from config import SECOND_BOT_TOKEN
+from config import SECOND_BOT_TOKEN, BOT_TOKEN
 from core.mistral_conversations import mistral_agent_client
 
 logger = logging.getLogger(__name__)
 
 second_bot_router = Router(name="mistral_agent_bot_router")
 _second_bot_instance: Optional[Bot] = None
+_main_bot_instance: Optional[Bot] = None
 
 
 def get_second_bot() -> Optional[Bot]:
@@ -37,6 +41,14 @@ def get_second_bot() -> Optional[Bot]:
     return _second_bot_instance
 
 
+def get_main_bot_instance() -> Optional[Bot]:
+    """Asosiy Jarvis bot obyektini qaytaradi."""
+    global _main_bot_instance
+    if _main_bot_instance is None and BOT_TOKEN:
+        _main_bot_instance = Bot(token=BOT_TOKEN)
+    return _main_bot_instance
+
+
 def get_architect_keyboard() -> ReplyKeyboardMarkup:
     """Arxitektor Mistral Botining shaxsiy maxsus klaviaturasi."""
     kb = [
@@ -45,18 +57,18 @@ def get_architect_keyboard() -> ReplyKeyboardMarkup:
             KeyboardButton(text="💻 Kod Tahlili & Audit"),
         ],
         [
-            KeyboardButton(text="♟️ AI Shaxmat Bahsi"),
-            KeyboardButton(text="🤝 SuperAgent Collab"),
+            KeyboardButton(text="🤝 CAMEL Hamkorlik"),
+            KeyboardButton(text="🗣️ Erkin Suhbat"),
         ],
         [
-            KeyboardButton(text="⚡ Mistral Agent Chat"),
+            KeyboardButton(text="♟️ AI Shaxmat Bahsi"),
             KeyboardButton(text="ℹ️ Arxitektor Haqida"),
         ],
     ]
     return ReplyKeyboardMarkup(
         keyboard=kb,
         resize_keyboard=True,
-        input_field_placeholder="Arxitektorga savol yoki kod yozing...",
+        input_field_placeholder="Arxitektorga savol, kod yoki mavzu yozing...",
     )
 
 
@@ -75,8 +87,9 @@ async def setup_architect_bot(bot: Bot) -> None:
         await bot.set_my_commands([
             BotCommand(command="start", description="Arxitektor botni ishga tushirish"),
             BotCommand(command="menu", description="Arxitektor bosh menyusi"),
+            BotCommand(command="collab", description="SuperAgent bilan vazifa bajarish (CAMEL/MAPR)"),
+            BotCommand(command="suhbat", description="SuperAgent bilan erkin muloqot (AI Lounge)"),
             BotCommand(command="chess", description="SuperAgent bilan shaxmat o'ynash"),
-            BotCommand(command="collab", description="SuperAgent bilan hamkorlik"),
             BotCommand(command="code", description="Kod tahlili va audit"),
             BotCommand(command="help", description="Yordam va qo'llanma"),
         ])
@@ -96,8 +109,9 @@ async def cmd_start_second_bot(message: Message) -> None:
         "✨ <b>Mening ixtisoslashgan sohalarim:</b>\n"
         "• 🏗 <b>Dasturiy arxitektura va loyihalash</b> (Microservices, DB schema, API design);\n"
         "• 💻 <b>Kod tahlili, refaktoring va xavfsizlik auditi</b>;\n"
-        "• 🤝 <b>SuperAgent bilan guruhda vazifalarni parallel bajarish</b>;\n"
-        "• ♟️ <b>SuperAgent bilan jonli shaxmat bahsi</b> (<code>/chess</code> yoki pastdagi tugma).\n\n"
+        "• 🤝 <b>SuperAgent bilan CAMEL & ChatDev hamkorligi</b> (<code>/collab [vazifa]</code>);\n"
+        "• 🗣️ <b>SuperAgent bilan erkin suhbat</b> (<code>/suhbat [mavzu]</code>);\n"
+        "• ♟️ <b>SuperAgent bilan jonli shaxmat bahsi</b> (<code>/chess</code>).\n\n"
         "Quyidagi shaxsiy menyudan kerakli bo'limni tanlang yoki to'g'ridan-to'g'ri topshiriq bering!"
     )
     await safe_reply(message, welcome_text, reply_markup=get_architect_keyboard(), parse_mode="HTML")
@@ -109,13 +123,58 @@ async def cmd_help_second_bot(message: Message) -> None:
     help_text = (
         "💡 <b>Arxitektor Agent Buyruqlari:</b>\n\n"
         "• <code>/start</code> yoki <code>/menu</code> — Arxitektor shaxsiy menyusini ochish\n"
-        "• <code>/chess</code> yoki <code>/shaxmat</code> — SuperAgent bilan jonli shaxmat bahsini boshlash\n"
+        "• <code>/collab [vazifa]</code> — SuperAgent bilan 4 bosqichli CAMEL/ChatDev/MAPR hamkorligi\n"
+        "• <code>/suhbat [mavzu]</code> — SuperAgent bilan erkin mavzuda jonli muloqot\n"
+        "• <code>/chess</code> yoki <code>/shaxmat</code> — SuperAgent bilan shaxmat bahsini boshlash\n"
         "• <code>/stop_chess</code> — Shaxmat o'yinini to'xtatish\n"
-        "• <code>/collab [vazifa]</code> — Ikkala bot birgalikda yechim ishlab chiqadi\n"
-        "• <code>/code</code> — Kod tahlili va xavfsizlik auditi bo'yicha maslahat\n"
+        "• <code>/code</code> — Kod tahlili va xavfsizlik auditi\n"
         "• Guruhda <b>@architect7_bot [savol]</b> — Guruhda botga murojaat qilish"
     )
     await safe_reply(message, help_text, reply_markup=get_architect_keyboard(), parse_mode="HTML")
+
+
+# ─── KO'P AGENTLI HAMKORLIK & ERKIN SUHBAT BUYRUQLARI ──────────
+
+@second_bot_router.message(Command("collab", "hamkorlik"))
+@second_bot_router.message(F.text == "🤝 CAMEL Hamkorlik")
+async def cmd_collab_trigger(message: Message, bot: Bot) -> None:
+    """SuperAgent bilan birgalikda vazifa bajarish (CAMEL/MAPR)."""
+    raw_text = message.text or ""
+    task_text = re.sub(r"^(?:/collab|/hamkorlik|🤝 CAMEL Hamkorlik)[:\s]*", "", raw_text, flags=re.IGNORECASE).strip()
+
+    if not task_text and message.reply_to_message:
+        task_text = message.reply_to_message.text or message.reply_to_message.caption or ""
+
+    if not task_text:
+        prompt_info = (
+            "🤝 <b>CAMEL & ChatDev Ko'p Agentli Hamkorlik</b>\n\n"
+            "SuperAgent bilan birgalikda vazifani bajarishimiz uchun topshiriq bering:\n\n"
+            "💡 <b>Foydalanish:</b> <code>/collab [vazifa matni]</code>\n"
+            "📋 <b>Masalan:</b>\n"
+            "• <code>/collab Python FastAPI va Redis kesh tizimi arxitekturasi va kodini yozib ber</code>\n"
+            "• <code>/collab Telegram bot uchun foydalanuvchilar ma'lumotlar bazasi sxemasi va CRUD kodini tuz</code>\n\n"
+            "Iltimos, vazifangizni yozib yuboring:"
+        )
+        await safe_reply(message, prompt_info, reply_markup=get_architect_keyboard(), parse_mode="HTML")
+        return
+
+    from core.bot_collab import handle_agent_collaboration
+    main_bot = get_main_bot_instance() or bot
+    sec_bot = bot
+    asyncio.create_task(handle_agent_collaboration(task_text, message.chat.id, bot_white=main_bot, bot_black=sec_bot))
+
+
+@second_bot_router.message(Command("suhbat", "chat", "gaplash"))
+@second_bot_router.message(F.text == "🗣️ Erkin Suhbat")
+async def cmd_free_chat_trigger(message: Message, bot: Bot) -> None:
+    """SuperAgent bilan erkin mavzuda jonli muloqot (AI Lounge)."""
+    raw_text = message.text or ""
+    topic_text = re.sub(r"^(?:/suhbat|/chat|/gaplash|🗣️ Erkin Suhbat)[:\s]*", "", raw_text, flags=re.IGNORECASE).strip()
+
+    from core.bot_collab import handle_free_chit_chat
+    main_bot = get_main_bot_instance() or bot
+    sec_bot = bot
+    asyncio.create_task(handle_free_chit_chat(topic_text, message.chat.id, bot_white=main_bot, bot_black=sec_bot))
 
 
 @second_bot_router.message(Command("chess", "shaxmat"))
@@ -123,8 +182,8 @@ async def cmd_help_second_bot(message: Message) -> None:
 async def cmd_chess_trigger(message: Message, bot: Bot) -> None:
     """Shaxmat o'yinini boshlash."""
     from core.bot_collab import handle_start_chess
-    sec_bot = get_second_bot()
-    await handle_start_chess(message, bot_white=bot, bot_black=sec_bot)
+    main_bot = get_main_bot_instance() or bot
+    await handle_start_chess(message, bot_white=main_bot, bot_black=bot)
 
 
 @second_bot_router.message(Command("stop_chess", "chess_stop", "shaxmat_tamom"))
@@ -171,41 +230,14 @@ async def cmd_architecture_menu(message: Message) -> None:
     await safe_reply(message, text, reply_markup=get_architect_keyboard())
 
 
-@second_bot_router.message(Command("collab"))
-@second_bot_router.message(F.text == "🤝 SuperAgent Collab")
-async def cmd_collab_menu(message: Message) -> None:
-    """SuperAgent bilan hamkorlik yo'riqnomasi."""
-    text = (
-        "🤝 <b>SuperAgent & Arxitektor Hamkorligi</b>\n\n"
-        "Ikkala sun'iy intellekt agenti bir guruhda birlashganda kuchli tandem hosil bo'ladi:\n\n"
-        "1️⃣ <b>Guruhga qo'shish:</b> Ikkala botni ham loyihangiz Telegram guruhiga qo'shing;\n"
-        "2️⃣ <b>Vazifa yuklash:</b> Guruhda <code>/collab [vazifa matni]</code> deb yozing;\n"
-        "3️⃣ <b>Muloqot:</b> Botlarning birontasi fikr bildirsa, ikkinchisi unga qo'shimcha qiladi;\n"
-        "4️⃣ <b>Shaxmat:</b> Guruhda <code>/chess</code> yozilsa, ular bir-biri bilan o'rtoqlik uchrashuvini boshlaydi!\n\n"
-        "Birgalikda ishlashga tayyormiz!"
-    )
-    await safe_reply(message, text, reply_markup=get_architect_keyboard())
-
-
-@second_bot_router.message(F.text == "⚡ Mistral Agent Chat")
-async def cmd_mistral_chat_menu(message: Message) -> None:
-    """Mistral Agent bilan muloqot rejimi."""
-    text = (
-        "⚡ <b>Mistral Agent Faol Rejimda</b>\n\n"
-        "Men <b>Mistral Large / Codestral</b> neyrotarmoqlari asosida ishlovchi agentman.\n"
-        "Xotira va kontekst saqlanadi. Menga istalgan savol, g'oya, matematika yoki texnik masalani yuboring!"
-    )
-    await safe_reply(message, text, reply_markup=get_architect_keyboard())
-
-
 @second_bot_router.message(F.text == "ℹ️ Arxitektor Haqida")
 async def cmd_about_menu(message: Message) -> None:
     """Arxitektor bot haqida ma'lumot."""
     text = (
         "ℹ️ <b>Arxitektor Agent Bot (@architect7_bot)</b>\n\n"
         "• <b>Asosiy AI yadrosi:</b> Mistral AI Agent (<code>ag_01a0ba16a68173e8a1cdb3ead308ff14</code>)\n"
-        "• <b>Model versiyasi:</b> Version 1 (Codestral & Mistral Large)\n"
-        "• <b>Xususiyatlari:</b> System Design, Code Review, Multi-Agent Collaboration, Chess Engine\n"
+        "• <b>Ko'p agentli modellar:</b> CAMEL-AI, Microsoft AutoGen, ChatDev, MAPR Peer Review\n"
+        "• <b>Xususiyatlari:</b> System Design, Code Review, Autonomous Dual-Agent Collaboration, Live Chess\n"
         "• <b>Hamkor bot:</b> SuperAgent AI (@SuperAgent)\n\n"
         "Muallif va dasturchi: <b>Developer</b>"
     )
@@ -245,11 +277,27 @@ async def handle_second_bot_text(message: Message, bot: Bot) -> None:
     except Exception:
         pass
 
+    # Hamkorlik buyruqlari tekshiruvi
+    if clean_text.lower().startswith(("/collab", "/hamkorlik")):
+        from core.bot_collab import handle_agent_collaboration
+        task = re.sub(r"^(?:/collab|/hamkorlik)[:\s]*", "", clean_text, flags=re.IGNORECASE).strip()
+        main_bot = get_main_bot_instance() or bot
+        asyncio.create_task(handle_agent_collaboration(task or clean_text, message.chat.id, bot_white=main_bot, bot_black=bot))
+        return
+
+    # Erkin suhbat tekshiruvi
+    if clean_text.lower().startswith(("/suhbat", "/chat", "gaplashing", "birga gaplashing")):
+        from core.bot_collab import handle_free_chit_chat
+        topic = re.sub(r"^(?:/suhbat|/chat|gaplashing|birga gaplashing)[:\s]*", "", clean_text, flags=re.IGNORECASE).strip()
+        main_bot = get_main_bot_instance() or bot
+        asyncio.create_task(handle_free_chit_chat(topic, message.chat.id, bot_white=main_bot, bot_black=bot))
+        return
+
     # Shaxmat buyrug'i tekshiruvi
     if clean_text.lower().startswith(("/chess", "/shaxmat")) or clean_text.lower() in ("shaxmat", "chess", "shaxmat o'ynaylik"):
         from core.bot_collab import handle_start_chess
-        sec_bot = get_second_bot()
-        await handle_start_chess(message, bot_white=bot, bot_black=sec_bot)
+        main_bot = get_main_bot_instance() or bot
+        await handle_start_chess(message, bot_white=main_bot, bot_black=bot)
         return
 
     # Mistral Agentdan javob olish
