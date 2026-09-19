@@ -161,7 +161,7 @@ async def cmd_collab_trigger(message: Message, bot: Bot) -> None:
     from core.bot_collab import handle_agent_collaboration
     main_bot = get_main_bot_instance() or bot
     sec_bot = bot
-    asyncio.create_task(handle_agent_collaboration(task_text, message.chat.id, bot_white=main_bot, bot_black=sec_bot))
+    asyncio.create_task(handle_agent_collaboration(task_text, message.chat.id, bot_white=main_bot, bot_black=sec_bot, origin_bot=bot))
 
 
 @second_bot_router.message(Command("suhbat", "chat", "gaplash"))
@@ -174,7 +174,7 @@ async def cmd_free_chat_trigger(message: Message, bot: Bot) -> None:
     from core.bot_collab import handle_free_chit_chat
     main_bot = get_main_bot_instance() or bot
     sec_bot = bot
-    asyncio.create_task(handle_free_chit_chat(topic_text, message.chat.id, bot_white=main_bot, bot_black=sec_bot))
+    asyncio.create_task(handle_free_chit_chat(topic_text, message.chat.id, bot_white=main_bot, bot_black=sec_bot, origin_bot=bot))
 
 
 @second_bot_router.message(Command("chess", "shaxmat"))
@@ -282,7 +282,7 @@ async def handle_second_bot_text(message: Message, bot: Bot) -> None:
         from core.bot_collab import handle_agent_collaboration
         task = re.sub(r"^(?:/collab|/hamkorlik)[:\s]*", "", clean_text, flags=re.IGNORECASE).strip()
         main_bot = get_main_bot_instance() or bot
-        asyncio.create_task(handle_agent_collaboration(task or clean_text, message.chat.id, bot_white=main_bot, bot_black=bot))
+        asyncio.create_task(handle_agent_collaboration(task or clean_text, message.chat.id, bot_white=main_bot, bot_black=bot, origin_bot=bot))
         return
 
     # Erkin suhbat tekshiruvi
@@ -290,7 +290,7 @@ async def handle_second_bot_text(message: Message, bot: Bot) -> None:
         from core.bot_collab import handle_free_chit_chat
         topic = re.sub(r"^(?:/suhbat|/chat|gaplashing|birga gaplashing)[:\s]*", "", clean_text, flags=re.IGNORECASE).strip()
         main_bot = get_main_bot_instance() or bot
-        asyncio.create_task(handle_free_chit_chat(topic, message.chat.id, bot_white=main_bot, bot_black=bot))
+        asyncio.create_task(handle_free_chit_chat(topic, message.chat.id, bot_white=main_bot, bot_black=bot, origin_bot=bot))
         return
 
     # Shaxmat buyrug'i tekshiruvi
