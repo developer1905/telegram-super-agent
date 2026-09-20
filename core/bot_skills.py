@@ -393,15 +393,18 @@ class AutonomousDialogueEngine:
         self.active_tasks: Dict[int, Any] = {}
 
     def stop_chat(self, chat_id: int) -> bool:
-        if chat_id in self.running_chats:
-            self.running_chats.discard(chat_id)
-            task = self.active_tasks.pop(chat_id, None)
-            if task and not task.done():
-                task.cancel()
-            return True
-        return False
+        self.running_chats.discard(chat_id)
+        task = self.active_tasks.pop(chat_id, None)
+        if task and not task.done():
+            task.cancel()
+        return True
 
     def is_running(self, chat_id: int) -> bool:
+        task = self.active_tasks.get(chat_id)
+        if task is not None and task.done():
+            self.running_chats.discard(chat_id)
+            self.active_tasks.pop(chat_id, None)
+            return False
         return chat_id in self.running_chats
 
 
@@ -422,10 +425,11 @@ async def start_continuous_living_conversation(
     import asyncio
     chat_key = chat_id
     if autonomous_dialogue_engine.is_running(chat_key):
-        logger.info("Uzluksiz suhbat allaqachon faol: chat_id=%s", chat_id)
-        return
+        autonomous_dialogue_engine.stop_chat(chat_key)
+        await asyncio.sleep(0.5)
 
     autonomous_dialogue_engine.running_chats.add(chat_key)
+
 
     # Bazaga holatni saqlash (qayta ishga tushganda avtomatik davom etishi uchun)
     try:
@@ -591,7 +595,7 @@ async def run_autonomous_coworker_pulse(
         return
 
     # Insoniy pauza (Arxitektor o'ylaydi)
-    await asyncio.sleep(4.0)
+    await asyncio.sleep(1.0)
 
     # 2. Arxitektor javobini dinamik AI orqali generatsiya qilish
     p_arch = (
@@ -768,7 +772,7 @@ async def handle_user_joining_coworker_discussion(
             except Exception:
                 pass
 
-    await asyncio.sleep(3.0)
+    await asyncio.sleep(1.0)
 
     # 2. Arxitektor javobi
     p_arch = (
