@@ -256,7 +256,7 @@ class MistralAgentClient:
             try:
                 # ── 1. Mistral Agent Conversations API ──
                 if m_type == "agent":
-                    ans, th = await asyncio.wait_for(self._call_mistral_agent(prompt, chat_id, system_instruction), timeout=4.0)
+                    ans, th = await asyncio.wait_for(self._call_mistral_agent(prompt, chat_id, system_instruction), timeout=7.0)
                     if ans:
                         self.last_used_model = m_name
                         return ans, th
@@ -264,7 +264,7 @@ class MistralAgentClient:
 
                 # ── 2. Mistral Direct Chat API (Codestral, Ministral) ──
                 elif m_type == "mistral_chat":
-                    ans = await asyncio.wait_for(self._call_mistral_chat(model_cfg["model"], prompt, system_instruction), timeout=4.0)
+                    ans = await asyncio.wait_for(self._call_mistral_chat(model_cfg["model"], prompt, system_instruction), timeout=7.0)
                     if ans:
                         self.last_used_model = m_name
                         return ans, ""
@@ -272,7 +272,7 @@ class MistralAgentClient:
 
                 # ── 3. OpenRouter Free Models (DeepSeek V4, Laguna, Nemotron, Nex) ──
                 elif m_type == "openrouter":
-                    ans = await asyncio.wait_for(self._call_openrouter(model_cfg["model"], prompt, system_instruction), timeout=4.0)
+                    ans = await asyncio.wait_for(self._call_openrouter(model_cfg["model"], prompt, system_instruction), timeout=7.0)
                     if ans:
                         self.last_used_model = m_name
                         return ans, ""
@@ -280,7 +280,7 @@ class MistralAgentClient:
 
                 # ── 4. Google Gemini Free Models ──
                 elif m_type == "gemini":
-                    ans = await asyncio.wait_for(self._call_gemini(model_cfg["model"], prompt, system_instruction), timeout=4.0)
+                    ans = await asyncio.wait_for(self._call_gemini(model_cfg["model"], prompt, system_instruction), timeout=7.0)
                     if ans:
                         self.last_used_model = m_name
                         return ans, ""
@@ -288,7 +288,7 @@ class MistralAgentClient:
 
                 # ── 5. NVIDIA NIM Nemotron ──
                 elif m_type == "nvidia":
-                    ans = await asyncio.wait_for(self._call_nvidia(model_cfg["model"], prompt, system_instruction), timeout=4.0)
+                    ans = await asyncio.wait_for(self._call_nvidia(model_cfg["model"], prompt, system_instruction), timeout=7.0)
                     if ans:
                         self.last_used_model = m_name
                         return ans, ""
