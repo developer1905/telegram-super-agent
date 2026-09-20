@@ -40,8 +40,13 @@ _main_bot_instance: Optional[Bot] = None
 def get_second_bot() -> Optional[Bot]:
     """2-Bot obyektini qaytaradi (agar SECOND_BOT_TOKEN mavjud bo'lsa)."""
     global _second_bot_instance
-    if _second_bot_instance is None and SECOND_BOT_TOKEN:
-        _second_bot_instance = Bot(token=SECOND_BOT_TOKEN)
+    if (_second_bot_instance is None or (_second_bot_instance.session and _second_bot_instance.session.closed)) and SECOND_BOT_TOKEN:
+        from aiogram.client.default import DefaultBotProperties
+        from aiogram.enums import ParseMode
+        _second_bot_instance = Bot(
+            token=SECOND_BOT_TOKEN,
+            default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+        )
     return _second_bot_instance
 
 
