@@ -551,8 +551,8 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
 
     # 2. /suhbat yoki /chat (Erkin muloqot / AI Lounge)
     if clean_lower.startswith(("/suhbat", "/chat", "/gaplash", "🗣️ erkin suhbat", "erkin suhbat", "suhbat")):
-        from core.bot_collab import handle_free_chit_chat, parse_topic_and_turns, ACTIVE_CHIT_CHATS
-        if ACTIVE_CHIT_CHATS.get(str(message.chat.id), False):
+        from core.bot_collab import handle_free_chit_chat, parse_topic_and_turns, is_chit_chat_running, ACTIVE_CHIT_CHAT_TASKS
+        if is_chit_chat_running(str(message.chat.id)):
             await safe_message_reply(
                 message,
                 "☕ <b>Suhbat hozirda allaqachon davom etmoqda!</b>\n"
@@ -563,7 +563,8 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
         topic_text, parsed_turns = parse_topic_and_turns(clean_text, default_turns=8)
         from core.mistral_agent_bot import get_second_bot
         sec_bot = get_second_bot()
-        asyncio.create_task(handle_free_chit_chat(topic_text, message.chat.id, bot_white=bot, bot_black=sec_bot, origin_bot=bot, turns=parsed_turns))
+        task = asyncio.create_task(handle_free_chit_chat(topic_text, message.chat.id, bot_white=bot, bot_black=sec_bot, origin_bot=bot, turns=parsed_turns))
+        ACTIVE_CHIT_CHAT_TASKS[str(message.chat.id)] = task
         return
 
     # 2.5. /bahs yoki /debate (Multi-Agent Debate & Jury)
