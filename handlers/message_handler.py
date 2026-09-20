@@ -1322,12 +1322,29 @@ async def handle_ai_chat(message: Message, ai_manager: AIManager) -> None:
         "oxirgi", "so'nggi", "kecha", "bugun nima", "kim yutdi", "kim gol urdi",
         "jadval", "chempionat", "dollar", "valyuta", "qachon o'ynaydi", "necha necha bo'ldi"
     ]
-    if any(trig in lower_u for trig in live_triggers) and len(user_text.split()) >= 2:
-        wait_msg = await message.answer("🌐 **Internetdan jonli faktlar qidirilmoqda va AI tahlil qilmoqda...**", parse_mode="Markdown")
-        ai_ans = await answer_with_web_search(user_text, ai_manager)
-        voice_btn = InlineKeyboardBuilder()
-        voice_btn.row(InlineKeyboardButton(text="🔊 Ovozda eshitish", callback_data="read_voice_msg"))
-        await safe_edit_text(wait_msg, ai_ans, reply_markup=voice_btn.as_markup(), parse_mode="Markdown")
+    # 6.9. Ikkala bot birga suhbatlashishi yoki tahlil qilishi (Dual-Bot Autonomous Dialogue)
+    dual_talk_triggers = [
+        "ikkalangiz", "birga gaplashing", "arxitektor bilan", "birga tahlil", "ikkala bot",
+        "o'rtangizda gaplashing", "men haqimda gaplashing", "ikkalang fikring", "birga suhbat"
+    ]
+    if any(trig in lower_u for trig in dual_talk_triggers):
+        import time
+        from core.bot_skills import LAST_COWORKER_CONTEXT, handle_user_joining_coworker_discussion
+        from core.mistral_agent_bot import get_second_bot
+        sec_b = get_second_bot()
+        user_name = message.from_user.full_name or "Do'stimiz"
+        if (time.time() - LAST_COWORKER_CONTEXT.get("timestamp", 0) < 900) and LAST_COWORKER_CONTEXT.get("topic"):
+            asyncio.create_task(handle_user_joining_coworker_discussion(
+                user_name=user_name,
+                user_text=user_text,
+                chat_id=message.chat.id,
+                bot_white=message.bot,
+                bot_black=sec_b,
+                origin_bot=message.bot
+            ))
+        else:
+            from core.bot_collab import handle_group_dual_opinion
+            asyncio.create_task(handle_group_dual_opinion(message, bot_white=message.bot, ai_manager=ai_manager))
         return
 
     # 7. Oddiy so'rov → AI bilan to'g'ridan-to'g'ri va tezkor suhbat
