@@ -66,37 +66,54 @@ async def _send_agent_message(
     origin_bot orqali xavfsiz yetkazish. Agar audio_text berilgan bo'lsa, avtomatik
     Edge-TTS ovozli xabarini ham birga yuboradi.
     """
-    target_bot = origin_bot
-    if is_group and bot_black and bot_white:
-        if sender_role == "architect":
-            target_bot = bot_black
-        elif sender_role == "superagent":
-            target_bot = bot_white
-        else:
-            target_bot = origin_bot
-
-    async def _do_send(b: Bot) -> bool:
+    if not bot_black:
         try:
-            await b.send_message(chat_id, text, parse_mode="HTML")
+            from core.mistral_agent_bot import get_second_bot
+            bot_black = get_second_bot()
+        except Exception:
+            pass
+
+    if not bot_white:
+        try:
+            from core.mistral_agent_bot import get_main_bot_instance
+            bot_white = get_main_bot_instance() or origin_bot
+        except Exception:
+            bot_white = origin_bot
+
+    if sender_role == "architect":
+        target_bot = bot_black or origin_bot
+    elif sender_role == "superagent":
+        target_bot = bot_white or origin_bot
+    else:
+        target_bot = origin_bot
+
+    async def _do_send(b: Bot, custom_text: Optional[str] = None) -> bool:
+        t_to_send = custom_text or text
+        try:
+            await b.send_message(chat_id, t_to_send, parse_mode="HTML")
             return True
         except Exception as err_html:
             try:
                 # Agar HTML parser (masalan < yoki > belgilari sababli) xato bersa
-                await b.send_message(chat_id, text, parse_mode=None)
+                await b.send_message(chat_id, t_to_send, parse_mode=None)
                 return True
             except Exception as err_plain:
-                logger.warning("Bot orqali yuborish xatosi: %s", err_plain)
+                logger.warning("Bot orqali yuborish xatosi (sender=%s, chat_id=%s): %s", sender_role, chat_id, err_plain)
                 return False
 
     sent = await _do_send(target_bot)
     if not sent:
-        # Agar maqsadli bot (masalan guruhdagi Arxitektor bot) yubora olmasa, SuperAgent yoki origin_bot orqali zaxira yuborish
-        if bot_white and target_bot != bot_white:
-            logger.info("target_bot yubora olmadi, bot_white orqali xabar yuborilmoqda...")
-            sent = await _do_send(bot_white)
-        if not sent and origin_bot and target_bot != origin_bot and bot_white != origin_bot:
-            logger.info("origin_bot orqali xabar yuborilmoqda...")
-            await _do_send(origin_bot)
+        # Agar maqsadli bot (masalan Arxitektor bot guruhga a'zo bo'lmagani sababli) yubora olmasa
+        fallback_bot = bot_white if (bot_white and target_bot != bot_white) else origin_bot
+        if fallback_bot and target_bot != fallback_bot:
+            logger.info("target_bot (%s) yubora olmadi, fallback_bot orqali xabar yuborilmoqda...", sender_role)
+            notice = ""
+            if sender_role == "architect":
+                notice = (
+                    "⚠️ <i>[Diqqat: @architect7_bot ushbu guruhga qo'shilmagan yoki yozish huquqi yo'q! "
+                    "Arxitektor o'z profilidan yozishi uchun @architect7_bot ni guruhga a'zo qilib, Administrator qiling!]</i>\n\n"
+                )
+            sent = await _do_send(fallback_bot, custom_text=f"{notice}{text}")
 
     # 🎙️ 1. Dual-Voice Audio xabar yuborish (agar talab qilingan bo'lsa)
     if audio_text and sender_role in ("superagent", "architect"):
