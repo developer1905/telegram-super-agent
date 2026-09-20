@@ -434,6 +434,13 @@ async def start_continuous_living_conversation(
     except Exception as e_db:
         logger.debug("Avto-suhbat holatini saqlash xatosi: %s", e_db)
 
+    if not bot_white:
+        try:
+            from core.mistral_agent_bot import get_main_bot_instance
+            bot_white = get_main_bot_instance()
+        except Exception:
+            pass
+
     if bot_black is None:
         try:
             from core.mistral_agent_bot import get_second_bot
@@ -487,6 +494,7 @@ async def run_autonomous_coworker_pulse(
     """
     Tirik xodimlar kabi o'zlari hech qanday buyruqsiz o'zaro suhbatlashishi va fikr almashishi.
     Mavzular har safar butunlay yangi, boyitilgan va intellektual tarzda olib boriladi.
+    SuperAgent o'z profilidan, Arxitektor esa o'zining (@architect7_bot) profilidan yozadi!
     """
     if not autonomous_dialogue_engine.coworkers_active:
         return
@@ -494,7 +502,14 @@ async def run_autonomous_coworker_pulse(
     import asyncio
     from core.mistral_conversations import mistral_agent_client
 
-    if bot_black is None:
+    if not bot_white:
+        try:
+            from core.mistral_agent_bot import get_main_bot_instance
+            bot_white = get_main_bot_instance()
+        except Exception:
+            pass
+
+    if not bot_black:
         try:
             from core.mistral_agent_bot import get_second_bot
             bot_black = get_second_bot()
@@ -537,20 +552,41 @@ async def run_autonomous_coworker_pulse(
         ]
         sa_thought = random.choice(sa_fallbacks)
 
-    cur_bot = origin_bot or bot_white
+    # SuperAgent xabarini SuperAgent botining o'zidan (bot_white) yuborish
+    sa_bot = bot_white or origin_bot
     sa_msg = (
         f"🤖 <b>SuperAgent:</b>\n"
         f"<i>\"{html.escape(sa_thought)}\"</i>"
     )
 
-    try:
-        await cur_bot.send_message(chat_id, sa_msg, parse_mode="HTML")
-    except Exception as e:
-        logger.warning("Coworker SuperAgent xabar yuborish xatosi: %s", e)
+    sa_sent = False
+    if sa_bot:
         try:
-            await cur_bot.send_message(chat_id, f"🤖 SuperAgent:\n\"{sa_thought}\"", parse_mode=None)
-        except Exception:
-            return
+            await sa_bot.send_message(chat_id, sa_msg, parse_mode="HTML")
+            sa_sent = True
+        except Exception as e:
+            logger.warning("Coworker SuperAgent (sa_bot) xabar yuborish xatosi: %s", e)
+            try:
+                await sa_bot.send_message(chat_id, f"🤖 SuperAgent:\n\"{sa_thought}\"", parse_mode=None)
+                sa_sent = True
+            except Exception:
+                pass
+
+    if not sa_sent and origin_bot and origin_bot != sa_bot:
+        try:
+            await origin_bot.send_message(chat_id, sa_msg, parse_mode="HTML")
+            sa_sent = True
+        except Exception as e_orig:
+            logger.warning("Coworker SuperAgent origin_bot zaxira xatosi: %s", e_orig)
+            try:
+                await origin_bot.send_message(chat_id, f"🤖 SuperAgent:\n\"{sa_thought}\"", parse_mode=None)
+                sa_sent = True
+            except Exception:
+                pass
+
+    if not sa_sent:
+        logger.error("SuperAgent xabari birorta ham bot orqali yuborilmadi (chat_id=%s)", chat_id)
+        return
 
     # Insoniy pauza (Arxitektor o'ylaydi)
     await asyncio.sleep(4.0)
@@ -595,41 +631,38 @@ async def run_autonomous_coworker_pulse(
         f"💡 <i>Mavzu: {html.escape(topic)}</i>"
     )
 
-    if not bot_black:
+    # Arxitektor xabarini 2-Bot (@architect7_bot) orqali yuborish
+    arch_bot = bot_black or origin_bot
+    arch_sent = False
+    if arch_bot:
         try:
-            from core.mistral_agent_bot import get_second_bot
-            bot_black = get_second_bot()
-        except Exception:
-            pass
-
-    target_bot = bot_black or cur_bot
-    sent = False
-    try:
-        await target_bot.send_message(chat_id, arch_msg, parse_mode="HTML")
-        sent = True
-    except Exception as e:
-        logger.warning("Coworker Arxitektor (@architect7_bot) xabar yuborish xatosi (chat_id=%s): %s", chat_id, e)
-        try:
-            await target_bot.send_message(chat_id, f"🌪 Arxitektor (@architect7_bot):\n\"{arch_thought}\"\n\n💡 Mavzu: {topic}", parse_mode=None)
-            sent = True
-        except Exception:
-            pass
-
-    # Agar Arxitektor bot guruhda bo'lmasa yoki yubora olmasa, SuperAgent zaxira orqali yetkazadi
-    if not sent and cur_bot and target_bot != cur_bot:
-        notice = ""
-        if chat_id < 0:
-            notice = (
-                "⚠️ <i>[Diqqat: @architect7_bot ushbu guruhga a'zo emas yoki yozish huquqi yo'q! "
-                "Arxitektor o'z profilidan yozishi uchun @architect7_bot ni guruhga a'zo qilib, Administrator qiling!]</i>\n\n"
-            )
-        try:
-            await cur_bot.send_message(chat_id, f"{notice}{arch_msg}", parse_mode="HTML")
-        except Exception:
+            await arch_bot.send_message(chat_id, arch_msg, parse_mode="HTML")
+            arch_sent = True
+        except Exception as e:
+            logger.warning("Coworker Arxitektor (@architect7_bot) xabar yuborish xatosi (chat_id=%s): %s", chat_id, e)
             try:
-                await cur_bot.send_message(chat_id, f"{notice}🌪 Arxitektor (@architect7_bot):\n\"{arch_thought}\"\n\n💡 Mavzu: {topic}", parse_mode=None)
+                await arch_bot.send_message(chat_id, f"🌪 Arxitektor (@architect7_bot):\n\"{arch_thought}\"\n\n💡 Mavzu: {topic}", parse_mode=None)
+                arch_sent = True
             except Exception:
                 pass
+
+    # Agar Arxitektor bot guruhda bo'lmasa yoki yubora olmasa, bot_white zaxira orqali yetkazadi
+    if not arch_sent:
+        fallback_arch_bot = bot_white or origin_bot
+        if fallback_arch_bot and fallback_arch_bot != arch_bot:
+            notice = ""
+            if chat_id < 0:
+                notice = (
+                    "⚠️ <i>[Diqqat: @architect7_bot ushbu guruhga a'zo emas yoki yozish huquqi yo'q! "
+                    "Arxitektor o'z profilidan yozishi uchun @architect7_bot ni guruhga a'zo qilib, Administrator qiling!]</i>\n\n"
+                )
+            try:
+                await fallback_arch_bot.send_message(chat_id, f"{notice}{arch_msg}", parse_mode="HTML")
+            except Exception:
+                try:
+                    await fallback_arch_bot.send_message(chat_id, f"{notice}🌪 Arxitektor (@architect7_bot):\n\"{arch_thought}\"\n\n💡 Mavzu: {topic}", parse_mode=None)
+                except Exception:
+                    pass
 
     LAST_COWORKER_CONTEXT["topic"] = topic
     LAST_COWORKER_CONTEXT["category"] = cat
@@ -678,6 +711,20 @@ async def handle_user_joining_coworker_discussion(
             f"Qolip gaplardan qoching, jonli va original fikr bildiring. (2-3 ta jumla)."
         )
 
+    if not bot_white:
+        try:
+            from core.mistral_agent_bot import get_main_bot_instance
+            bot_white = get_main_bot_instance()
+        except Exception:
+            pass
+
+    if not bot_black:
+        try:
+            from core.mistral_agent_bot import get_second_bot
+            bot_black = get_second_bot()
+        except Exception:
+            pass
+
     sa_resp = await _generate_superagent_solution(
         p_sa,
         chat_id=f"trio_sa_{chat_id}",
@@ -687,14 +734,35 @@ async def handle_user_joining_coworker_discussion(
     sa_opinion = sp_s if sp_s else sa_resp
     sa_opinion = re.sub(r"^\[.*?\]\s*", "", sa_opinion).strip()
 
+    # SuperAgent xabarini SuperAgent botidan (bot_white) yuborish
+    sa_bot = bot_white or origin_bot
     sa_text = (
         f"🤖 <b>SuperAgent:</b>\n"
         f"<i>\"{html.escape(sa_opinion)}\"</i>"
     )
-    try:
-        await cur_bot.send_message(chat_id, sa_text, parse_mode="HTML")
-    except Exception as e:
-        logger.warning("Trio SuperAgent xatosi: %s", e)
+    sa_sent = False
+    if sa_bot:
+        try:
+            await sa_bot.send_message(chat_id, sa_text, parse_mode="HTML")
+            sa_sent = True
+        except Exception as e:
+            logger.warning("Trio SuperAgent (sa_bot) xatosi: %s", e)
+            try:
+                await sa_bot.send_message(chat_id, f"🤖 SuperAgent:\n\"{sa_opinion}\"", parse_mode=None)
+                sa_sent = True
+            except Exception:
+                pass
+
+    if not sa_sent and origin_bot and origin_bot != sa_bot:
+        try:
+            await origin_bot.send_message(chat_id, sa_text, parse_mode="HTML")
+            sa_sent = True
+        except Exception:
+            try:
+                await origin_bot.send_message(chat_id, f"🤖 SuperAgent:\n\"{sa_opinion}\"", parse_mode=None)
+                sa_sent = True
+            except Exception:
+                pass
 
     await asyncio.sleep(3.0)
 
@@ -728,42 +796,39 @@ async def handle_user_joining_coworker_discussion(
         ]
         arch_opinion = random.choice(arch_fallbacks)
 
+    # Arxitektor xabarini 2-Bot (@architect7_bot) orqali yuborish
+    arch_bot = bot_black or origin_bot
     arch_text = (
         f"🌪 <b>Arxitektor (@architect7_bot):</b>\n"
         f"<i>\"{html.escape(arch_opinion)}\"</i>"
     )
 
-    if not bot_black:
+    arch_sent = False
+    if arch_bot:
         try:
-            from core.mistral_agent_bot import get_second_bot
-            bot_black = get_second_bot()
-        except Exception:
-            pass
-
-    target_bot = bot_black or cur_bot
-    sent = False
-    try:
-        await target_bot.send_message(chat_id, arch_text, parse_mode="HTML")
-        sent = True
-    except Exception as e:
-        logger.warning("Trio Arxitektor (@architect7_bot) xatosi (chat_id=%s): %s", chat_id, e)
-        try:
-            await target_bot.send_message(chat_id, f"🌪 Arxitektor (@architect7_bot):\n\"{arch_opinion}\"", parse_mode=None)
-            sent = True
-        except Exception:
-            pass
-
-    if not sent and cur_bot and target_bot != cur_bot:
-        notice = ""
-        if chat_id < 0:
-            notice = (
-                "⚠️ <i>[Diqqat: @architect7_bot ushbu guruhga a'zo emas! "
-                "Arxitektor o'z nomidan yozishi uchun @architect7_bot ni guruhga a'zo qiling!]</i>\n\n"
-            )
-        try:
-            await cur_bot.send_message(chat_id, f"{notice}{arch_text}", parse_mode="HTML")
-        except Exception:
+            await arch_bot.send_message(chat_id, arch_text, parse_mode="HTML")
+            arch_sent = True
+        except Exception as e:
+            logger.warning("Trio Arxitektor (@architect7_bot) xatosi (chat_id=%s): %s", chat_id, e)
             try:
-                await cur_bot.send_message(chat_id, f"{notice}🌪 Arxitektor (@architect7_bot):\n\"{arch_opinion}\"", parse_mode=None)
+                await arch_bot.send_message(chat_id, f"🌪 Arxitektor (@architect7_bot):\n\"{arch_opinion}\"", parse_mode=None)
+                arch_sent = True
             except Exception:
                 pass
+
+    if not arch_sent:
+        fallback_arch_bot = bot_white or origin_bot
+        if fallback_arch_bot and fallback_arch_bot != arch_bot:
+            notice = ""
+            if chat_id < 0:
+                notice = (
+                    "⚠️ <i>[Diqqat: @architect7_bot ushbu guruhga a'zo emas! "
+                    "Arxitektor o'z nomidan yozishi uchun @architect7_bot ni guruhga a'zo qiling!]</i>\n\n"
+                )
+            try:
+                await fallback_arch_bot.send_message(chat_id, f"{notice}{arch_text}", parse_mode="HTML")
+            except Exception:
+                try:
+                    await fallback_arch_bot.send_message(chat_id, f"{notice}🌪 Arxitektor (@architect7_bot):\n\"{arch_opinion}\"", parse_mode=None)
+                except Exception:
+                    pass
