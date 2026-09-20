@@ -46,7 +46,7 @@ MISTRAL_CONVERSATIONS_URL = f"{MISTRAL_BASE_URL.rstrip('/')}/conversations"
 # ─── Bepul Modellar Katalogi va Prioritet Kaskadi ────────────
 
 ARCHITECT_CASCADE_MODELS = [
-    # 1. Google Gemini 3.5 Flash Lite (Ultra-Tezkor va 100% Faol Bepul Model)
+    # 1. Google Gemini 3.5 Flash Lite (Ultra-Tezkor 0.7s va 100% Faol Bepul Model)
     {
         "id": "gemini_35_flash_lite",
         "provider": "Google Gemini",
@@ -54,30 +54,7 @@ ARCHITECT_CASCADE_MODELS = [
         "name": "💎 Gemini 3.5 Flash Lite",
         "type": "gemini",
     },
-    # 2. Google Gemini 3.1 Flash Lite
-    {
-        "id": "gemini_31_flash_lite",
-        "provider": "Google Gemini",
-        "model": "gemini-3.1-flash-lite",
-        "name": "💎 Gemini 3.1 Flash Lite",
-        "type": "gemini",
-    },
-    # 3. Asosiy Mistral Agent (Conversations API)
-    {
-        "id": "mistral_agent",
-        "provider": "Mistral Agent",
-        "name": "🌪 Mistral Agent (Maxsus Arxitektor)",
-        "type": "agent",
-    },
-    # 4. OpenRouter Free: DeepSeek V4 Flash
-    {
-        "id": "or_deepseek_v4",
-        "provider": "OpenRouter (Free)",
-        "model": "deepseek/deepseek-v4-flash-0731:free",
-        "name": "🧠 DeepSeek V4 Flash Free (1M)",
-        "type": "openrouter",
-    },
-    # 5. Mistral Direct Codestral
+    # 2. Mistral Direct Codestral (Tezkor va yuqori darajali AI)
     {
         "id": "codestral_latest",
         "provider": "Mistral AI",
@@ -85,21 +62,20 @@ ARCHITECT_CASCADE_MODELS = [
         "name": "💻 Codestral Latest (Dasturlash)",
         "type": "mistral_chat",
     },
-    # 6. OpenRouter Free: Poolside Laguna (Arxitektor modeli)
-    {
-        "id": "or_laguna",
-        "provider": "OpenRouter (Free)",
-        "model": "poolside/laguna-s-2.1:free",
-        "name": "🌊 Poolside Laguna S 2.1 (Arxitektor)",
-        "type": "openrouter",
-    },
-    # 7. Google Gemini 3.6 Flash
+    # 3. Google Gemini 3.6 Flash (Katta fikrlovchi model)
     {
         "id": "gemini_36_flash",
         "provider": "Google Gemini",
         "model": "gemini-3.6-flash",
         "name": "💎 Gemini 3.6 Flash",
         "type": "gemini",
+    },
+    # 4. Asosiy Mistral Agent (Conversations API)
+    {
+        "id": "mistral_agent",
+        "provider": "Mistral Agent",
+        "name": "🌪 Mistral Agent (Maxsus Arxitektor)",
+        "type": "agent",
     },
     # 8. OpenRouter Free: NVIDIA Nemotron Super 120B
     {
