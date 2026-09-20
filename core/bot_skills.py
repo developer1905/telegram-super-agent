@@ -552,8 +552,10 @@ async def run_autonomous_coworker_pulse(
         ]
         sa_thought = random.choice(sa_fallbacks)
 
-    # SuperAgent xabarini SuperAgent botining o'zidan (bot_white) yuborish
-    sa_bot = bot_white or origin_bot
+    is_group = chat_id < 0
+
+    # SuperAgent xabarini yuborish
+    sa_bot = (bot_white or origin_bot) if is_group else (origin_bot or bot_white)
     sa_msg = (
         f"🤖 <b>SuperAgent:</b>\n"
         f"<i>\"{html.escape(sa_thought)}\"</i>"
@@ -631,8 +633,8 @@ async def run_autonomous_coworker_pulse(
         f"💡 <i>Mavzu: {html.escape(topic)}</i>"
     )
 
-    # Arxitektor xabarini 2-Bot (@architect7_bot) orqali yuborish
-    arch_bot = bot_black or origin_bot
+    # Guruhda 2-Bot (@architect7_bot), shaxsiyda esa origin_bot orqali yuborish
+    arch_bot = (bot_black or origin_bot) if is_group else (origin_bot or bot_white)
     arch_sent = False
     if arch_bot:
         try:
@@ -734,8 +736,10 @@ async def handle_user_joining_coworker_discussion(
     sa_opinion = sp_s if sp_s else sa_resp
     sa_opinion = re.sub(r"^\[.*?\]\s*", "", sa_opinion).strip()
 
-    # SuperAgent xabarini SuperAgent botidan (bot_white) yuborish
-    sa_bot = bot_white or origin_bot
+    is_group = chat_id < 0
+
+    # SuperAgent xabarini yuborish
+    sa_bot = (bot_white or origin_bot) if is_group else (origin_bot or bot_white)
     sa_text = (
         f"🤖 <b>SuperAgent:</b>\n"
         f"<i>\"{html.escape(sa_opinion)}\"</i>"
@@ -796,8 +800,8 @@ async def handle_user_joining_coworker_discussion(
         ]
         arch_opinion = random.choice(arch_fallbacks)
 
-    # Arxitektor xabarini 2-Bot (@architect7_bot) orqali yuborish
-    arch_bot = bot_black or origin_bot
+    # Guruhda 2-Bot (@architect7_bot), shaxsiyda esa origin_bot orqali yuborish
+    arch_bot = (bot_black or origin_bot) if is_group else (origin_bot or bot_white)
     arch_text = (
         f"🌪 <b>Arxitektor (@architect7_bot):</b>\n"
         f"<i>\"{html.escape(arch_opinion)}\"</i>"
