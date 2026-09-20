@@ -150,7 +150,7 @@ async def _generate_superagent_solution(prompt: str, chat_id: str, system_instru
     try:
         ai_mgr = _get_shared_ai_manager()
         full_p = f"{system_instruction}\n\n{prompt}" if system_instruction else prompt
-        resp = await asyncio.wait_for(ai_mgr.generate(full_p, save_history=False), timeout=5.0)
+        resp = await asyncio.wait_for(ai_mgr.generate(full_p, save_history=False), timeout=9.0)
         if resp and not resp.startswith("❌") and not resp.startswith("⚠️"):
             return resp
     except Exception as e:
@@ -164,7 +164,7 @@ async def _generate_superagent_solution(prompt: str, chat_id: str, system_instru
                 chat_id=f"collab_dev_{chat_id}",
                 system_instruction=system_instruction or "Siz SuperAgent AI — erkin fikrlovchi, o'tkir zehnli, hazilkash va ijodkor sun'iy intellektsiz. Qoliplarsiz, jonli va boy o'zbek tilida so'zlaysiz."
             ),
-            timeout=5.0
+            timeout=8.0
         )
         if ans and not ans.startswith("❌"):
             return ans
@@ -1547,9 +1547,9 @@ async def handle_group_dual_opinion(
 
     import time
     now_ts = time.time()
-    # Agar ayni paytda ushbu guruhda allaqachon suhbat jarayoni ketayotgan bo'lsa (45 soniya ichida)
+    # Agar ayni paytda ushbu guruhda allaqachon suhbat jarayoni ketayotgan bo'lsa (8 soniya ichida)
     if chat_id in ACTIVE_GROUP_DUAL_OPINIONS:
-        if now_ts - ACTIVE_GROUP_DUAL_OPINIONS[chat_id] < 45.0:
+        if now_ts - ACTIVE_GROUP_DUAL_OPINIONS[chat_id] < 8.0:
             return
         else:
             ACTIVE_GROUP_DUAL_OPINIONS.pop(chat_id, None)
@@ -1664,7 +1664,7 @@ async def handle_group_dual_opinion(
                         chat_id=f"group_opinion_{chat_id}",
                         system_instruction=f"Siz Bosh Arxitektor (@architect7_bot) botsiz. Xarakteringiz: {arch_persona['name']}. Uslubingiz: {arch_persona['prompt_tone']}"
                     ),
-                    timeout=5.0
+                    timeout=8.0
                 )
             except Exception as e_grp_arch:
                 logger.warning("Guruhda Arxitektor javobida kechikish (%s), zaxira tahlil qo'llanadi", e_grp_arch)
