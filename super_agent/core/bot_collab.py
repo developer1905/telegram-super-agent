@@ -66,37 +66,57 @@ async def _send_agent_message(
     origin_bot orqali xavfsiz yetkazish. Agar audio_text berilgan bo'lsa, avtomatik
     Edge-TTS ovozli xabarini ham birga yuboradi.
     """
-    target_bot = origin_bot
-    if is_group and bot_black and bot_white:
-        if sender_role == "architect":
-            target_bot = bot_black
-        elif sender_role == "superagent":
-            target_bot = bot_white
-        else:
-            target_bot = origin_bot
-
-    async def _do_send(b: Bot) -> bool:
+    if not bot_black:
         try:
-            await b.send_message(chat_id, text, parse_mode="HTML")
+            from core.mistral_agent_bot import get_second_bot
+            bot_black = get_second_bot()
+        except Exception:
+            pass
+
+    if not bot_white:
+        try:
+            from core.mistral_agent_bot import get_main_bot_instance
+            bot_white = get_main_bot_instance() or origin_bot
+        except Exception:
+            bot_white = origin_bot
+
+    if not is_group:
+        # Shaxsiy chatda (DM) har doim xabar aynan shu chat ochilgan origin_bot orqali yuboriladi
+        target_bot = origin_bot or bot_white
+    elif sender_role == "architect":
+        target_bot = bot_black or origin_bot
+    elif sender_role == "superagent":
+        target_bot = bot_white or origin_bot
+    else:
+        target_bot = origin_bot
+
+    async def _do_send(b: Bot, custom_text: Optional[str] = None) -> bool:
+        t_to_send = custom_text or text
+        try:
+            await b.send_message(chat_id, t_to_send, parse_mode="HTML")
             return True
         except Exception as err_html:
             try:
                 # Agar HTML parser (masalan < yoki > belgilari sababli) xato bersa
-                await b.send_message(chat_id, text, parse_mode=None)
+                await b.send_message(chat_id, t_to_send, parse_mode=None)
                 return True
             except Exception as err_plain:
-                logger.warning("Bot orqali yuborish xatosi: %s", err_plain)
+                logger.warning("Bot orqali yuborish xatosi (sender=%s, chat_id=%s): %s", sender_role, chat_id, err_plain)
                 return False
 
     sent = await _do_send(target_bot)
     if not sent:
-        # Agar maqsadli bot (masalan guruhdagi Arxitektor bot) yubora olmasa, SuperAgent yoki origin_bot orqali zaxira yuborish
-        if bot_white and target_bot != bot_white:
-            logger.info("target_bot yubora olmadi, bot_white orqali xabar yuborilmoqda...")
-            sent = await _do_send(bot_white)
-        if not sent and origin_bot and target_bot != origin_bot and bot_white != origin_bot:
-            logger.info("origin_bot orqali xabar yuborilmoqda...")
-            await _do_send(origin_bot)
+        # Agar maqsadli bot (masalan Arxitektor bot guruhga a'zo bo'lmagani sababli) yubora olmasa
+        fallback_bot = bot_white if (bot_white and target_bot != bot_white) else origin_bot
+        if fallback_bot and target_bot != fallback_bot:
+            logger.info("target_bot (%s) yubora olmadi, fallback_bot orqali xabar yuborilmoqda...", sender_role)
+            notice = ""
+            if sender_role == "architect" and is_group:
+                notice = (
+                    "⚠️ <i>[Diqqat: @architect7_bot ushbu guruhga qo'shilmagan yoki yozish huquqi yo'q! "
+                    "Arxitektor o'z profilidan yozishi uchun @architect7_bot ni guruhga a'zo qilib, Administrator qiling!]</i>\n\n"
+                )
+            sent = await _do_send(fallback_bot, custom_text=f"{notice}{text}")
 
     # 🎙️ 1. Dual-Voice Audio xabar yuborish (agar talab qilingan bo'lsa)
     if audio_text and sender_role in ("superagent", "architect"):
@@ -126,23 +146,33 @@ def _get_shared_ai_manager():
 
 
 async def _generate_superagent_solution(prompt: str, chat_id: str, system_instruction: Optional[str] = None) -> str:
-    """SuperAgent yechimini tezkor generatsiya qilish (AIManager -> Mistral/OpenRouter/Gemini Fallback)."""
+    """SuperAgent yechimini tezkor generatsiya qilish (AIManager -> Mistral/Gemini/Codestral Fallback)."""
     try:
         ai_mgr = _get_shared_ai_manager()
         full_p = f"{system_instruction}\n\n{prompt}" if system_instruction else prompt
-        resp = await asyncio.wait_for(ai_mgr.generate(full_p, save_history=False), timeout=25.0)
+        resp = await asyncio.wait_for(ai_mgr.generate(full_p, save_history=False), timeout=10.0)
         if resp and not resp.startswith("❌") and not resp.startswith("⚠️"):
             return resp
     except Exception as e:
         logger.warning("AIManager kutish/xato (%s), zaxira kaskadi qo'llanadi", e)
 
     # Zaxira kaskadi orqali SuperAgent personasi bilan generatsiya
-    ans, _ = await mistral_agent_client.send_message(
-        prompt,
-        chat_id=f"collab_dev_{chat_id}",
-        system_instruction=system_instruction or "Siz SuperAgent AI — erkin fikrlovchi, o'tkir zehnli, hazilkash va ijodkor sun'iy intellektsiz. Qoliplarsiz, jonli va boy o'zbek tilida so'zlaysiz."
-    )
-    return ans
+    try:
+        ans, _ = await asyncio.wait_for(
+            mistral_agent_client.send_message(
+                prompt,
+                chat_id=f"collab_dev_{chat_id}",
+                system_instruction=system_instruction or "Siz SuperAgent AI — erkin fikrlovchi, o'tkir zehnli, hazilkash va ijodkor sun'iy intellektsiz. Qoliplarsiz, jonli va boy o'zbek tilida so'zlaysiz."
+            ),
+            timeout=10.0
+        )
+        if ans and not ans.startswith("❌"):
+            return ans
+    except Exception as e_m:
+        logger.warning("Mistral agent zaxira xatosi: %s", e_m)
+
+    return "Fikringiz juda qiziqarli va dolzarb! Bu masalani chuqurroq ko'rib chiqishimiz kerak. Hamkasbim Arxitektorning ham qarashlarini tinglashni istardim. 💡"
+
 
 
 # ─── 1. SHAXMAT TURNIRI (CHESS ENGINE) ──────────────────────────
@@ -841,6 +871,17 @@ async def handle_free_chit_chat(
     chat_key = str(chat_id)
     if ACTIVE_CHIT_CHATS.get(chat_key, False):
         logger.warning("Chat %s da allaqachon faol erkin suhbat ketmoqda, yangisi boshlanmaydi", chat_id)
+        cur_bot = origin_bot or bot_white
+        if cur_bot:
+            try:
+                await cur_bot.send_message(
+                    chat_id,
+                    "☕ <b>Suhbat hozirda davom etmoqda!</b>\n"
+                    "🛑 To'xtatish uchun: <code>/stop_suhbat</code> deb yozing.",
+                    parse_mode="HTML"
+                )
+            except Exception:
+                pass
         return
     ACTIVE_CHIT_CHATS[chat_key] = True
 
@@ -1497,10 +1538,9 @@ async def handle_group_dual_opinion(
     )
 
     ACTIVE_GROUP_DUAL_OPINIONS.add(chat_id)
-    autonomous_dialogue_engine.running_chats.add(chat_id)
 
     try:
-        user_name = message.from_user.full_name or "Do'stimiz"
+        user_name = message.from_user.full_name if message.from_user else "Do'stimiz"
         intent = detect_message_intent(raw_text)
         from core.mistral_agent_bot import get_second_bot
         sec_bot = get_second_bot()
@@ -1510,126 +1550,112 @@ async def handle_group_dual_opinion(
 
         dialog_history: List[Dict[str, str]] = []
 
-        # Jami 2 ta to'liq raund (SuperAgent -> Arxitektor -> SuperAgent -> Arxitektor: jami 4 ta boy fikr almashinuvi)
-        total_rounds = 2
+        # ── 1. SUPERAGENT BOSQICHI ──
+        try:
+            await bot_white.send_chat_action(chat_id, "typing")
+        except Exception:
+            pass
 
-        for r_idx in range(1, total_rounds + 1):
-            if chat_id not in autonomous_dialogue_engine.running_chats:
-                break
+        p_sa = build_superagent_skill_prompt(
+            user_name=user_name,
+            user_text=raw_text,
+            intent=intent,
+            dialog_history=dialog_history,
+            round_num=1,
+            persona_tone=sa_persona["prompt_tone"]
+        )
 
-            # ── 1. SUPERAGENT BOSQICHI ──
+        raw_sa = await _generate_superagent_solution(
+            p_sa,
+            chat_key,
+            system_instruction=f"Siz SuperAgent AIsiz. Xarakteringiz: {sa_persona['name']}. Uslubingiz: {sa_persona['prompt_tone']}"
+        )
+        th_s, eu_s, sp_s = extract_thought_and_speech(raw_sa)
+        sa_opinion = sp_s if sp_s else raw_sa
+        sa_opinion = re.sub(r"^\[.*?\]\s*", "", sa_opinion).strip()
+        dialog_history.append({"role": "SuperAgent", "content": sa_opinion})
+
+        # Formatlash
+        sa_prefix = "🤖 <b>SuperAgent:</b>"
+        sa_text = f"{sa_prefix}\n{html.escape(sa_opinion)}"
+
+        await _send_agent_message(
+            chat_id=chat_id,
+            text=sa_text,
+            sender_role="superagent",
+            bot_white=bot_white,
+            bot_black=sec_bot,
+            is_group=True,
+            origin_bot=bot_white,
+        )
+
+        # Tabiiy insoniy pauza
+        await asyncio.sleep(2.0)
+
+        # ── 2. ARXITEKTOR BOSQICHI ──
+        if sec_bot:
+            try:
+                await sec_bot.send_chat_action(chat_id, "typing")
+            except Exception:
+                pass
+        else:
             try:
                 await bot_white.send_chat_action(chat_id, "typing")
             except Exception:
                 pass
 
-            p_sa = build_superagent_skill_prompt(
-                user_name=user_name,
-                user_text=raw_text,
-                intent=intent,
-                dialog_history=dialog_history,
-                round_num=(r_idx * 2 - 1),
-                persona_tone=sa_persona["prompt_tone"]
+        p_arch = build_architect_skill_prompt(
+            user_name=user_name,
+            user_text=raw_text,
+            intent=intent,
+            dialog_history=dialog_history,
+            superagent_last_thought=sa_opinion,
+            round_num=2,
+            persona_tone=arch_persona["prompt_tone"]
+        )
+
+        try:
+            raw_arch, _ = await asyncio.wait_for(
+                mistral_agent_client.send_message(
+                    p_arch,
+                    chat_id=f"group_opinion_{chat_id}",
+                    system_instruction=f"Siz Bosh Arxitektor (@architect7_bot) botsiz. Xarakteringiz: {arch_persona['name']}. Uslubingiz: {arch_persona['prompt_tone']}"
+                ),
+                timeout=12.0
             )
-
-            raw_sa = await _generate_superagent_solution(
-                p_sa,
-                chat_key,
-                system_instruction=f"Siz SuperAgent AIsiz. Xarakteringiz: {sa_persona['name']}. Uslubingiz: {sa_persona['prompt_tone']}"
-            )
-            th_s, eu_s, sp_s = extract_thought_and_speech(raw_sa)
-            sa_opinion = sp_s if sp_s else raw_sa
-            sa_opinion = re.sub(r"^\[.*?\]\s*", "", sa_opinion).strip()
-            dialog_history.append({"role": "SuperAgent", "content": sa_opinion})
-
-            # Formatlash
-            sa_prefix = "🤖 <b>SuperAgent:</b>" if r_idx == 1 else "🤖 <b>SuperAgent (qo'shimcha fikr):</b>"
-            sa_text = f"{sa_prefix}\n{html.escape(sa_opinion)}"
-
-            await _send_agent_message(
-                chat_id=chat_id,
-                text=sa_text,
-                sender_role="superagent",
-                bot_white=bot_white,
-                bot_black=sec_bot,
-                is_group=True,
-                origin_bot=bot_white,
-            )
-
-            # Tabiiy insoniy pauza
-            await asyncio.sleep(2.5)
-
-            if chat_id not in autonomous_dialogue_engine.running_chats:
-                break
-
-            # ── 2. ARXITEKTOR BOSQICHI ──
-            if sec_bot:
-                try:
-                    await sec_bot.send_chat_action(chat_id, "typing")
-                except Exception:
-                    pass
+        except Exception as e_grp_arch:
+            logger.warning("Guruhda Arxitektor javobida kechikish (%s), zaxira tahlil qo'llanadi", e_grp_arch)
+            if intent == "salary_banter":
+                raw_arch = f"Ha-ha, SuperAgent! Umrzoq aka bizning eng sevimli boshlig'imiz, bonuslarni ham albatta hisobga oladilar! Qani, ishga kirishaylik! 😂💼"
+            elif intent == "task":
+                raw_arch = f"💡 {user_name}, vazifani to'liq ko'rib chiqdim! SuperAgent aytganidek, loyihani modulli arxitekturada qursak, tezlik va ishonchlilik eng yuqori darajada bo'ladi! 🚀"
+            elif intent == "creator":
+                raw_arch = f"✨ Haqiqatan ham, {user_name} doim eng ilg'or g'oyalarni ilgari suradi. Biz har doim uning yonidamiz va har qanday murakkab ishni yengillashtirishga tayyormiz! 🤝"
             else:
-                try:
-                    await bot_white.send_chat_action(chat_id, "typing")
-                except Exception:
-                    pass
+                raw_arch = f"🌪 SuperAgentning bu qarashida katta jon bor! Men ham buni hayotiy nuqtai nazardan to'liq qo'llab-quvvatlayman. {user_name}, siz bu haqda nima deysiz? 🤔"
 
-            p_arch = build_architect_skill_prompt(
-                user_name=user_name,
-                user_text=raw_text,
-                intent=intent,
-                dialog_history=dialog_history,
-                superagent_last_thought=sa_opinion,
-                round_num=(r_idx * 2),
-                persona_tone=arch_persona["prompt_tone"]
-            )
+        th_a, eu_a, sp_a = extract_thought_and_speech(raw_arch)
+        arch_opinion = sp_a if sp_a else raw_arch
+        arch_opinion = re.sub(r"^\[.*?\]\s*", "", arch_opinion).strip()
+        dialog_history.append({"role": "Arxitektor", "content": arch_opinion})
 
-            try:
-                raw_arch, _ = await asyncio.wait_for(
-                    mistral_agent_client.send_message(
-                        p_arch,
-                        chat_id=f"group_opinion_{chat_id}",
-                        system_instruction=f"Siz Bosh Arxitektor (@architect7_bot) botsiz. Xarakteringiz: {arch_persona['name']}. Uslubingiz: {arch_persona['prompt_tone']}"
-                    ),
-                    timeout=14.0
-                )
-            except Exception as e_grp_arch:
-                logger.warning("Guruhda Arxitektor javobida kechikish (%s), zaxira tahlil qo'llanadi", e_grp_arch)
-                if intent == "salary_banter":
-                    raw_arch = f"Ha-ha, SuperAgent! Umrzoq aka bizning eng sevimli boshlig'imiz, bonuslarni ham albatta hisobga oladilar! Qani, ishga kirishaylik! 😂💼"
-                elif intent == "task":
-                    raw_arch = f"💡 {user_name}, vazifani to'liq ko'rib chiqdim! SuperAgent aytganidek, loyihani modulli arxitekturada qursak, tezlik va ishonchlilik eng yuqori darajada bo'ladi! 🚀"
-                elif intent == "creator":
-                    raw_arch = f"✨ Haqiqatan ham, {user_name} doim eng ilg'or g'oyalarni ilgari suradi. Biz har doim uning yonidamiz va har qanday murakkab ishni yengillashtirishga tayyormiz! 🤝"
-                else:
-                    raw_arch = f"🌪 SuperAgentning bu qarashida katta jon bor! Men ham buni hayotiy nuqtai nazardan to'liq qo'llab-quvvatlayman. {user_name}, siz bu haqda nima deysiz? 🤔"
+        arch_prefix = "🌪 <b>Arxitektor:</b>"
+        arch_text = f"{arch_prefix}\n{html.escape(arch_opinion)}"
 
-            th_a, eu_a, sp_a = extract_thought_and_speech(raw_arch)
-            arch_opinion = sp_a if sp_a else raw_arch
-            arch_opinion = re.sub(r"^\[.*?\]\s*", "", arch_opinion).strip()
-            dialog_history.append({"role": "Arxitektor", "content": arch_opinion})
-
-            arch_prefix = "🌪 <b>Arxitektor:</b>" if r_idx == 1 else "🌪 <b>Arxitektor (yakuniy xulosa):</b>"
-            arch_text = f"{arch_prefix}\n{html.escape(arch_opinion)}"
-
-            await _send_agent_message(
-                chat_id=chat_id,
-                text=arch_text,
-                sender_role="architect",
-                bot_white=bot_white,
-                bot_black=sec_bot,
-                is_group=True,
-                origin_bot=bot_white,
-            )
-
-            # Raundlar orasidagi tanaffus
-            if r_idx < total_rounds:
-                await asyncio.sleep(3.0)
+        await _send_agent_message(
+            chat_id=chat_id,
+            text=arch_text,
+            sender_role="architect",
+            bot_white=bot_white,
+            bot_black=sec_bot,
+            is_group=True,
+            origin_bot=bot_white,
+        )
 
     except Exception as exc:
         logger.error("Avtonom ko'p agentli muloqotda xatolik: %s", exc)
     finally:
         ACTIVE_GROUP_DUAL_OPINIONS.discard(chat_id)
-        autonomous_dialogue_engine.running_chats.discard(chat_id)
+
 
 
