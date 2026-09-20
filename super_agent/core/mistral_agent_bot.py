@@ -37,10 +37,24 @@ _second_bot_instance: Optional[Bot] = None
 _main_bot_instance: Optional[Bot] = None
 
 
+def _is_bot_active(b: Optional[Bot]) -> bool:
+    if b is None:
+        return False
+    try:
+        sess = getattr(b, "session", None)
+        if sess is not None:
+            raw_sess = getattr(sess, "_session", None)
+            if raw_sess is not None and getattr(raw_sess, "closed", False):
+                return False
+        return True
+    except Exception:
+        return True
+
+
 def get_second_bot() -> Optional[Bot]:
     """2-Bot obyektini qaytaradi (agar SECOND_BOT_TOKEN mavjud bo'lsa)."""
     global _second_bot_instance
-    if (_second_bot_instance is None or (_second_bot_instance.session and _second_bot_instance.session.closed)) and SECOND_BOT_TOKEN:
+    if not _is_bot_active(_second_bot_instance) and SECOND_BOT_TOKEN:
         from aiogram.client.default import DefaultBotProperties
         from aiogram.enums import ParseMode
         _second_bot_instance = Bot(
@@ -53,7 +67,7 @@ def get_second_bot() -> Optional[Bot]:
 def get_main_bot_instance() -> Optional[Bot]:
     """Asosiy Jarvis bot obyektini qaytaradi."""
     global _main_bot_instance
-    if (_main_bot_instance is None or (_main_bot_instance.session and _main_bot_instance.session.closed)) and BOT_TOKEN:
+    if not _is_bot_active(_main_bot_instance) and BOT_TOKEN:
         from aiogram.client.default import DefaultBotProperties
         from aiogram.enums import ParseMode
         _main_bot_instance = Bot(
