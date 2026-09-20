@@ -102,9 +102,8 @@ ENABLE_VOICE_REPLIES: bool = os.getenv("ENABLE_VOICE_REPLIES", "true").lower() =
 WATERMARK_TEXT: str = os.getenv("WATERMARK_TEXT", "© SuperAgent")
 
 # ─── AI Modellari ────────────────────────────────────────────
-GEMINI_MODEL: str = "gemini-3.1-flash-lite"
+GEMINI_MODEL: str = "gemini-3.5-flash-lite"
 GEMINI_FALLBACK_MODELS: list[str] = [
-    "gemini-3.1-flash-lite",
     "gemini-3.5-flash-lite",
     "gemini-3.6-flash",
 ]
