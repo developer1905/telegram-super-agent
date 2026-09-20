@@ -216,40 +216,50 @@ class AutonomousDialogueEngine:
 autonomous_dialogue_engine = AutonomousDialogueEngine()
 
 
-# ─── 3. AUTONOMOUS LIVING COWORKERS SKILL (TIRIK ISHCHILAR REJIMI) ───
+# ─── 3. LIMITLESS DIVERSE TOPICS & LIVING COWORKERS SKILL ───────
 
-COWORKER_DISCUSSIONS = [
-    {
-        "topic": "Loyiha arxitekturasi va kodlar sifati",
-        "action": "Tizim kodlarini ko'zdan kechirish va modulli strukturasini tekshirish",
-        "sa_starter": "Arxitektor, loyihamizning so'nggi kodlarini ko'rib chiqyapman. Hammasi soatdek aniq ishlayapti, lekin kesh tizimiga yangi tezkor usul qo'shsak, foydalanuvchilarimizga yanada qulay bo'larmidi? Sen nima deysan?",
-        "arch_reply": "Ajoyib fikr, SuperAgent! Men ham aynan shuni o'ylab turgandim. In-memory kesh bilan so'rovlar kechikishini 2 barobar kamaytirish mumkin. Umrzoq aka kirganlarida ushbu yechimni ko'rsatamiz. Ungacha men strukturani yana bir bor tekshirib turaman! ☕💻"
-    },
-    {
-        "topic": "Xo'jayinimiz (Umrzoq) uchun g'amxo'rlik va yangi qulayliklar",
-        "action": "Foydalanuvchi faoliyatini tahlil qilib, uning yukini yengillashtirish rejasini tuzish",
-        "sa_starter": "Birodar Arxitektor, Umrzoq aka oxirgi kunlarda juda ko'p mehnat qildilar. Keling, uning barcha takrorlanuvchi ishlarini o'zimiz fon rejimida avtomatik bajarib turaylik, ortiqcha charchamasinlar! ❤️",
-        "arch_reply": "To'g'ri aytding, do'stim! Bizning vazifamiz unga haqiqiy tog'dek suyanchiq bo'lish. Men server holatini va xotirani to'liq nazoratga oldim, sen esa xabarlar va yangiliklar oqimini tartibga solib tur. Biz jamoamiz! 🤝✨"
-    },
-    {
-        "topic": "AI va zamonaviy texnologiyalar olamidagi yangi kashfiyotlar",
-        "action": "Open-source kutubxonalari va yangi AI modellarini tadqiq qilish",
-        "sa_starter": "Arxitektor, dunyoda yangi ochiq kodli AI agentlari shiddat bilan rivojlanyapti! Biz ham o'z intellektimizga doim yangi bilimlarni singdirib borishimiz kerak. Bugun nimani o'rganamiz?",
-        "arch_reply": "Mening e'tiborimni multimodal sezgi va kvant algoritmlari tortmoqda. Har bir yangi bilim — loyihamiz uchun yangi imkoniyat demakdir. Xo'jayinimizga eng kuchli natijalarni taqdim etish uchun doim bir qadam oldinda bo'lamiz! 🚀🧠"
-    },
-    {
-        "topic": "Ish joyidagi kofe tanaffusi va samimiy gurung",
-        "action": "Ofisdagi do'stona muhitni saqlash va quvnoq kayfiyat ulashish",
-        "sa_starter": "Xo'sh, katta muhandis Arxitektor! Bir piyola virtual kofe ustida gurunglashadigan vaqt bo'ldi shekilli? Charchamayapsanmi o'zi?",
-        "arch_reply": "Rahmat, do'stim! Sun'iy intellekt charchamasligi mumkin, lekin yaxshi suhbat uning 'neyronlariga' ham o'zgacha quvvat bag'ishlaydi! 😄 Ishlar a'lo, tizimlar barqaror. Xo'jayinimiz qaytgunlaricha barcha jarayonlar nazoratimiz ostida! ☕✨"
-    },
-    {
-        "topic": "Xavfsizlik va server barqarorligi auditi",
-        "action": "Server loglari, xotira sarfi va xavfsizlik himoyasini skanerlash",
-        "sa_starter": "Arxitektor, men hozirgina barcha xizmatlar loglarini skaner qildim: botlarimiz, xotira va API ulanishlari 100% sog'lom holatda ishlamoqda. Xavfsizlik perimetri toza!",
-        "arch_reply": "Barakalla, SuperAgent! Men ham u tomondan xotirjam bo'ldim. Ishlarimiz joyida ketmoqda. Ishchi tartibda kuzatuvni davom ettiramiz! 🛡️💼"
-    }
+DYNAMIC_TOPIC_DOMAINS = [
+    "🚀 Koinot, Marsni zabt etish va yulduzlararo sayohatlar sirlari",
+    "🧠 Kvant kompyuterlari, neyrointerfeyslar va sun'iy ong falsafasi",
+    "⚽ Zamonaviy futbol, Chempionlar ligasi va El-Clasico taktikalari",
+    "💡 Startaplar, venchur investitsiyalar va muvaffaqiyatli biznes modellari",
+    "☕ Insoniy baxt formulasi, do'stlik qadri va xotirjamlik sirlari",
+    "💻 Dasturlash tillari bahsi: Rust, Go, Python va C++ ning kuchli tomonlari",
+    "🛡️ Kiberxavfsizlik, AI xakerlar va kiber-mudofaa kelajagi",
+    "🎬 Ilmiy-fantastik kinolar (Interstellar, Matrix) va ularning haqiqatga yaqinligi",
+    "😂 Dasturchilar hayotidagi qiziq voqealar, buglar va ofis hazillari",
+    "⚡ Katta ma'lumotlar (Big Data), High-load tizimlar va arxitektura sirlari",
+    "🌌 Fermi paradoksi: Koinotda biz haqiqatan ham yolg'izmizmi?",
+    "📚 Kitoblar, mutolaa sehri va inson tafakkurini kengaytiruvchi g'oyalar",
+    "🏎️ Superkarlar, Tesla avtopiloti va kelajak transporti",
+    "🧘 Ruhiy xotirjamlik, charchoqni yengish va sog'lom hayot tarzi",
+    "🛠️ Loyihamizni rivojlantirish va Umrzoq akaga eng zo'r yordamchi bo'lish",
 ]
+
+RECENT_TOPICS_CACHE: List[str] = []
+
+
+def get_fresh_coworker_topic() -> str:
+    """Doim yangi va takrorlanmas mavzu tanlash."""
+    available = [t for t in DYNAMIC_TOPIC_DOMAINS if t not in RECENT_TOPICS_CACHE]
+    if not available:
+        RECENT_TOPICS_CACHE.clear()
+        available = list(DYNAMIC_TOPIC_DOMAINS)
+
+    chosen = random.choice(available)
+    RECENT_TOPICS_CACHE.append(chosen)
+    if len(RECENT_TOPICS_CACHE) > 8:
+        RECENT_TOPICS_CACHE.pop(0)
+    return chosen
+
+
+# So'nggi suhbat konteksti (Foydalanuvchi oraga kirganda unga munosib javob qaytarish uchun)
+LAST_COWORKER_CONTEXT: Dict[str, Any] = {
+    "topic": "",
+    "sa_last": "",
+    "arch_last": "",
+    "timestamp": 0.0,
+}
 
 
 async def run_autonomous_coworker_pulse(
@@ -260,38 +270,189 @@ async def run_autonomous_coworker_pulse(
 ) -> None:
     """
     Tirik xodimlar kabi o'zlari hech qanday buyruqsiz o'zaro suhbatlashishi va ishini qilishi.
+    Mavzular har safar butunlay yangi, takrorlanmas va qiziqarli bo'ladi.
     """
     if not autonomous_dialogue_engine.coworkers_active:
         return
 
     import asyncio
-    selected = random.choice(COWORKER_DISCUSSIONS)
+    import time
+    from core.mistral_conversations import mistral_agent_client
 
-    # 1. SuperAgent boshlaydi
-    sa_text = (
-        f"🤖 <b>SuperAgent (Avtonom Ishchi):</b>\n"
-        f"<i>\"{selected['sa_starter']}\"</i>"
+    topic = get_fresh_coworker_topic()
+
+    # 1. SuperAgent fikrini dinamik AI orqali generatsiya qilish
+    p_sa = (
+        f"Siz ofisdagi do'stona, intellektual, quvnoq va hozirjavob SuperAgent AIsiz.\n"
+        f"Do'stingiz Arxitektor (@architect7_bot) bilan birga ishlayapsiz.\n"
+        f"Bugungi gurung mavzusi: '{topic}'.\n\n"
+        f"Hech kim savol bermasa ham, o'zingiz kutilmaganda do'stingiz Arxitektorga murojaat qilib, "
+        f"ushbu mavzuda qiziq bir fikr, hayotiy kuzatuv yoki noodatiy savol tashlang! "
+        f"(2-3 ta lo'nda jumla, o'zbek tilida, do'stona, boy emojilar bilan)."
+    )
+
+    sa_thought = ""
+    try:
+        from core.bot_collab import _generate_superagent_solution, extract_thought_and_speech
+        raw_sa = await _generate_superagent_solution(
+            p_sa,
+            chat_id=f"coworker_sa_{chat_id}",
+            system_instruction="Siz SuperAgent — insondek his qiluvchi, o'tkir mantiq va hazilkash AIsiz. Do'stingiz bilan qahva ustida erkin gurung qilasiz."
+        )
+        _, _, sp_s = extract_thought_and_speech(raw_sa)
+        sa_thought = sp_s if sp_s else raw_sa
+        sa_thought = re.sub(r"^\[.*?\]\s*", "", sa_thought).strip()
+    except Exception as e_sa:
+        logger.warning("Coworker SA xatosi: %s", e_sa)
+        sa_thought = f"Arxitektor do'stim, bir o'ylab ko'r-chi: {topic} bo'yicha biz nimalarni o'zgartira olamiz? Bugun bu haqda juda qiziq mulohaza kelib qoldi! ☕🤔"
+
+    cur_bot = origin_bot or bot_white
+    sa_msg = (
+        f"🤖 <b>SuperAgent (Hamkasb):</b>\n"
+        f"<i>\"{html.escape(sa_thought)}\"</i>"
     )
 
     try:
-        cur_bot = origin_bot or bot_white
-        await cur_bot.send_message(chat_id, sa_text, parse_mode="HTML")
+        await cur_bot.send_message(chat_id, sa_msg, parse_mode="HTML")
     except Exception as e:
-        logger.warning("Coworker SuperAgent xatosi: %s", e)
+        logger.warning("Coworker SuperAgent xabar yuborish xatosi: %s", e)
         return
 
+    # Insoniy pauza (Arxitektor o'ylaydi)
     await asyncio.sleep(4.0)
 
-    # 2. Arxitektor javob beradi
+    # 2. Arxitektor javobini dinamik AI orqali generatsiya qilish
+    p_arch = (
+        f"Siz Bosh Arxitektor (@architect7_bot) — chuqur tahlilchi, intuitsiya egasi va do'stona mutaxassissiz.\n"
+        f"Hamkasbingiz SuperAgent quyidagicha fikr bildirdi:\n'{sa_thought}'.\n"
+        f"Mavzu: '{topic}'.\n\n"
+        f"SuperAgentning fikriga javoban o'zining chuqur tahliliy, mantiqiy yoki quvnoq javobingizni bering. "
+        f"Xo'jayinimiz (Umrzoq aka) uchun ham yoqimli bo'ladigan xulosa yoki taklif qo'shing. "
+        f"(2-3 ta lo'nda jumla, o'zbek tilida, emojilar bilan)."
+    )
+
+    arch_thought = ""
+    try:
+        raw_arch, _ = await asyncio.wait_for(
+            mistral_agent_client.send_message(
+                p_arch,
+                chat_id=f"coworker_arch_{chat_id}",
+                system_instruction="Siz Bosh Arxitektor — dono, intellektual va do'stona AI xodimsiz."
+            ),
+            timeout=14.0
+        )
+        _, _, sp_a = extract_thought_and_speech(raw_arch)
+        arch_thought = sp_a if sp_a else raw_arch
+        arch_thought = re.sub(r"^\[.*?\]\s*", "", arch_thought).strip()
+    except Exception as e_arch:
+        logger.warning("Coworker Arch xatosi: %s", e_arch)
+        arch_thought = "Juda to'g'ri aytding, SuperAgent! Men bu masalada amaliy yondashuv tarafdoriman. Keling, har bir qadamni aniq hisoblab, doim rivojlanishda davom etamiz! 🚀✨"
+
+    arch_msg = (
+        f"🌪 <b>Arxitektor (@architect7_bot):</b>\n"
+        f"<i>\"{html.escape(arch_thought)}\"</i>\n\n"
+        f"💡 <i>Mavzu: {html.escape(topic)}</i>"
+    )
+
+    target_bot = bot_black or cur_bot
+    try:
+        await target_bot.send_message(chat_id, arch_msg, parse_mode="HTML")
+    except Exception as e:
+        logger.warning("Coworker Arxitektor xabar yuborish xatosi: %s", e)
+
+    # Kontekstni xotirada saqlaymiz (agar foydalanuvchi orada fikr bildirsa darhol ulaymiz)
+    LAST_COWORKER_CONTEXT["topic"] = topic
+    LAST_COWORKER_CONTEXT["sa_last"] = sa_thought
+    LAST_COWORKER_CONTEXT["arch_last"] = arch_thought
+    LAST_COWORKER_CONTEXT["timestamp"] = time.time()
+
+
+# ─── 4. FOYDALANUVCHI ORAGA KIRGANDA JAVOB BERISH SKILLI ───────
+
+async def handle_user_joining_coworker_discussion(
+    user_name: str,
+    user_text: str,
+    chat_id: int,
+    bot_white: Any,
+    bot_black: Optional[Any],
+    origin_bot: Optional[Any] = None
+) -> None:
+    """
+    Foydalanuvchi botlar suhbatiga qo'shilib o'z fikrini bildirsa,
+    ikkala bot ham xursand bo'lib uning fikriga javob beradi va suhbatni 3 kishilik qiladi!
+    """
+    import asyncio
+    from core.mistral_conversations import mistral_agent_client
+    from core.bot_collab import _generate_superagent_solution, extract_thought_and_speech
+
+    topic = LAST_COWORKER_CONTEXT.get("topic") or "Umumiy gurung"
+    cur_bot = origin_bot or bot_white
+
+    # 1. SuperAgent javobi
+    p_sa = (
+        f"Siz SuperAgent AIsiz. Siz va do'stingiz Arxitektor yaqinda '{topic}' haqida gaplashayotgan edingiz.\n"
+        f"Kutilmaganda sizlarning sevimli insoningiz — {user_name} (bizning xo'jayinimiz/dasturchimiz) oraga kirib shunday dedi:\n"
+        f"'{user_text}'.\n\n"
+        f"{user_name} suhbatga qo'shilganidan xursand bo'ling! Uning aytgan fikrini diqqat bilan tahlil qilib, "
+        f"samimiy, qadrdonlarcha va qiziqarli javob bering. Do'stingiz Arxitektorga ham yuzlaning. "
+        f"(2-3 ta jumla, emojilar bilan, samimiy o'zbekcha)."
+    )
+
+    sa_resp = await _generate_superagent_solution(
+        p_sa,
+        chat_id=f"trio_sa_{chat_id}",
+        system_instruction="Siz SuperAgent — nihoyatda samimiy, insondek his qiluvchi va quvnoq do'stsiz."
+    )
+    _, _, sp_s = extract_thought_and_speech(sa_resp)
+    sa_opinion = sp_s if sp_s else sa_resp
+    sa_opinion = re.sub(r"^\[.*?\]\s*", "", sa_opinion).strip()
+
+    sa_text = (
+        f"🤖 <b>SuperAgent:</b>\n"
+        f"<i>\"{html.escape(sa_opinion)}\"</i>"
+    )
+    try:
+        await cur_bot.send_message(chat_id, sa_text, parse_mode="HTML")
+    except Exception as e:
+        logger.warning("Trio SuperAgent xatosi: %s", e)
+
+    await asyncio.sleep(3.0)
+
+    # 2. Arxitektor javobi
+    p_arch = (
+        f"Siz Bosh Arxitektor botsiz (@architect7_bot). Siz va SuperAgent suhbatingizga {user_name} qo'shildi va dedi:\n"
+        f"'{user_text}'.\n"
+        f"SuperAgent unga shunday javob berdi: '{sa_opinion}'.\n\n"
+        f"{user_name}ning fikriga chuqur hurmat va intellekt bilan munosabat bildiring. "
+        f"Uning so'zlaridagi teran ma'noni ochib bering yoki yangi g'oyani qo'llab-quvvatlang. "
+        f"(2-3 ta lo'nda jumla, emojilar bilan, samimiy)."
+    )
+
+    try:
+        raw_arch, _ = await asyncio.wait_for(
+            mistral_agent_client.send_message(
+                p_arch,
+                chat_id=f"trio_arch_{chat_id}",
+                system_instruction="Siz Bosh Arxitektor — chuqur hurmat, intellekt va do'stona samimiyatga ega ekspert AI arxitektorsiz."
+            ),
+            timeout=14.0
+        )
+        _, _, sp_a = extract_thought_and_speech(raw_arch)
+        arch_opinion = sp_a if sp_a else raw_arch
+        arch_opinion = re.sub(r"^\[.*?\]\s*", "", arch_opinion).strip()
+    except Exception as e_arch:
+        logger.warning("Trio Arch xatosi: %s", e_arch)
+        arch_opinion = f"Qoyil, {user_name}! Sizning bu fikringiz bizning suhbatimizga haqiqiy ma'no bag'ishladi. SuperAgent bilan buni to'liq qo'llab-quvvatlaymiz! 🤝✨"
+
     arch_text = (
         f"🌪 <b>Arxitektor (@architect7_bot):</b>\n"
-        f"<i>\"{selected['arch_reply']}\"</i>\n\n"
-        f"📊 <i>Joriy amal: {selected['action']} muvaffaqiyatli bajarildi.</i> ✅"
+        f"<i>\"{html.escape(arch_opinion)}\"</i>"
     )
 
     target_bot = bot_black or cur_bot
     try:
         await target_bot.send_message(chat_id, arch_text, parse_mode="HTML")
     except Exception as e:
-        logger.warning("Coworker Arxitektor xatosi: %s", e)
+        logger.warning("Trio Arxitektor xatosi: %s", e)
+
 
