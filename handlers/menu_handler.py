@@ -644,10 +644,19 @@ async def cmd_main_profile(message: Message) -> None:
 
 
 @router.message(Command("suhbat", "chat", "gaplash"))
+@router.message(F.text.lower().startswith(("/suhbat", "/chat", "/gaplash", "🗣️ erkin suhbat", "erkin suhbat")))
+@router.message(F.text.lower().in_({"suhbat", "chat", "gaplash", "gaplashamiz"}))
 async def cmd_main_suhbat(message: Message, bot: Bot) -> None:
     """Ikki AI o'rtasida erkin jonli suhbat: /suhbat [N] [mavzu]."""
     raw_text = message.text or ""
-    from core.bot_collab import handle_free_chit_chat, parse_topic_and_turns
+    from core.bot_collab import handle_free_chit_chat, parse_topic_and_turns, ACTIVE_CHIT_CHATS
+    if ACTIVE_CHIT_CHATS.get(str(message.chat.id), False):
+        await message.answer(
+            "☕ <b>Suhbat hozirda allaqachon davom etmoqda!</b>\n"
+            "🛑 To'xtatish uchun: <code>/stop_suhbat</code> deb yozing.",
+            parse_mode="HTML"
+        )
+        return
     topic, turns = parse_topic_and_turns(raw_text, default_turns=8)
     from core.mistral_agent_bot import get_second_bot
     sec_bot = get_second_bot()
@@ -666,10 +675,11 @@ async def cmd_main_stop_collab(message: Message) -> None:
         await message.answer("⚠️ Hozirda faol vazifa mavjud emas.", parse_mode="HTML")
 
 
-@router.message(Command("avto_suhbat", "jonli_suhbat", "avto_gaplash"))
-@router.message(F.text.in_({"☕ Avto-Suhbat", "☕ Avto-Suhbat (Jonli)", "Avto-Suhbat", "avto suhbat"}))
+@router.message(Command("avto_suhbat", "avtosuhbat", "jonli_suhbat", "avto_gaplash", "avto"))
+@router.message(F.text.lower().startswith(("/avto_suhbat", "/avtosuhbat", "/jonli_suhbat", "☕ avto-suhbat", "avto suhbat", "avtosuhbat", "jonli suhbat")))
+@router.message(F.text.in_({"☕ Avto-Suhbat", "☕ Avto-Suhbat (Jonli)", "Avto-Suhbat", "avto suhbat", "avtosuhbat"}))
 async def cmd_main_avto_suhbat(message: Message, bot: Bot) -> None:
-    """Uzluksiz Avtonom Jonli Muloqot: /avto_suhbat."""
+    """Uzluksiz Avtonom Jonli Muloqot: /avtosuhbat yoki /avto_suhbat."""
     from core.bot_skills import start_continuous_living_conversation, autonomous_dialogue_engine
     from core.mistral_agent_bot import get_second_bot
     sec_bot = get_second_bot()
@@ -700,7 +710,8 @@ async def cmd_main_avto_suhbat(message: Message, bot: Bot) -> None:
         pass
 
 
-@router.message(Command("stop_suhbat", "stop_chat", "toxtat_suhbat"))
+@router.message(Command("stop_suhbat", "stop_chat", "toxtat_suhbat", "stop_avto"))
+@router.message(F.text.lower().startswith(("/stop_suhbat", "/stop_chat", "/toxtat_suhbat", "/avto_suhbat off", "/avtosuhbat off", "toxtat", "to'xtat suhbat")))
 async def cmd_main_stop_suhbat(message: Message) -> None:
     """Erkin suhbat, bahs yoki avtonom jonli muloqotni to'xtatish."""
     from core.bot_collab import stop_chit_chat
@@ -712,15 +723,14 @@ async def cmd_main_stop_suhbat(message: Message) -> None:
         await db.save_fact(f"auto_chat_{message.chat.id}", "0", category="auto_chat")
     except Exception:
         pass
-
     if stopped_auto or stopped_chit:
         await message.answer(
-            "🛑 <b>Avtonom jonli suhbat to'xtatildi.</b>\n"
-            "Qayta ishga tushirish uchun: <code>/avto_suhbat</code>",
+            "🛑 <b>Suhbat / Avtonom muloqot to'xtatildi.</b>\n"
+            "Qayta yoqish uchun: <code>/avtosuhbat</code> yoki <code>/suhbat</code> deb yozing.",
             parse_mode="HTML"
         )
     else:
-        await message.answer("⚠️ Hozirda faol suhbat yoki bahs mavjud emas.", parse_mode="HTML")
+        await message.answer("⚠️ Hozirda faol suhbat yoki avtonom muloqot mavjud emas.", parse_mode="HTML")
 
 
 @router.message(Command("persona", "character", "xarakter", "uslub"))
