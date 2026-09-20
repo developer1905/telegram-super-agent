@@ -759,7 +759,7 @@ class DatabaseManager:
         """Suhbat xabarini chat_id bo'yicha saqlash (Supabase va SQLite)."""
         now_iso = datetime.datetime.utcnow().isoformat()
         chat_id_str = str(chat_id)
-        if self.use_supabase and self._supabase_client:
+        if self.use_supabase and self._supabase_client and self._supabase_chats_available:
             try:
                 loop = asyncio.get_running_loop()
                 data = {
@@ -775,8 +775,12 @@ class DatabaseManager:
                     None,
                     lambda: self._supabase_client.table("chat_history").insert(data).execute()
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                err_str = str(e).lower()
+                # Jadval mavjud bo'lmasa (404) - Supabase ni o'chirib SQLite ga o'tamiz
+                if "404" in err_str or "not found" in err_str or "does not exist" in err_str:
+                    logger.warning("Supabase 'chat_history' jadvali mavjud emas (404). SQLite ga o'tildi.")
+                    self._supabase_chats_available = False
 
         loop = asyncio.get_running_loop()
         def _insert():
@@ -792,7 +796,7 @@ class DatabaseManager:
     async def get_recent_chat_history(self, chat_id: Optional[str] = None, limit: int = 30) -> list[dict]:
         """Oxirgi suhbat xabarlarini chat_id bo'yicha yuklash."""
         chat_id_str = str(chat_id) if chat_id is not None else None
-        if self.use_supabase and self._supabase_client:
+        if self.use_supabase and self._supabase_client and self._supabase_chats_available:
             try:
                 loop = asyncio.get_running_loop()
                 def _sb_query():
@@ -803,8 +807,11 @@ class DatabaseManager:
                 res = await loop.run_in_executor(None, _sb_query)
                 if res and hasattr(res, "data") and res.data:
                     return list(reversed(res.data))
-            except Exception:
-                pass
+            except Exception as e:
+                err_str = str(e).lower()
+                if "404" in err_str or "not found" in err_str or "does not exist" in err_str:
+                    logger.warning("Supabase 'chat_history' jadvali mavjud emas (404). SQLite ga o'tildi.")
+                    self._supabase_chats_available = False
 
         loop = asyncio.get_running_loop()
         def _query():
