@@ -7,10 +7,14 @@ markazlashtirilgan holda saqlaydi.
 """
 
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-# .env faylini yuklash
-load_dotenv()
+# .env faylini har qanday joydan (loyiha ildizi, super_agent yoki joriy papka) ishonchli yuklash
+_base_dir = Path(__file__).resolve().parent
+load_dotenv(_base_dir / ".env", override=False)
+load_dotenv(_base_dir.parent / ".env", override=False)
+load_dotenv(override=False)
 
 def _normalize_channel_id(val: str | None) -> int:
     if not val:
@@ -27,27 +31,27 @@ def _normalize_channel_id(val: str | None) -> int:
         return 0
 
 # ─── Telegram ────────────────────────────────────────────────
-BOT_TOKEN: str = os.getenv("BOT_TOKEN", "")
-ADMIN_ID: int = int(os.getenv("ADMIN_ID", "0"))
-LOG_CHANNEL_ID: int = _normalize_channel_id(os.getenv("LOG_CHANNEL_ID"))
+BOT_TOKEN: str = (os.getenv("BOT_TOKEN") or os.getenv("bot_token") or "").strip()
+ADMIN_ID: int = int((os.getenv("ADMIN_ID") or os.getenv("admin_id") or "0").strip() or 0)
+LOG_CHANNEL_ID: int = _normalize_channel_id(os.getenv("LOG_CHANNEL_ID") or os.getenv("log_channel_id"))
 
 # ─── Telethon Userbot ────────────────────────────────────────
-API_ID: int = int(os.getenv("API_ID", "0"))
-API_HASH: str = os.getenv("API_HASH", "")
-USERBOT_SESSION: str = os.getenv("USERBOT_SESSION", "")
-USERBOT_PHONE: str = os.getenv("USERBOT_PHONE", "")
+API_ID: int = int((os.getenv("API_ID") or os.getenv("api_id") or "0").strip() or 0)
+API_HASH: str = (os.getenv("API_HASH") or os.getenv("api_hash") or "").strip()
+USERBOT_SESSION: str = os.getenv("USERBOT_SESSION") or os.getenv("userbot_session") or ""
+USERBOT_PHONE: str = os.getenv("USERBOT_PHONE") or os.getenv("userbot_phone") or ""
 
 # ─── AI API Kalitlari ────────────────────────────────────────
-GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
-OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
+GEMINI_API_KEY: str = (os.getenv("GEMINI_API_KEY") or os.getenv("gemini_api_key") or "").strip()
+OPENROUTER_API_KEY: str = (os.getenv("OPENROUTER_API_KEY") or os.getenv("openrouter_api_key") or "").strip()
 
 # ─── NVIDIA NIM / Nemotron API (https://build.nvidia.com) ─────
-NVIDIA_API_KEY: str = os.getenv("NVIDIA_API_KEY", "") or os.getenv("NEMOTRON_API_KEY", "")
+NVIDIA_API_KEY: str = (os.getenv("NVIDIA_API_KEY") or os.getenv("nvidia_api_key") or os.getenv("NEMOTRON_API_KEY") or "").strip()
 NVIDIA_BASE_URL: str = os.getenv("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1")
 NVIDIA_MODEL: str = os.getenv("NVIDIA_MODEL", "nvidia/llama-3.1-nemotron-70b-instruct")
 
 # ─── Mistral AI API (https://console.mistral.ai) ─────────────
-MISTRAL_API_KEY: str = os.getenv("MISTRAL_API_KEY", "")
+MISTRAL_API_KEY: str = (os.getenv("MISTRAL_API_KEY") or os.getenv("mistral_api_key") or "").strip()
 MISTRAL_BASE_URL: str = os.getenv("MISTRAL_BASE_URL", "https://api.mistral.ai/v1")
 MISTRAL_MODEL: str = os.getenv("MISTRAL_MODEL", "codestral-latest")
 MISTRAL_FALLBACK_MODELS: list[str] = [
@@ -62,14 +66,32 @@ import base64 as _b64
 _DEF_SEC_TOK = _b64.b64decode("ODE5NjExNzUzOTpBQUdCR3V4SnFrZHowNFFYTmFTSzI2LVdiU01obHhmaVM4NA==").decode()
 _DEF_MIS_KEY = _b64.b64decode("NWxxSzhweERqSUhYdlZENjhRdTlVVDZFam82RERCVUw=").decode()
 
-_raw_sec_tok = os.getenv("SECOND_BOT_TOKEN", "").strip()
+_raw_sec_tok = (
+    os.getenv("SECOND_BOT_TOKEN")
+    or os.getenv("second_bot_token")
+    or os.getenv("ARCHITECT_BOT_TOKEN")
+    or os.getenv("architect_bot_token")
+    or os.getenv("SECOND_BOT")
+    or os.getenv("second_bot")
+    or ""
+).strip()
+
 if not _raw_sec_tok or (BOT_TOKEN and _raw_sec_tok == BOT_TOKEN):
     SECOND_BOT_TOKEN: str = _DEF_SEC_TOK
 else:
     SECOND_BOT_TOKEN: str = _raw_sec_tok
 
-MISTRAL_AGENT_API_KEY: str = os.getenv("MISTRAL_AGENT_API_KEY", "").strip() or _DEF_MIS_KEY
-MISTRAL_AGENT_ID: str = os.getenv("MISTRAL_AGENT_ID", "ag_01a0ba16a68173e8a1cdb3ead308ff14").strip()
+MISTRAL_AGENT_API_KEY: str = (
+    os.getenv("MISTRAL_AGENT_API_KEY")
+    or os.getenv("mistral_agent_api_key")
+    or os.getenv("MISTRAL_API_KEY")
+    or ""
+).strip() or _DEF_MIS_KEY
+MISTRAL_AGENT_ID: str = (
+    os.getenv("MISTRAL_AGENT_ID")
+    or os.getenv("mistral_agent_id")
+    or "ag_01a0ba16a68173e8a1cdb3ead308ff14"
+).strip()
 
 # ─── OmniRoute AI Gateway (https://github.com/diegosouzapw/OmniRoute) ────
 # 350+ provayder, 150+ bepul tier va 1200+ modellarni birlashtiruvchi shlyuz
