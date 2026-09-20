@@ -179,6 +179,16 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
     Guruhdagi har qanday topshiriq va buyruqlarni aqlli tarzda bajarish.
     """
     raw_text = (message.text or "").strip()
+
+    # DEBUG: Guruhdan xabar kelganini log qilamiz
+    logger.info(
+        "[GROUP_MSG] chat_id=%s chat_type=%s from_user=%s text=%r",
+        message.chat.id,
+        message.chat.type,
+        message.from_user.id if message.from_user else "N/A",
+        raw_text[:80],
+    )
+
     if not raw_text:
         return
 
@@ -245,26 +255,17 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
             pass
 
     if not should_process:
-        # Hech qanday '/' buyrug'isiz yozilgan guruh xabarlariga ikkala bot ham erkin fikr bildiradi
-        if message.from_user and not message.from_user.is_bot and len(raw_text.strip()) >= 3:
-            import time
-            from core.bot_skills import LAST_COWORKER_CONTEXT, handle_user_joining_coworker_discussion
-            # Agar botlar yaqinda o'zaro gaplashgan bo'lsa (oxirgi 15 daqiqa ichida), foydalanuvchi fikriga 3 kishilik do'stona munosabat bildiriladi
-            if (time.time() - LAST_COWORKER_CONTEXT.get("timestamp", 0) < 900) and LAST_COWORKER_CONTEXT.get("topic"):
-                from core.mistral_agent_bot import get_second_bot
-                sec_bot = get_second_bot()
-                user_name = message.from_user.full_name or "Do'stimiz"
-                asyncio.create_task(handle_user_joining_coworker_discussion(
-                    user_name=user_name,
-                    user_text=raw_text,
-                    chat_id=message.chat.id,
-                    bot_white=bot,
-                    bot_black=sec_bot,
-                    origin_bot=bot
-                ))
-            else:
-                asyncio.create_task(handle_group_dual_opinion(message, bot, ai_manager))
+        # Hech qanday '/' buyrug'isiz yozilgan guruh xabarlariga ikkala bot ham o'zaro jonli suhbat quradi
+        is_from_bot = bool(message.from_user and message.from_user.is_bot)
+        logger.info(
+            "[GROUP_MSG] should_process=False, is_from_bot=%s, text_len=%d -> dual_opinion task yaratilmoqda",
+            is_from_bot,
+            len(raw_text.strip()),
+        )
+        if not is_from_bot and len(raw_text.strip()) >= 2:
+            asyncio.create_task(handle_group_dual_opinion(message, bot, ai_manager))
         return
+
 
     # Agar buyruq aniq boshqa bot nomiga yuborilgan bo'lsa (masalan, /suhbat@architect7_bot), bu bot aralashmaydi
     cmd_mention = re.match(r"^/\w+@(\w+)", raw_text)
@@ -448,15 +449,10 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
         from core.mistral_agent_bot import get_second_bot
         sec_bot = get_second_bot()
 
+        # Agar oldin faol bo'lsa, tozalab qayta yangitdan ishga tushiramiz
         if autonomous_dialogue_engine.is_running(message.chat.id):
-            await safe_message_reply(
-                message,
-                "☕ <b>Avtonom jonli suhbat hozirda ishlab turibdi!</b>\n"
-                "🤖 SuperAgent va 🌪 Arxitektor har 25-35 soniyada yangi mavzularda gurung qilmoqda.\n\n"
-                "🛑 <i>To'xtatish uchun:</i> <code>/stop_suhbat</code>",
-                parse_mode="HTML"
-            )
-            return
+            autonomous_dialogue_engine.stop_chat(message.chat.id)
+            await asyncio.sleep(0.5)
 
         task = asyncio.create_task(
             start_continuous_living_conversation(
@@ -472,6 +468,7 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
         except Exception:
             pass
         return
+
 
     # 1. /collab yoki /avtopilot
     if clean_lower.startswith(("/collab", "/hamkorlik", "/vazifa", "/avtopilot", "/kechki_vazifa", "/night")):
@@ -551,8 +548,8 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
 
     # 2. /suhbat yoki /chat (Erkin muloqot / AI Lounge)
     if clean_lower.startswith(("/suhbat", "/chat", "/gaplash", "🗣️ erkin suhbat", "erkin suhbat", "suhbat")):
-        from core.bot_collab import handle_free_chit_chat, parse_topic_and_turns, ACTIVE_CHIT_CHATS
-        if ACTIVE_CHIT_CHATS.get(str(message.chat.id), False):
+        from core.bot_collab import handle_free_chit_chat, parse_topic_and_turns, is_chit_chat_running, ACTIVE_CHIT_CHAT_TASKS
+        if is_chit_chat_running(str(message.chat.id)):
             await safe_message_reply(
                 message,
                 "☕ <b>Suhbat hozirda allaqachon davom etmoqda!</b>\n"
@@ -563,7 +560,8 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
         topic_text, parsed_turns = parse_topic_and_turns(clean_text, default_turns=8)
         from core.mistral_agent_bot import get_second_bot
         sec_bot = get_second_bot()
-        asyncio.create_task(handle_free_chit_chat(topic_text, message.chat.id, bot_white=bot, bot_black=sec_bot, origin_bot=bot, turns=parsed_turns))
+        task = asyncio.create_task(handle_free_chit_chat(topic_text, message.chat.id, bot_white=bot, bot_black=sec_bot, origin_bot=bot, turns=parsed_turns))
+        ACTIVE_CHIT_CHAT_TASKS[str(message.chat.id)] = task
         return
 
     # 2.5. /bahs yoki /debate (Multi-Agent Debate & Jury)
