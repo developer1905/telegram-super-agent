@@ -63,3 +63,6 @@ g4f>=8.5.0
 # Shaxmat dvigateli (AI vs AI Chess)
 python-chess>=1.10.0
 
+# HTTP asinxron mijoz (Mistral, OpenRouter, Webhooks)
+httpx>=0.27.0
+
