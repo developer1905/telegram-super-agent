@@ -179,6 +179,16 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
     Guruhdagi har qanday topshiriq va buyruqlarni aqlli tarzda bajarish.
     """
     raw_text = (message.text or "").strip()
+
+    # DEBUG: Guruhdan xabar kelganini log qilamiz
+    logger.info(
+        "[GROUP_MSG] chat_id=%s chat_type=%s from_user=%s text=%r",
+        message.chat.id,
+        message.chat.type,
+        message.from_user.id if message.from_user else "N/A",
+        raw_text[:80],
+    )
+
     if not raw_text:
         return
 
@@ -247,6 +257,11 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
     if not should_process:
         # Hech qanday '/' buyrug'isiz yozilgan guruh xabarlariga ikkala bot ham o'zaro jonli suhbat quradi
         is_from_bot = bool(message.from_user and message.from_user.is_bot)
+        logger.info(
+            "[GROUP_MSG] should_process=False, is_from_bot=%s, text_len=%d -> dual_opinion task yaratilmoqda",
+            is_from_bot,
+            len(raw_text.strip()),
+        )
         if not is_from_bot and len(raw_text.strip()) >= 2:
             asyncio.create_task(handle_group_dual_opinion(message, bot, ai_manager))
         return
