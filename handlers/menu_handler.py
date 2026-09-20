@@ -105,6 +105,7 @@ def build_reply_ai_studio_menu() -> ReplyKeyboardMarkup:
         ],
         [
             KeyboardButton(text="🎬 Video Yuklovchi"),
+            KeyboardButton(text="☕ Avto-Suhbat"),
         ],
         [
             KeyboardButton(text="🔙 Asosiy Menyu"),
@@ -164,13 +165,14 @@ def build_reply_settings_menu() -> ReplyKeyboardMarkup:
     buttons = [
         [
             KeyboardButton(text="🤖 AI Modellar"),
+            KeyboardButton(text="🎭 Xarakter & Uslub"),
+        ],
+        [
             KeyboardButton(text="🎭 Tizim Rollari"),
-        ],
-        [
             KeyboardButton(text="🧠 Doimiy Xotira"),
-            KeyboardButton(text="🧹 Xotirani Tozalash"),
         ],
         [
+            KeyboardButton(text="🧹 Xotirani Tozalash"),
             KeyboardButton(text="🔙 Asosiy Menyu"),
         ],
     ]
@@ -664,15 +666,93 @@ async def cmd_main_stop_collab(message: Message) -> None:
         await message.answer("⚠️ Hozirda faol vazifa mavjud emas.", parse_mode="HTML")
 
 
+@router.message(Command("avto_suhbat", "jonli_suhbat", "avto_gaplash"))
+@router.message(F.text.in_({"☕ Avto-Suhbat", "☕ Avto-Suhbat (Jonli)", "Avto-Suhbat", "avto suhbat"}))
+async def cmd_main_avto_suhbat(message: Message, bot: Bot) -> None:
+    """Uzluksiz Avtonom Jonli Muloqot: /avto_suhbat."""
+    from core.bot_skills import start_continuous_living_conversation, autonomous_dialogue_engine
+    from core.mistral_agent_bot import get_second_bot
+    sec_bot = get_second_bot()
+    import asyncio
+
+    if autonomous_dialogue_engine.is_running(message.chat.id):
+        await message.answer(
+            "☕ <b>Avtonom jonli suhbat hozirda ishlab turibdi!</b>\n"
+            "🤖 SuperAgent va 🌪 Arxitektor har 25-35 soniyada yangi mavzularda (oylik, koinot, hayot, IT) gurung qilmoqda.\n\n"
+            "🛑 <i>To'xtatish uchun:</i> <code>/stop_suhbat</code>",
+            parse_mode="HTML"
+        )
+        return
+
+    task = asyncio.create_task(
+        start_continuous_living_conversation(
+            chat_id=message.chat.id,
+            bot_white=bot,
+            bot_black=sec_bot,
+            origin_bot=bot
+        )
+    )
+    autonomous_dialogue_engine.active_tasks[message.chat.id] = task
+    try:
+        from core.database import db
+        await db.save_fact(f"auto_chat_{message.chat.id}", "1", category="auto_chat")
+    except Exception:
+        pass
+
+
 @router.message(Command("stop_suhbat", "stop_chat", "toxtat_suhbat"))
 async def cmd_main_stop_suhbat(message: Message) -> None:
-    """Erkin suhbat yoki bahsni to'xtatish."""
+    """Erkin suhbat, bahs yoki avtonom jonli muloqotni to'xtatish."""
     from core.bot_collab import stop_chit_chat
-    stopped = stop_chit_chat(str(message.chat.id))
-    if stopped:
-        await message.answer("🛑 <b>Erkin suhbat / Bahs to'xtatildi.</b>", parse_mode="HTML")
+    from core.bot_skills import autonomous_dialogue_engine
+    stopped_auto = autonomous_dialogue_engine.stop_chat(message.chat.id)
+    stopped_chit = stop_chit_chat(str(message.chat.id))
+    try:
+        from core.database import db
+        await db.save_fact(f"auto_chat_{message.chat.id}", "0", category="auto_chat")
+    except Exception:
+        pass
+
+    if stopped_auto or stopped_chit:
+        await message.answer(
+            "🛑 <b>Avtonom jonli suhbat to'xtatildi.</b>\n"
+            "Qayta ishga tushirish uchun: <code>/avto_suhbat</code>",
+            parse_mode="HTML"
+        )
     else:
         await message.answer("⚠️ Hozirda faol suhbat yoki bahs mavjud emas.", parse_mode="HTML")
+
+
+@router.message(Command("persona", "character", "xarakter", "uslub"))
+@router.message(F.text.in_({"🎭 Xarakter & Uslub", "Xarakter & Uslub", "xarakter", "uslub"}))
+async def cmd_superagent_persona(message: Message) -> None:
+    """SuperAgent botining gapirish uslubi va xarakterini tanlash."""
+    from core.bot_skills import build_persona_keyboard, get_agent_persona
+    cur_p = get_agent_persona("superagent", message.chat.id)
+    text = (
+        f"🎭 <b>SuperAgent Gapirish Uslubi & Xarakteri</b>\n\n"
+        f"📌 <b>Hozirgi xarakter:</b> {cur_p['name']}\n"
+        f"📝 <i>{cur_p['desc']}</i>\n\n"
+        f"Quyidagi xarakterlardan birini tanlang. SuperAgent barcha muloqotlar va javoblarda ushbu uslubda so'zlaydi:"
+    )
+    await message.answer(text, reply_markup=build_persona_keyboard("superagent", message.chat.id), parse_mode="HTML")
+
+
+@router.callback_query(F.data.startswith("set_persona:superagent:"))
+async def cb_set_superagent_persona(callback: CallbackQuery) -> None:
+    """SuperAgent xarakterini almashtirish callbacki."""
+    parts = callback.data.split(":")
+    if len(parts) == 3:
+        p_key = parts[2]
+        from core.bot_skills import set_agent_persona, build_persona_keyboard, BOT_PERSONAS
+        ok = set_agent_persona("superagent", callback.message.chat.id, p_key)
+        if ok:
+            p_name = BOT_PERSONAS[p_key]["name"]
+            await callback.answer(f"✅ SuperAgent xarakteri tanlandi: {p_name}", show_alert=True)
+            try:
+                await callback.message.edit_reply_markup(reply_markup=build_persona_keyboard("superagent", callback.message.chat.id))
+            except Exception:
+                pass
 
 
 @router.message(Command("bahs", "debate", "tortishuv"))
