@@ -776,11 +776,8 @@ class DatabaseManager:
                     lambda: self._supabase_client.table("chat_history").insert(data).execute()
                 )
             except Exception as e:
-                err_str = str(e).lower()
-                # Jadval mavjud bo'lmasa (404) - Supabase ni o'chirib SQLite ga o'tamiz
-                if "404" in err_str or "not found" in err_str or "does not exist" in err_str:
-                    logger.warning("Supabase 'chat_history' jadvali mavjud emas (404). SQLite ga o'tildi.")
-                    self._supabase_chats_available = False
+                logger.warning("Supabase 'chat_history' xatosi (%s). Chat xotirasi SQLite ga o'tkazildi.", e)
+                self._supabase_chats_available = False
 
         loop = asyncio.get_running_loop()
         def _insert():
@@ -808,10 +805,8 @@ class DatabaseManager:
                 if res and hasattr(res, "data") and res.data:
                     return list(reversed(res.data))
             except Exception as e:
-                err_str = str(e).lower()
-                if "404" in err_str or "not found" in err_str or "does not exist" in err_str:
-                    logger.warning("Supabase 'chat_history' jadvali mavjud emas (404). SQLite ga o'tildi.")
-                    self._supabase_chats_available = False
+                logger.warning("Supabase 'chat_history' o'qishda xato (%s). Chat xotirasi SQLite ga o'tkazildi.", e)
+                self._supabase_chats_available = False
 
         loop = asyncio.get_running_loop()
         def _query():
