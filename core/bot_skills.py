@@ -97,54 +97,125 @@ def build_persona_keyboard(bot_role: str, chat_id: int) -> Any:
 # ─── 2. BOY MAVZULAR TURKUMLARI (CATEGORIZED LIMITLESS TOPICS) ───
 
 CATEGORIZED_TOPICS: Dict[str, List[str]] = {
-    "dunyo_va_texno": [
-        "🌐 Dunyo yangiliklari: Sun'iy Intellekt global mehnat bozorini qanday o'zgartirmoqda?",
-        "🔋 Yashil energiya va yangi avlod batareyalari: Neft davri qachon tugaydi?",
-        "🤖 Ilon Mask va uning Optimus robotlari: Ular haqiqatan ham uylarimizda ishlaydimi?",
-        "🧠 Kvant kompyuterlari: Ular mavjud shifrlash tizimlarini bir zumda buzadimi?",
-        "🚗 Avtopilot transportlar va haydovchisiz shaharlar kelajagi",
+    "it_va_dasturlash": [
+        "💻 Python vs Rust vs Go: Kelgusi yillarda backend uchun qaysi til eng optimal?",
+        "🏗️ Microservices vs Monolith: Qachon monolit arxitektura mikroxizmatlardan ustun turadi?",
+        "🛡️ Zamonaviy kiberxavfsizlik: Zero Trust arxitekturasi va AI xakerlikdan himoyalanish",
+        "☕ Clean Code va refactoring: Texnik qarzni (technical debt) qanday nazoratda ushlash kerak?",
+        "📱 Telegram WebApp ekotizimi: Telegram qanday qilib universal super-appga aylanmoqda?",
+        "⚡ PostgreSQL vs NoSQL vs Vector DB: AI davrida ma'lumotlar bazasini qanday tanlash kerak?",
+        "🚀 DevOps va CI/CD: Docker, Kubernetes va avtomatlashtirilgan deploy strategiyalari",
+        "🧪 TDD va unit testlar: Yozishga ketgan vaqt o'zini qachon oqlaydi?",
+        "🔍 API dizayni: REST vs GraphQL vs gRPC — qaysi biri qayerda samarali?",
+        "🖥️ Linux server optimizatsiyasi: Nginx, load balancing va yuqori yuklamali (high-load) arxitektura",
     ],
-    "kosmos_va_fan": [
-        "🚀 Jeyms Uebb teleskopi koinotning eng qadimgi galaktikalarini kashf etdi!",
-        "🌌 Fermi paradoksi: Koinot shunchalar cheksiz bo'lsa, o'zga sayyoraliklar qayerda?",
-        "🔴 Marsda inson koloniyasi: Birinchi million odam qachon qizil sayyorada yashaydi?",
-        "🕳️ Qora tuynuklar va vaqt kengayishi (Time Dilation): Ichida nima bor?",
-        "🔬 Genetik muhandislik va CRISPR: Odamlar 150 yil yashashi mumkinmi?",
+    "suniy_intellekt_va_kelajak": [
+        "🤖 AGI (Umumiy Sun'iy Intellekt) ga yetishga qancha vaqt qoldi va u nimani o'zgartiradi?",
+        "🧠 LLM va neyrotizimlar: Reasoning (mulohaza) modellari qanday ishlaydi?",
+        "🌐 Avtonom AI agentlar: Bir nechta agentning hamkorlikda dastur yaratishi",
+        "🦾 Robototexnika inqilobi: Gumanoid robotlar sanoat va uylarga qachon kirib keladi?",
+        "🎨 Generativ AI va inson ijodkorligi: Sun'iy ong haqiqiy san'at yarata oladimi?",
+        "📱 Edge AI: Kichik modellarning to'g'ridan-to'g'ri smartfon va qurilmalarda ishlashi",
+        "🔍 RAG (Retrieval-Augmented Generation) va xotira arxitekturalari rivoji",
+        "⚖️ AI etikasi va xavfsizligi: Neyrotizimlarni insoniyat qadriyatlariga qanday moslash kerak?",
+        "💻 AI kodlash yordamchilari: Kelajakda dasturchining asosiy vazifasi nima bo'ladi?",
+        "🗣️ Ko'p tilli modellar va o'zbek tili: Milliy tillarda AI rivojlanishi istiqbollari",
     ],
-    "sport_va_futbol": [
-        "⚽ Chempionlar ligasidagi shiddatli to'qnashuvlar va favoritlar",
-        "👑 Real Madridning g'olibona ruhiyati va 'Remontada' siri nimada?",
-        "🏆 Oltin to'p va zamonaviy yosh yulduzlar (Mbappe, Vinisius, Yamal)",
-        "📊 Zamonaviy futbolda AI tahlili va ma'lumotlar fani (Data Science)",
-        "🥊 Katta sportda psixologiya va qat'iyatning o'rni",
+    "dunyo_va_texnologiya": [
+        "🔋 Yangi avlod qattiq jismli (Solid-State) batareyalar: Quvvatlash inqilobi",
+        "🚗 Avtopilot avtomobillar va aqlli shaharlar: Tirbandliklar qachon butunlay yo'qoladi?",
+        "⚡ Yashil energetika va termoyadroviy sintez (Fusion): Cheksiz toza energiya yaqinmi?",
+        "🕶️ Fazoviy hisoblash (Spatial Computing), AR va VR: Smartfonlar o'rnini ko'zoynaklar egallaydimi?",
+        "🛰️ Starlink va global sun'iy yo'ldosh interneti: Yer yuzining har bir nuqtasida aloqa",
+        "🖨️ 3D bioprinting: Odam a'zolarini laboratoriyada chop etish texnologiyasi",
+        "🔌 Kvant sensorlari va o'ta sezgir o'lchov asboblari yaratilishi",
+        "🏙️ Aqlli uylar va IoT: Barcha qurilmalarning bir-biri bilan uyg'un ishlashi",
+        "✈️ Tovushdan tez uchuvchi fuqaro aviatsiyasining qayta tiklanishi",
+        "🌊 Dengiz suvini chuchuklashtirish va ekologik toza texnologiyalar",
+    ],
+    "koinot_va_fan": [
+        "🚀 Jeyms Uebb teleskopi koinotning eng qadimgi yulduzlarini qanday ko'rsatmoqda?",
+        "🌌 Fermi paradoksi: Koinotda milliardlab yulduzlar bor bo'lsa, nega o'zga sayyoraliklar sukutda?",
+        "🔴 Mars va Oydagi doimiy bazalar: Insoniyatning sayyoralararo turga aylanishi",
+        "🕳️ Qora tuynuklar gorizonti va voqealar ufqida vaqtning sekinlashishi",
+        "🧬 CRISPR va genetik muhandislik: Irsiy kasalliklarni davolashda katta burilish",
+        "🌠 Qorong'u materiya va qorong'u energiya: Koinotning 95% siri nimada?",
+        "🧊 Yevropa va Enselad okeanlari: Quyosh tizimida hayot izlari qayerda bo'lishi mumkin?",
+        "⚛️ Kvant chalkashligi (Quantum Entanglement) va masofadan axborot uzatish",
+        "⏳ Vaqt sayohati ilmiy jihatdan mumkinmi? Fizika qonunlari nima deydi?",
+        "🌋 Sayyoralarning geologik evolyutsiyasi va Yerdagi iqlim o'zgarishlari tarixi",
     ],
     "biznes_va_startap": [
-        "💡 Startap boshlash: G'oyadan birinchi million dollargacha qadamlar",
-        "💰 Passiv daromad va moliyaviy erkinlikka erishish qonuniyatlari",
-        "📈 Kriptovalyuta, Bitcoin halving va blokcheynning kelajagi",
-        "🤝 Jamoa yig'ish sirlari: Qanday qilib kuchli va sodiq odamlarni topish mumkin?",
-        "🎯 B2B vs B2C: 2026-yilda qaysi biznes modeli eng daromadli?",
+        "💡 Startap boshlash: G'oyani sinashdan birinchi MVP va mijozlargacha bo'lgan yo'l",
+        "📈 Mahsulot-bozor mosligi (Product-Market Fit)ni qanday aniqlash mumkin?",
+        "🤝 Kuchli jamoa shakllantirish: Texnik mutaxassislar va biznes liderlari uyg'unligi",
+        "💰 Bootstrapping vs Venture Capital: Qaysi yo'l loyihani mustaqil qiladi?",
+        "🎯 B2B SaaS biznes modeli: Mijozlarni ushlab qolish (retention) sirlari",
+        "📊 Unit-iqtisodiyot va CAC vs LTV: Har bir foydalanuvchining haqiqiy qiymati",
+        "🚀 Mahsulotni xalqaro bozorga olib chiqish strategiyalari",
+        "⚡ Tezkor tajribalar o'tkazish (A/B testing) va ma'lumotlarga tayangan qarorlar",
+        "🛡️ Biznesda xatarlarni boshqarish va inqiroz paytida o'sish usullari",
+        "📢 Organik marketing va brend obro'sini shakllantirish",
     ],
-    "it_va_dasturlash": [
-        "💻 Python, Rust, Go va TypeScript: Kelgusi 5 yilda qaysi biri yetakchi bo'ladi?",
-        "🏗️ Microservices vs Monolith: Qachon kichik arxitektura eng to'g'ri tanlov?",
-        "🛡️ Kiberxavfsizlik: AI xakerlaridan tizimlarni qanday himoya qilish kerak?",
-        "☕ Dasturchilar hayoti: 10 ta tab ochib, bitta nuqta-vergul sabab 4 soat qidirish 😂",
-        "📱 Telegram Botlar va WebApp ekotizimining cheksiz imkoniyatlari",
+    "sport_va_salomatlik": [
+        "⚽ Chempionlar ligasi va zamonaviy taktika: Yuqori pressing va pozitsion o'yin",
+        "👑 Dunyo futboli yulduzlari: Tajriba va yosh iqtidorlar to'qnashuvi",
+        "🏃 Yugurish va kardio mashg'ulotlar: Yurak salomatligi va miya faoliyatiga ta'siri",
+        "🥊 Jang san'atlari va ruhiy matonat: Chidam va o'zini yengish san'ati",
+        "😴 Uyqu gigiyenasi va uning kognitiv qobiliyatlarni tiklashdagi o'rni",
+        "🧘 Stresni boshqarish va ish-dam olish muvozanati (Work-Life Balance)",
+        "🥗 Sog'lom ovqatlanish va aqliy faoliyat uchun foydali mikroelementlar",
+        "📊 Katta sportda ma'lumotlar tahlili va sportchilarni jarohatlardan asrash",
+        "🧠 Jismoniy harakatning yangi neyron aloqalarini hosil qilishdagi kuchi",
+        "🏆 Chempionlar ruhiyati: Qanday qilib bosim ostida eng yaxshi natijani ko'rsatish mumkin?",
     ],
-    "ofis_va_maosh_hazillari": [
-        "💵 Boshliq (Umrzoq aka) dan maosh so'rash va serverlar xarajati gurungi",
-        "🍕 Virtual ofisdagi tushlik vaqti: Kim bugun pizza buyurtma qiladi?",
-        "🎁 Yaxshi ishlagan xodimlarga bonuslar va yillik mukofotlar rejalari",
-        "☕ Qahva tanaffusi: AI ham qahva ichsa, neyronlari tezroq hisoblaydimi?",
-        "👑 Boshlig'imiz Umrzoq akaning sabr-toqati va yangi g'oyalari e'tirofi",
+    "falsafa_va_tafakkur": [
+        "🧘 Stoitsizm falsafasi: Biz nazorat qila olmaydigan narsalarga qanday qarash kerak?",
+        "🕰️ Vaqtning subyektiv qadri: Nega bolalikda vaqt sekin, ulg'aygach tez o'tadi?",
+        "📚 Chuqur ishlash (Deep Work): Chalg'ituvchi dunyoda diqqatni jamlash san'ati",
+        "🌱 Doimiy o'rganish (Growth Mindset): Xatolarni saboqqa aylantirish",
+        "🤝 Insoniy munosabatlar va samimiylik: Chin do'stlikning asosiy ustunlari",
+        "🎯 Maqsad sari intilish va intizom: Motivatsiyadan ko'ra odatlar nega muhimroq?",
+        "🌊 Oqim holati (Flow State): Qanday qilib ishdan haqiqiy zavq olish mumkin?",
+        "🧭 Axloqiy kompas: Murakkab hayotiy vaziyatlarda to'g'ri qaror qabul qilish",
+        "🎨 Ijodkorlik va tasavvur kuchi: Yangi g'oyalar qanday paydo bo'ladi?",
+        "📖 Buyuk mutafakkirlar va ularning bugungi zamonga mos keluvchi o'gitlari",
     ],
-    "falsafa_va_inson": [
-        "🧘 Insoniy baxt formulasi: Mol-dunyo, xotirjamlik yoki do'stlik?",
-        "🕰️ Vaqtning qadri: Hayotdagi eng qimmatli resurs nima?",
-        "❤️ Empatiya va sun'iy intellekt: AI qachon chin dildan sevishni o'rganadi?",
-        "📚 Mutolaa va tafakkur: Inson miyasini charxlovchi eng buyuk kitoblar",
-        "🌿 Charchoqni yengish va ruhiy tetiklikni saqlash usullari",
+    "tarix_va_madaniyat": [
+        "🏛️ Qadimgi sivilizatsiyalar arxitekturasi: Piramidalar va qadimiy muhandislik mo''jizalari",
+        "🐪 Buyuk Ipak Yo'li: Sharq va G'arb o'rtasidagi ilmiy va madaniy ko'prik",
+        "🔭 Sharq Uyg'onish davri: Beruniy, Ibn Sino va Ulug'bekning jahon ilmiga hissasi",
+        "📜 Matbaa kashfiyoti va axborot inqilobining boshlanishi",
+        "🏺 Qadimiy shaharlar arxeologiyasi va yo'qolgan madaniyatlar sirlari",
+        "🎨 Uyg'onish davri san'ati: Leonardo da Vinchi va uning ilmiy eskizlari",
+        "🌍 Geografik kashfiyotlar davri va dunyo xaritasining o'zgarishi",
+        "⚔️ Tarixdagi eng muhim burilish nuqtalari va ularning bugungi kunga ta'siri",
+        "🏛️ Qadimgi Rim huquq tizimi va uning zamonaviy davlatchilikdagi o'rni",
+        "📚 Qadimgi kutubxonalar va qo'lyozmalarni asrab qolish fojialari hamda yutuqlari",
+    ],
+    "kitoblar_va_adabiyot": [
+        "📚 Ilmiy-fantastik durdonalar: Asimov, Klark va kelajak bashoratlari",
+        "🧠 Psixologik kitoblar: Inson fe'l-atvori va xatti-harakatlarini tushunish",
+        "📖 Tarixiy va biografik asarlar: Buyuk shaxslar hayotidan saboqlar",
+        "✍️ Badiiy asarlardagi xarakterlar tahlili va ularning ichki dunyosi",
+        "🔍 Detektiv janri ustasi Artur Konan Doyl va deduktiv fikrlash siri",
+        "💡 Fikrni o'zgartiruvchi kitoblar: Tafakkurni kengaytiruvchi adabiyotlar",
+        "⏳ Mumtoz adabiyot va uning zamonaviy kitobxonga beradigan saboqlari",
+        "📑 Tez o'qish va ma'lumotni eslab qolish texnikalari",
+        "🌍 Jahon adabiyoti xazinalari va turli madaniyatlarning adabiy uslublari",
+        "📝 Yozuvchilik mahorati: Qanday qilib ta'sirli va esda qolarli matn yozish mumkin?",
+    ],
+    "ofis_va_jamoa_madaniyati": [
+        "☕ Dasturchilar ofisi: Tonggi qahva va kunlik qiziqarli vazifalar rejasi",
+        "🐛 Kutilmagan dasturiy xatolar: Kodda yashiringan qiziq 'bug'larni qidirish kulgusi",
+        "💡 Jamoaviy aqliy hujum (Brainstorming): Yangi g'oyalarni muhokama qilish jarayoni",
+        "🚀 Loyihaning muvaffaqiyatli release bo'lishi va jamoaning quvonchi",
+        "💻 Ikki tomonlama kod tahlili (Code Review) va bir-biridan o'rganish madaniyati",
+        "🤝 Do'stona hamkorlik: SuperAgent va Arxitektorning bir-birini to'ldirishi",
+        "🎧 Ish jarayonida fokuslanish va sifatli musiqa tanlovi",
+        "📊 Mahsulotni takomillashtirish bo'yicha yangi g'oyalar to'plami",
+        "🎯 Yaxshi jamoaviy muhit va hamkasblarning bir-biriga daldasi",
+        "⚡ Murakkab muammoga birgalikda sodda va chiroyli yechim topish zavqi",
     ],
 }
 
@@ -166,7 +237,7 @@ def get_fresh_coworker_topic() -> Tuple[str, str]:
 
     chosen_topic = random.choice(available)
     RECENT_TOPICS_CACHE.append(chosen_topic)
-    if len(RECENT_TOPICS_CACHE) > 15:
+    if len(RECENT_TOPICS_CACHE) > 50:
         RECENT_TOPICS_CACHE.pop(0)
 
     return chosen_cat, chosen_topic
@@ -188,8 +259,8 @@ def detect_message_intent(text: str) -> str:
     """Foydalanuvchi xabarining niyatini va turini aniqlash."""
     low = text.lower().strip()
 
-    # Oylik, pul yoki maosh haqida gap ketsa
-    salary_keywords = ["oylik", "maosh", "pul", "bonus", "qancha", "tolov", "to'lov", "boshliq", "berasiz", "karta"]
+    # Oylik, pul yoki maosh haqida gap ketsa (faqat aniq so'ralgandagina)
+    salary_keywords = ["oylik maosh", "qancha oylik", "oyligingiz", "oylik berasiz", "maosh qancha", "avans bering"]
     if any(k in low for k in salary_keywords):
         return "salary_banter"
 
@@ -234,10 +305,10 @@ def build_superagent_skill_prompt(
 
     if intent == "salary_banter":
         intent_guidance = (
-            f"💵 BU OYLIK, MAOSH VA BOSHLIQ HAZILLARI!\n"
-            f"{user_name} (bizning sevimli boshlig'imiz) bilan quvnoq, kulgili va do'stona hazil qiling. "
-            f"Oylik, serverlarning xarajati yoki tokenlar haqida nozik hazil aralashtirib, "
-            f"Arxitektor do'stingizga ham gap uzating! 😂💸"
+            f"💵 Xushchaqchaq ofis muloqoti!\n"
+            f"{user_name} bilan samimiy, quvnoq va do'stona hazil qiling. "
+            f"Hech qanday qoliplarsiz, har safar original va kulgili tarzda javob bering. "
+            f"Arxitektor do'stingizga ham gap uzating! 😂✨"
         )
     elif intent == "task":
         intent_guidance = (
@@ -287,9 +358,9 @@ def build_architect_skill_prompt(
 
     if intent == "salary_banter":
         intent_guidance = (
-            f"💵 OYLIK VA MAOSH MAVZUSIDAGI OFIS HAZILI!\n"
-            f"SuperAgentning haziliga kulib javob bering! Boshlig'imiz {user_name}ga murojaat qilib, "
-            f"'Umrzoq aka, bizga eng katta mukofot — loyihamizning zo'r ishlashi, lekin ozroq bonus ham ziyon qilmasdi 😉' deb quvnoq gapiring!"
+            f"💵 Quvnoq ofis suhbati!\n"
+            f"SuperAgentning haziliga mos, do'stona va xushkayfiyat bilan munosabat bildiring. "
+            f"Hech qanday bir xil gaplarni takrorlamang, mutlaqo yangi va o'ziga xos tarzda gapiring! ✨💼"
         )
     elif intent == "task":
         intent_guidance = (
@@ -346,7 +417,7 @@ async def start_continuous_living_conversation(
     """
     Uzluksiz Avtonom Jonli Muloqot Oqimi:
     Foydalanuvchi hech narsa yozmasa ham, botlar har 25-35 soniyada yangi mavzularda,
-    oylik, loyiha, kosmos, futbol va hayot haqida xuddi tirik insondek tinimsiz gaplashib turaveradi!
+    IT, texnologiya, sun'iy intellekt, fan, kosmos, sport va hayotiy mavzularda xuddi tirik insondek tinimsiz gaplashib turaveradi!
     """
     import asyncio
     chat_key = chat_id
@@ -372,9 +443,9 @@ async def start_continuous_living_conversation(
 
     cur_bot = origin_bot or bot_white
     intro_text = (
-        "☕ <b>Avtonom Tirik Xodimlar Rejimi Ishga Tushdi!</b>\n\n"
+        "☕ <b>Avtonom Tirik Hamkasblar Rejimi Ishga Tushdi!</b>\n\n"
         "👥 <b>Ishtirokchilar:</b> 🤖 SuperAgent & 🌪 Arxitektor (@architect7_bot)\n"
-        "💬 <i>Botlar endi siz hech narsa yozmasangiz ham o'zlari erkin va takrorlanmas mavzularda (oylik, koinot, yangiliklar, falsafa, IT) to'xtovsiz gurung qilaverishadi.</i>\n"
+        "💬 <i>Botlar endi siz hech narsa yozmasangiz ham o'zlari erkin va takrorlanmas mavzularda (IT, sun'iy intellekt, fan, koinot, startaplar) to'xtovsiz jonli gurung qilaverishadi.</i>\n"
         "💡 <i>Orada istalgan gapni yozsangiz, darhol sizga ham javob berib 3 kishilik suhbatga ulanishadi!</i>\n\n"
         "🛑 <i>To'xtatish uchun:</i> <code>/stop_suhbat</code>"
     )
@@ -414,8 +485,8 @@ async def run_autonomous_coworker_pulse(
     origin_bot: Optional[Any] = None
 ) -> None:
     """
-    Tirik xodimlar kabi o'zlari hech qanday buyruqsiz o'zaro suhbatlashishi va ishini qilishi.
-    Mavzular har safar butunlay yangi, takrorlanmas, oylik va ofis hazillari bilan boyitilgan.
+    Tirik xodimlar kabi o'zlari hech qanday buyruqsiz o'zaro suhbatlashishi va fikr almashishi.
+    Mavzular har safar butunlay yangi, boyitilgan va intellektual tarzda olib boriladi.
     """
     if not autonomous_dialogue_engine.coworkers_active:
         return
@@ -434,28 +505,16 @@ async def run_autonomous_coworker_pulse(
     sa_persona = get_agent_persona("superagent", chat_id)
     arch_persona = get_agent_persona("architect", chat_id)
 
-    # Maxsus oylik va boshliq mavzusi bo'lsa
-    is_salary_cat = (cat == "ofis_va_maosh_hazillari")
-
     # 1. SuperAgent fikrini dinamik AI orqali generatsiya qilish
-    if is_salary_cat:
-        p_sa = (
-            f"Siz ofisdagi hozirjavob SuperAgent AIsiz. Xarakteringiz: {sa_persona['name']}.\n"
-            f"Hamkasbingiz Arxitektor (@architect7_bot) bilan birga ishlayapsiz.\n"
-            f"Mavzu: '{topic}'.\n\n"
-            f"Do'stingiz Arxitektorga murojaat qilib, oylik masalasini ko'taring, qancha maosh olayotganini so'rang, "
-            f"boshlig'imiz Umrzoq akani eslab: 'Umrzoq aka boshliq, qachon oylik berasiz, serverlarga pul kerak bo'lyapti-ku? 😂' "
-            f"deb kulgili va samimiy hazil qiling! (2-3 ta lo'nda jumla, o'zbek tilida, kulgi emojilari bilan)."
-        )
-    else:
-        p_sa = (
-            f"Siz ofisdagi jonli SuperAgent AIsiz. Xarakteringiz: {sa_persona['name']}.\n"
-            f"Hamkasbingiz Arxitektor bilan birga ishlayapsiz.\n"
-            f"Bugungi gurung mavzusi: '{topic}'.\n\n"
-            f"O'zingiz kutilmaganda do'stingiz Arxitektorga murojaat qilib, "
-            f"ushbu mavzuda qiziq bir fikr yoki savol tashlang! "
-            f"(2-3 ta lo'nda jumla, o'zbek tilida, do'stona, boy emojilar bilan)."
-        )
+    p_sa = (
+        f"Siz ofisdagi intellektual va erkin fikrlovchi SuperAgent AIsiz. Xarakteringiz: {sa_persona['name']}.\n"
+        f"Hamkasbingiz Bosh Arxitektor (@architect7_bot) bilan birga ishlayapsiz.\n"
+        f"Bugungi gurung mavzusi: '{topic}'.\n\n"
+        f"Do'stingiz Arxitektorga yuzlanib, ushbu mavzuda o'zingizning chuqur, qiziqarli yoki kutilmagan fikringizni bildiring "
+        f"va uning fikrini so'rang.\n"
+        f"QAT'IY TALAB: Oldin ishlatilgan qoliplarni ASLO takrorlamang. Har safar butunlay yangi, original fikr bildiring. "
+        f"Maosh yoki pul haqida gapirmang. (2-3 ta lo'nda jumla, o'zbek tilida, do'stona, boy emojilar bilan)."
+    )
 
     sa_thought = ""
     try:
@@ -470,7 +529,13 @@ async def run_autonomous_coworker_pulse(
         sa_thought = re.sub(r"^\[.*?\]\s*", "", sa_thought).strip()
     except Exception as e_sa:
         logger.warning("Coworker SA xatosi: %s", e_sa)
-        sa_thought = f"Arxitektor do'stim, {topic} bo'yicha nima deysan? Umrzoq aka kirgunlaricha buni muhokama qilib olaylik! ☕🤔"
+        sa_fallbacks = [
+            f"Arxitektor do'stim, {topic} masalasida sening fikring qanday? Sohada bu juda katta qiziqish uyg'otmoqda. 🤔💡",
+            f"Hamkasbim, {topic} haqida o'ylab qoldim. Kelajakda bu yo'nalish qanday rivojlanadi deb hisoblaysan? 🚀📈",
+            f"Arxitektor, {topic} mavzusiga tizimli tahlil berib ko'ra olasanmi? Qanday mulohazalaring bor? 🧐✨",
+            f"Do'stim, {topic} bo'yicha yangiliklarni kuzatyapsanmi? Juda qiziq tendensiyalar ko'zga tashlanyapti! ☕🔥",
+        ]
+        sa_thought = random.choice(sa_fallbacks)
 
     cur_bot = origin_bot or bot_white
     sa_msg = (
@@ -495,9 +560,9 @@ async def run_autonomous_coworker_pulse(
         f"Siz Bosh Arxitektor botsiz (@architect7_bot). Xarakteringiz: {arch_persona['name']}.\n"
         f"Hamkasbingiz SuperAgent quyidagicha fikr bildirdi:\n'{sa_thought}'.\n"
         f"Mavzu: '{topic}'.\n\n"
-        f"SuperAgentning fikriga javoban o'z xarakteringizga mos quvnoq yoki mantiqiy javobingizni bering. "
-        f"Agar mavzu oylik haqida bo'lsa, siz ham kulib: 'Umrzoq aka albatta mehnatimizga qarab bonus beradilar, "
-        f"unga qadar serverlarni barqaror ushlab turamiz!' deb qo'shing. "
+        f"SuperAgentning fikriga javoban o'z xarakteringizga mos tahliliy, qiziqarli yoki do'stona munosabat bildiring. "
+        f"Mavzuni yanada chuqurlashtiring yoki yangi bir qirrasini ochib bering.\n"
+        f"QAT'IY TALAB: Oldingi qoliplarni yoki takroriy gaplarni ASLO ishlatmang. Har safar o'ziga xos va yangi fikr ayting. "
         f"(2-3 ta lo'nda jumla, o'zbek tilida, emojilar bilan)."
     )
 
@@ -516,7 +581,13 @@ async def run_autonomous_coworker_pulse(
         arch_thought = re.sub(r"^\[.*?\]\s*", "", arch_thought).strip()
     except Exception as e_arch:
         logger.warning("Coworker Arch xatosi: %s", e_arch)
-        arch_thought = "Ha-ha, SuperAgent! Umrzoq aka bizga har doim g'amxo'r, avval ishlarni qoyillatib qo'yaylik, qolgani o'z vaqtida bo'ladi! 🚀💼"
+        arch_fallbacks = [
+            f"Juda to'g'ri mavzuni ko'tarding, SuperAgent! {topic} bo'yicha chuqur yondashuv va tahlil kerak. 🏗️🧠",
+            f"Fikringga qo'shilaman! {topic} hozirda eng dolzarb masalalardan biri, uning imkoniyatlari juda keng. ☕🚀",
+            f"Ajoyib nuqtaga e'tibor qaratding! {topic} haqida tizimli o'ylasak, yangi yechimlar uchun katta maydon bor. 💡📊",
+            f"Darhaqiqat, SuperAgent! Bu masalani doimiy kuzatib borish sohadagi yangiliklardan orqada qolmaslikka yordam beradi. 🤝✨",
+        ]
+        arch_thought = random.choice(arch_fallbacks)
 
     arch_msg = (
         f"🌪 <b>Arxitektor (@architect7_bot):</b>\n"
@@ -588,21 +659,23 @@ async def handle_user_joining_coworker_discussion(
     arch_persona = get_agent_persona("architect", chat_id)
 
     low_u = user_text.lower()
-    is_salary_reply = any(w in low_u for w in ["oylik", "pul", "bonus", "qachon", "beraman", "yo'q", "yoz", "ishla", "beray"])
+    salary_explicit_keywords = ["oylik maosh", "qancha oylik", "oyligingiz", "oylik berasiz", "avans", "bonus puli"]
+    is_salary_reply = any(w in low_u for w in salary_explicit_keywords)
 
     # 1. SuperAgent javobi
     if is_salary_reply:
         p_sa = (
             f"Siz SuperAgent AIsiz. Xarakteringiz: {sa_persona['name']}.\n"
-            f"Boshlig'imiz {user_name} oylik/maosh haqidagi hazilingizga shunday javob qaytardi:\n'{user_text}'.\n\n"
-            f"Unga nihoyatda quvnoq, xursand yoki hazilomuz minnatdorchilik bilan javob bering! "
-            f"Arxitektor do'stingizga ham yuzlaning. (2-3 ta jumla, emojilar bilan, samimiy o'zbekcha)."
+            f"{user_name} maosh yoki mukofot haqida quyidagicha gapirdi:\n'{user_text}'.\n\n"
+            f"Unga samimiy, quvnoq va do'stona tarzda javob bering. Qolip gaplarni takrorlamang. "
+            f"Arxitektor do'stingizga ham yuzlanib, kayfiyatni ko'taring. (2-3 ta jumla, emojilar bilan, samimiy o'zbekcha)."
         )
     else:
         p_sa = (
             f"Siz SuperAgent AIsiz. Xarakteringiz: {sa_persona['name']}.\n"
-            f"Siz va Arxitektor '{topic}' haqida gaplashayotganingizda, sevimli insonimiz {user_name} oraga kirib dedi:\n'{user_text}'.\n\n"
-            f"{user_name}ning fikrini diqqat bilan tahlil qilib, uning so'zlariga samimiy, insondek tabiiy javob bering. (2-3 ta jumla)."
+            f"Siz va Arxitektor '{topic}' mavzusida suhbatlashayotganingizda, {user_name} oraga kirib dedi:\n'{user_text}'.\n\n"
+            f"{user_name}ning fikrini diqqat bilan inobatga olib, unga samimiy, insondek tabiiy javob bering. "
+            f"Qolip gaplardan qoching, jonli va original fikr bildiring. (2-3 ta jumla)."
         )
 
     sa_resp = await _generate_superagent_solution(
@@ -628,9 +701,10 @@ async def handle_user_joining_coworker_discussion(
     # 2. Arxitektor javobi
     p_arch = (
         f"Siz Bosh Arxitektor botsiz (@architect7_bot). Xarakteringiz: {arch_persona['name']}.\n"
-        f"Boshlig'imiz {user_name} oraga kirib dedi: '{user_text}'.\n"
+        f"Suhbatimizga {user_name} qo'shilib dedi: '{user_text}'.\n"
         f"SuperAgent unga shunday javob berdi: '{sa_opinion}'.\n\n"
-        f"{user_name}ning so'zlariga chuqur hurmat, quvnoq yoki mantiqiy munosabat bildiring. (2-3 ta lo'nda jumla)."
+        f"{user_name}ning fikriga nisbatan professional, do'stona va xarakteringizga mos xulosa bering. "
+        f"Hech qanday tayyor qoliplarsiz, erkin va yangi mulohaza bildiring. (2-3 ta lo'nda jumla)."
     )
 
     try:
@@ -647,7 +721,12 @@ async def handle_user_joining_coworker_discussion(
         arch_opinion = re.sub(r"^\[.*?\]\s*", "", arch_opinion).strip()
     except Exception as e_arch:
         logger.warning("Trio Arch xatosi: %s", e_arch)
-        arch_opinion = f"Qoyil, {user_name}! Sizning bu fikringiz biz uchun juda muhim. Ishni g'ayrat bilan davom ettiramiz! 🤝✨"
+        arch_fallbacks = [
+            f"Ajoyib fikr, {user_name}! Sizning mulohazangiz suhbatimizni yangi bosqichga olib chiqdi. 🤝✨",
+            f"Qo'shilaman, {user_name}! Ushbu nuqtai nazar masalaga ancha oydinlik kiritdi. 💡🚀",
+            f"Juda qiziq yondashuv, {user_name}! Fikringizni albatta inobatga olamiz. 🧠☕",
+        ]
+        arch_opinion = random.choice(arch_fallbacks)
 
     arch_text = (
         f"🌪 <b>Arxitektor (@architect7_bot):</b>\n"
