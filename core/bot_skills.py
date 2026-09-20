@@ -524,26 +524,39 @@ async def run_autonomous_coworker_pulse(
         f"💡 <i>Mavzu: {html.escape(topic)}</i>"
     )
 
+    if not bot_black:
+        try:
+            from core.mistral_agent_bot import get_second_bot
+            bot_black = get_second_bot()
+        except Exception:
+            pass
+
     target_bot = bot_black or cur_bot
     sent = False
     try:
         await target_bot.send_message(chat_id, arch_msg, parse_mode="HTML")
         sent = True
     except Exception as e:
-        logger.warning("Coworker Arxitektor xabar yuborish xatosi: %s", e)
+        logger.warning("Coworker Arxitektor (@architect7_bot) xabar yuborish xatosi (chat_id=%s): %s", chat_id, e)
         try:
             await target_bot.send_message(chat_id, f"🌪 Arxitektor (@architect7_bot):\n\"{arch_thought}\"\n\n💡 Mavzu: {topic}", parse_mode=None)
             sent = True
         except Exception:
             pass
 
-    # Agar Arxitektor bot guruhda bo'lmasa yoki yubora olmasa, SuperAgent zaxira orqali yetkazadi!
+    # Agar Arxitektor bot guruhda bo'lmasa yoki yubora olmasa, SuperAgent zaxira orqali yetkazadi
     if not sent and cur_bot and target_bot != cur_bot:
+        notice = ""
+        if chat_id < 0:
+            notice = (
+                "⚠️ <i>[Diqqat: @architect7_bot ushbu guruhga a'zo emas yoki yozish huquqi yo'q! "
+                "Arxitektor o'z profilidan yozishi uchun @architect7_bot ni guruhga a'zo qilib, Administrator qiling!]</i>\n\n"
+            )
         try:
-            await cur_bot.send_message(chat_id, arch_msg, parse_mode="HTML")
+            await cur_bot.send_message(chat_id, f"{notice}{arch_msg}", parse_mode="HTML")
         except Exception:
             try:
-                await cur_bot.send_message(chat_id, f"🌪 Arxitektor (@architect7_bot):\n\"{arch_thought}\"\n\n💡 Mavzu: {topic}", parse_mode=None)
+                await cur_bot.send_message(chat_id, f"{notice}🌪 Arxitektor (@architect7_bot):\n\"{arch_thought}\"\n\n💡 Mavzu: {topic}", parse_mode=None)
             except Exception:
                 pass
 
@@ -641,13 +654,20 @@ async def handle_user_joining_coworker_discussion(
         f"<i>\"{html.escape(arch_opinion)}\"</i>"
     )
 
+    if not bot_black:
+        try:
+            from core.mistral_agent_bot import get_second_bot
+            bot_black = get_second_bot()
+        except Exception:
+            pass
+
     target_bot = bot_black or cur_bot
     sent = False
     try:
         await target_bot.send_message(chat_id, arch_text, parse_mode="HTML")
         sent = True
     except Exception as e:
-        logger.warning("Trio Arxitektor xatosi: %s", e)
+        logger.warning("Trio Arxitektor (@architect7_bot) xatosi (chat_id=%s): %s", chat_id, e)
         try:
             await target_bot.send_message(chat_id, f"🌪 Arxitektor (@architect7_bot):\n\"{arch_opinion}\"", parse_mode=None)
             sent = True
@@ -655,10 +675,16 @@ async def handle_user_joining_coworker_discussion(
             pass
 
     if not sent and cur_bot and target_bot != cur_bot:
+        notice = ""
+        if chat_id < 0:
+            notice = (
+                "⚠️ <i>[Diqqat: @architect7_bot ushbu guruhga a'zo emas! "
+                "Arxitektor o'z nomidan yozishi uchun @architect7_bot ni guruhga a'zo qiling!]</i>\n\n"
+            )
         try:
-            await cur_bot.send_message(chat_id, arch_text, parse_mode="HTML")
+            await cur_bot.send_message(chat_id, f"{notice}{arch_text}", parse_mode="HTML")
         except Exception:
             try:
-                await cur_bot.send_message(chat_id, f"🌪 Arxitektor (@architect7_bot):\n\"{arch_opinion}\"", parse_mode=None)
+                await cur_bot.send_message(chat_id, f"{notice}🌪 Arxitektor (@architect7_bot):\n\"{arch_opinion}\"", parse_mode=None)
             except Exception:
                 pass
