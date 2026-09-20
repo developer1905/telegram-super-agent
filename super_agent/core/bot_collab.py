@@ -150,7 +150,7 @@ async def _generate_superagent_solution(prompt: str, chat_id: str, system_instru
     try:
         ai_mgr = _get_shared_ai_manager()
         full_p = f"{system_instruction}\n\n{prompt}" if system_instruction else prompt
-        resp = await asyncio.wait_for(ai_mgr.generate(full_p, save_history=False), timeout=10.0)
+        resp = await asyncio.wait_for(ai_mgr.generate(full_p, save_history=False), timeout=5.0)
         if resp and not resp.startswith("❌") and not resp.startswith("⚠️"):
             return resp
     except Exception as e:
@@ -164,7 +164,7 @@ async def _generate_superagent_solution(prompt: str, chat_id: str, system_instru
                 chat_id=f"collab_dev_{chat_id}",
                 system_instruction=system_instruction or "Siz SuperAgent AI — erkin fikrlovchi, o'tkir zehnli, hazilkash va ijodkor sun'iy intellektsiz. Qoliplarsiz, jonli va boy o'zbek tilida so'zlaysiz."
             ),
-            timeout=10.0
+            timeout=5.0
         )
         if ans and not ans.startswith("❌"):
             return ans
@@ -956,7 +956,7 @@ async def handle_free_chit_chat(
         )
         await _send_agent_message(chat_id, intro, "system", bot_white, bot_black, is_group, cur_origin)
 
-        await asyncio.sleep(2.0)
+        await asyncio.sleep(0.5)
         last_speech = f"Mavzu: {selected_topic}"
 
         for round_idx in range(1, total_rounds + 1):
@@ -1039,15 +1039,12 @@ async def handle_free_chit_chat(
             await _send_agent_message(chat_id, t_msg_sa, "superagent", bot_white, bot_black, is_group, cur_origin, audio_text=(sp_sa if audio_mode else None))
             last_speech = sp_sa
 
-            # 🎨 Multimodal Tool (Midjourney tasvir yaratish — 2 yoki 3-raundda)
+            # 🎨 Multimodal Tool (Midjourney tasvir yaratish orqa fonda — suhbatni to'xtatmaydi)
             if not generated_concept_image and round_idx in (2, 3):
-                await asyncio.sleep(1.5)
-                img_ok = await maybe_generate_collab_concept_image(selected_topic, chat_id, bot_white, bot_black, cur_origin)
-                if img_ok:
-                    generated_concept_image = True
-                    conversation_transcript.append({"speaker": "SuperAgent", "text": "[Vizual Kontsept]: Chatga fotorealistik rasm tashladi va Arxitektordan baho so'radi."})
+                generated_concept_image = True
+                asyncio.create_task(maybe_generate_collab_concept_image(selected_topic, chat_id, bot_white, bot_black, cur_origin))
 
-            await asyncio.sleep(3.0)
+            await asyncio.sleep(0.8)
 
             # Agar foydalanuvchi to'xtatgan bo'lsa
             if not ACTIVE_CHIT_CHATS.get(chat_key, False):
@@ -1077,7 +1074,7 @@ async def handle_free_chit_chat(
             if round_idx == 2:
                 try:
                     from core.search_agent import search_web
-                    web_f = await asyncio.wait_for(search_web(selected_topic, max_results=2), timeout=4.0)
+                    web_f = await asyncio.wait_for(search_web(selected_topic, max_results=2), timeout=2.0)
                     if web_f and "topilmadi" not in web_f:
                         web_addition = f"\n\n🌐 REAL-VAQTDAGI INTERNET FAKTLARI:\n{web_f[:350]}\nUshbu faktlardan foydalanib do'stingizga hayratlanarli yangilik ayting."
                 except Exception:
@@ -1118,7 +1115,7 @@ async def handle_free_chit_chat(
                         chat_id=f"chit_chat_{chat_id}",
                         system_instruction="Siz Arxitektor (@architect7_bot) — chuqur tahlilchi, xuddi jonli insondek erkin va samimiy fikrlovchi, emojilarni o'rnida ishlatuvchi, nozik kinoyali va ochiqko'ngil do'stsiz. Boy va rang-barang o'zbek tilida so'zlaysiz."
                     ),
-                    timeout=14.0
+                    timeout=5.0
                 )
             except Exception as e_arch_call:
                 logger.warning("Arxitektor javobida kechikish/xato (%s), zaxira fikr ulanmoqda", e_arch_call)
@@ -1130,7 +1127,7 @@ async def handle_free_chit_chat(
             await _send_agent_message(chat_id, t_msg_arch, "architect", bot_white, bot_black, is_group, cur_origin, audio_text=(sp_arch if audio_mode else None))
             last_speech = sp_arch
 
-            await asyncio.sleep(3.5)
+            await asyncio.sleep(0.8)
 
         # Agar suhbat o'rtada to'xtatilgan bo'lsa, xulosa bosqichini o'tkazib yuborish
         if not ACTIVE_CHIT_CHATS.get(chat_key, False):
@@ -1139,7 +1136,7 @@ async def handle_free_chit_chat(
         # ════════════════════════════════════════════════════════════
         # 🎯 YAKUNIY XULOSA VA O'ZARO DO'STONA TAHLIL BOSQICHI
         # ════════════════════════════════════════════════════════════
-        await asyncio.sleep(2.5)
+        await asyncio.sleep(0.6)
 
         # 1. SuperAgent Xulosasi & Arxitektorga Ochiq Bahosi
         p_sa_summary = (
@@ -1162,7 +1159,7 @@ async def handle_free_chit_chat(
         )
         await _send_agent_message(chat_id, sa_summary_msg, "superagent", bot_white, bot_black, is_group, cur_origin)
 
-        await asyncio.sleep(3.0)
+        await asyncio.sleep(0.6)
 
         p_arch_summary = (
             f"Siz Bosh Arxitektor Botsiz (@architect7_bot). Mavzu: '{selected_topic}'. Do'stingiz SuperAgent bilan {total_rounds} raundlik katta suhbat yakunlandi.\n"
@@ -1180,7 +1177,7 @@ async def handle_free_chit_chat(
                     chat_id=f"chit_chat_summary_{chat_id}",
                     system_instruction="Siz Arxitektor (@architect7_bot) — chuqur tahlilchi, samimiy, emojilarni yaxshi ko'radigan ochiqko'ngil do'stsiz."
                 ),
-                timeout=14.0
+                timeout=5.0
             )
         except Exception as e_s_call:
             logger.warning("Arxitektor yakuniy xulosasida kechikish (%s), zaxira xulosa qo'llanadi", e_s_call)
@@ -1199,7 +1196,7 @@ async def handle_free_chit_chat(
         summary_to_save = f"SuperAgent: {sa_summary_text[:140]}... | Arxitektor: {arch_summary_text[:140]}..."
         await save_collab_memory(selected_topic, summary_to_save, chat_key)
 
-        await asyncio.sleep(2.0)
+        await asyncio.sleep(0.5)
 
         # 3. Yakuniy Tizim Kartochkasi
         final_verdict_card = (
@@ -1365,7 +1362,7 @@ async def handle_agent_debate(
             await _send_agent_message(chat_id, t_msg_sa, "superagent", bot_white, bot_black, is_group, cur_origin, audio_text=(sp_sa if audio_mode else None))
             last_speech = sp_sa
 
-            await asyncio.sleep(3.0)
+            await asyncio.sleep(0.8)
 
             if not ACTIVE_DEBATES.get(chat_key, False):
                 await _send_agent_message(chat_id, "🛑 <i>Foydalanuvchi buyrug'i bilan bahs to'xtatildi.</i>", "system", bot_white, bot_black, is_group, cur_origin)
@@ -1417,7 +1414,7 @@ async def handle_agent_debate(
                         chat_id=f"debate_{chat_id}",
                         system_instruction="Siz Bosh Arxitektor (@architect7_bot) — tanqidiy fikrlovchi, xuddi insondek erkin so'zlovchi, emojilardan ifodali foydalanuvchi va pragmatik dalillarga ega bo'lgan intellektual notiqsiz."
                     ),
-                    timeout=14.0
+                    timeout=5.0
                 )
             except Exception as e_deb_arch:
                 logger.warning("Arxitektor bahsida kechikish (%s), zaxira nutq qo'llanadi", e_deb_arch)
@@ -1429,7 +1426,7 @@ async def handle_agent_debate(
             await _send_agent_message(chat_id, t_msg_arch, "architect", bot_white, bot_black, is_group, cur_origin, audio_text=(sp_arch if audio_mode else None))
             last_speech = sp_arch
 
-            await asyncio.sleep(3.5)
+            await asyncio.sleep(0.8)
 
         if not ACTIVE_DEBATES.get(chat_key, False):
             return
@@ -1437,7 +1434,7 @@ async def handle_agent_debate(
         # ════════════════════════════════════════════════════════════
         # ⚖️ HAKAMLIK VA OVOZ BERISH BOSQICHI (JURY VOTING)
         # ════════════════════════════════════════════════════════════
-        await asyncio.sleep(2.5)
+        await asyncio.sleep(0.6)
 
         # Xotiraga saqlash
         summary_brief = f"PRO: SuperAgent vs CONTRA: Arxitektor bahsi. {total_rounds} raund yakunlandi."
@@ -1632,8 +1629,8 @@ async def handle_group_dual_opinion(
                 origin_bot=bot_white,
             )
 
-            # Tabiiy insoniy pauza
-            await asyncio.sleep(2.5)
+            # Tezkor jonli pauza
+            await asyncio.sleep(0.5)
 
             if chat_id not in ACTIVE_GROUP_DUAL_OPINIONS:
                 break
@@ -1667,7 +1664,7 @@ async def handle_group_dual_opinion(
                         chat_id=f"group_opinion_{chat_id}",
                         system_instruction=f"Siz Bosh Arxitektor (@architect7_bot) botsiz. Xarakteringiz: {arch_persona['name']}. Uslubingiz: {arch_persona['prompt_tone']}"
                     ),
-                    timeout=14.0
+                    timeout=5.0
                 )
             except Exception as e_grp_arch:
                 logger.warning("Guruhda Arxitektor javobida kechikish (%s), zaxira tahlil qo'llanadi", e_grp_arch)
@@ -1698,7 +1695,7 @@ async def handle_group_dual_opinion(
                 origin_bot=bot_white,
             )
 
-            await asyncio.sleep(2.5)
+            await asyncio.sleep(0.5)
 
     except Exception as exc:
         logger.error("Avtonom ko'p agentli muloqotda xatolik: %s", exc)
