@@ -1084,6 +1084,36 @@ async def main() -> None:
     scheduler.start()
     logger.info("✅ Scheduler ishga tushdi (21:00 da hisobot, SMM avtopilot faol)")
 
+    # 7.5. Avtonom Jonli Muloqotlarni Tiklash (Avto-suhbat faol bo'lgan chatlar uchun)
+    async def _resume_auto_chat_conversations():
+        try:
+            await asyncio.sleep(6.0)
+            all_facts = await db.get_all_facts()
+            for f in all_facts:
+                if f.get("category") == "auto_chat" and f.get("content") == "1":
+                    k = f.get("key", "")
+                    if k.startswith("auto_chat_"):
+                        try:
+                            c_id = int(k.replace("auto_chat_", ""))
+                            from core.bot_skills import start_continuous_living_conversation, autonomous_dialogue_engine
+                            if not autonomous_dialogue_engine.is_running(c_id):
+                                task = asyncio.create_task(
+                                    start_continuous_living_conversation(
+                                        chat_id=c_id,
+                                        bot_white=bot,
+                                        bot_black=second_bot,
+                                        origin_bot=bot
+                                    )
+                                )
+                                autonomous_dialogue_engine.active_tasks[c_id] = task
+                                logger.info("☕ Avto-suhbat avtomatik qayta tiklandi: chat_id=%s", c_id)
+                        except Exception as e_res:
+                            logger.warning("Avto-suhbat tiklash xatosi (%s): %s", k, e_res)
+        except Exception as e_all:
+            logger.warning("_resume_auto_chat_conversations xatosi: %s", e_all)
+
+    asyncio.create_task(_resume_auto_chat_conversations())
+
     # 8. Adminga ishga tushdi xabari
     from core.safe_send import safe_send_message
     try:
