@@ -273,10 +273,24 @@ def stop_chess_game(chat_id: str) -> bool:
 
 # Holat boshqaruvi (To'xtatish va faollik bayroqlari)
 ACTIVE_CHIT_CHATS: dict[str, bool] = {}
+ACTIVE_CHIT_CHAT_TASKS: dict[str, asyncio.Task] = {}
 ACTIVE_COLLABS: dict[str, bool] = {}
 ACTIVE_DEBATES: dict[str, bool] = {}
 ACTIVE_PROJECT_BUILDS: dict[str, bool] = {}
 DEBATE_VOTES: dict[str, dict[str, Any]] = {}
+
+
+def is_chit_chat_running(chat_id: str | int) -> bool:
+    """Tekshirish: suhbat chindan ham ayni daqiqada ishlayaptimi (o'lik vazifalarni tozalaydi)."""
+    chat_key = str(chat_id)
+    if not ACTIVE_CHIT_CHATS.get(chat_key, False):
+        return False
+    task = ACTIVE_CHIT_CHAT_TASKS.get(chat_key)
+    if task is not None and task.done():
+        ACTIVE_CHIT_CHATS[chat_key] = False
+        ACTIVE_CHIT_CHAT_TASKS.pop(chat_key, None)
+        return False
+    return True
 
 
 def is_audio_dialogue_requested(raw_text: str) -> bool:
@@ -285,12 +299,16 @@ def is_audio_dialogue_requested(raw_text: str) -> bool:
     return any(w in low for w in ["ovozli", "audio", "voice", ":audio", "/ovozli_suhbat", "/ovozli_bahs", "/audio_chat"])
 
 
-def stop_chit_chat(chat_id: str) -> bool:
+def stop_chit_chat(chat_id: str | int) -> bool:
     """Faol erkin suhbat yoki bahsni to'xtatish."""
     chat_key = str(chat_id)
     stopped = False
     if ACTIVE_CHIT_CHATS.get(chat_key, False):
         ACTIVE_CHIT_CHATS[chat_key] = False
+        stopped = True
+    task = ACTIVE_CHIT_CHAT_TASKS.pop(chat_key, None)
+    if task and not task.done():
+        task.cancel()
         stopped = True
     if ACTIVE_DEBATES.get(chat_key, False):
         ACTIVE_DEBATES[chat_key] = False
@@ -417,10 +435,13 @@ async def maybe_generate_collab_concept_image(
         from aiogram.types import BufferedInputFile
 
         ai_mgr = AIManager()
-        img_bytes, enhanced_p, chosen_ar, seed, used_model = await draw_midjourney_image(
-            raw_prompt=f"{topic}, photorealistic concept art, cinematic lighting, 8k resolution, futuristic wallpaper",
-            ai_manager=ai_mgr,
-            aspect_ratio="16:9"
+        img_bytes, enhanced_p, chosen_ar, seed, used_model = await asyncio.wait_for(
+            draw_midjourney_image(
+                raw_prompt=f"{topic}, photorealistic concept art, cinematic lighting, 8k resolution, futuristic wallpaper",
+                ai_manager=ai_mgr,
+                aspect_ratio="16:9"
+            ),
+            timeout=10.0
         )
         if img_bytes:
             caption = (
@@ -869,7 +890,7 @@ async def handle_free_chit_chat(
     navbati bilan javob qaytaradi (masalan, 8 raund = 8 ta SuperAgent + 8 ta Arxitektor replikasi = jami 16 ta javob).
     """
     chat_key = str(chat_id)
-    if ACTIVE_CHIT_CHATS.get(chat_key, False):
+    if is_chit_chat_running(chat_key):
         logger.warning("Chat %s da allaqachon faol erkin suhbat ketmoqda, yangisi boshlanmaydi", chat_id)
         cur_bot = origin_bot or bot_white
         if cur_bot:
@@ -884,6 +905,9 @@ async def handle_free_chit_chat(
                 pass
         return
     ACTIVE_CHIT_CHATS[chat_key] = True
+    cur_task = asyncio.current_task()
+    if cur_task:
+        ACTIVE_CHIT_CHAT_TASKS[chat_key] = cur_task
 
     cur_origin = origin_bot or bot_white
     is_group = chat_id < 0
@@ -1191,6 +1215,7 @@ async def handle_free_chit_chat(
             pass
     finally:
         ACTIVE_CHIT_CHATS[chat_key] = False
+        ACTIVE_CHIT_CHAT_TASKS.pop(chat_key, None)
 
 
 # ─── 4. MULTI-AGENT DEBATE & JURY (BAHS VA HAKAMLIK) ───────────
@@ -1509,7 +1534,7 @@ async def handle_group_dual_opinion(
     chat_key = str(chat_id)
 
     # Faol suhbat, bahs yoki kollaboratsiya davom etayotgan bo'lsa xalaqit bermaymiz
-    if ACTIVE_CHIT_CHATS.get(chat_key) or ACTIVE_DEBATES.get(chat_key) or ACTIVE_COLLABS.get(chat_key):
+    if is_chit_chat_running(chat_key) or ACTIVE_DEBATES.get(chat_key) or ACTIVE_COLLABS.get(chat_key):
         return
 
     # Guruhda dual opinion rejimi o'chirilgan bo'lsa
