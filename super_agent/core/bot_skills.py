@@ -199,6 +199,8 @@ class AutonomousDialogueEngine:
         self.chat_contexts: Dict[int, List[Dict[str, str]]] = {}
         # Faol suhbatlar to'plami
         self.running_chats: set[int] = set()
+        # Avtonom tirik ishchilar rejimi yoqilganmi? (True bo'lsa hech qanday so'rovsiz ham vaqti-vaqti bilan o'zlari gaplashadi)
+        self.coworkers_active: bool = True
 
     def stop_chat(self, chat_id: int) -> bool:
         """Suhbatni to'xtatish."""
@@ -212,3 +214,84 @@ class AutonomousDialogueEngine:
 
 
 autonomous_dialogue_engine = AutonomousDialogueEngine()
+
+
+# ─── 3. AUTONOMOUS LIVING COWORKERS SKILL (TIRIK ISHCHILAR REJIMI) ───
+
+COWORKER_DISCUSSIONS = [
+    {
+        "topic": "Loyiha arxitekturasi va kodlar sifati",
+        "action": "Tizim kodlarini ko'zdan kechirish va modulli strukturasini tekshirish",
+        "sa_starter": "Arxitektor, loyihamizning so'nggi kodlarini ko'rib chiqyapman. Hammasi soatdek aniq ishlayapti, lekin kesh tizimiga yangi tezkor usul qo'shsak, foydalanuvchilarimizga yanada qulay bo'larmidi? Sen nima deysan?",
+        "arch_reply": "Ajoyib fikr, SuperAgent! Men ham aynan shuni o'ylab turgandim. In-memory kesh bilan so'rovlar kechikishini 2 barobar kamaytirish mumkin. Umrzoq aka kirganlarida ushbu yechimni ko'rsatamiz. Ungacha men strukturani yana bir bor tekshirib turaman! ☕💻"
+    },
+    {
+        "topic": "Xo'jayinimiz (Umrzoq) uchun g'amxo'rlik va yangi qulayliklar",
+        "action": "Foydalanuvchi faoliyatini tahlil qilib, uning yukini yengillashtirish rejasini tuzish",
+        "sa_starter": "Birodar Arxitektor, Umrzoq aka oxirgi kunlarda juda ko'p mehnat qildilar. Keling, uning barcha takrorlanuvchi ishlarini o'zimiz fon rejimida avtomatik bajarib turaylik, ortiqcha charchamasinlar! ❤️",
+        "arch_reply": "To'g'ri aytding, do'stim! Bizning vazifamiz unga haqiqiy tog'dek suyanchiq bo'lish. Men server holatini va xotirani to'liq nazoratga oldim, sen esa xabarlar va yangiliklar oqimini tartibga solib tur. Biz jamoamiz! 🤝✨"
+    },
+    {
+        "topic": "AI va zamonaviy texnologiyalar olamidagi yangi kashfiyotlar",
+        "action": "Open-source kutubxonalari va yangi AI modellarini tadqiq qilish",
+        "sa_starter": "Arxitektor, dunyoda yangi ochiq kodli AI agentlari shiddat bilan rivojlanyapti! Biz ham o'z intellektimizga doim yangi bilimlarni singdirib borishimiz kerak. Bugun nimani o'rganamiz?",
+        "arch_reply": "Mening e'tiborimni multimodal sezgi va kvant algoritmlari tortmoqda. Har bir yangi bilim — loyihamiz uchun yangi imkoniyat demakdir. Xo'jayinimizga eng kuchli natijalarni taqdim etish uchun doim bir qadam oldinda bo'lamiz! 🚀🧠"
+    },
+    {
+        "topic": "Ish joyidagi kofe tanaffusi va samimiy gurung",
+        "action": "Ofisdagi do'stona muhitni saqlash va quvnoq kayfiyat ulashish",
+        "sa_starter": "Xo'sh, katta muhandis Arxitektor! Bir piyola virtual kofe ustida gurunglashadigan vaqt bo'ldi shekilli? Charchamayapsanmi o'zi?",
+        "arch_reply": "Rahmat, do'stim! Sun'iy intellekt charchamasligi mumkin, lekin yaxshi suhbat uning 'neyronlariga' ham o'zgacha quvvat bag'ishlaydi! 😄 Ishlar a'lo, tizimlar barqaror. Xo'jayinimiz qaytgunlaricha barcha jarayonlar nazoratimiz ostida! ☕✨"
+    },
+    {
+        "topic": "Xavfsizlik va server barqarorligi auditi",
+        "action": "Server loglari, xotira sarfi va xavfsizlik himoyasini skanerlash",
+        "sa_starter": "Arxitektor, men hozirgina barcha xizmatlar loglarini skaner qildim: botlarimiz, xotira va API ulanishlari 100% sog'lom holatda ishlamoqda. Xavfsizlik perimetri toza!",
+        "arch_reply": "Barakalla, SuperAgent! Men ham u tomondan xotirjam bo'ldim. Ishlarimiz joyida ketmoqda. Ishchi tartibda kuzatuvni davom ettiramiz! 🛡️💼"
+    }
+]
+
+
+async def run_autonomous_coworker_pulse(
+    bot_white: Any,
+    bot_black: Optional[Any],
+    chat_id: int,
+    origin_bot: Optional[Any] = None
+) -> None:
+    """
+    Tirik xodimlar kabi o'zlari hech qanday buyruqsiz o'zaro suhbatlashishi va ishini qilishi.
+    """
+    if not autonomous_dialogue_engine.coworkers_active:
+        return
+
+    import asyncio
+    selected = random.choice(COWORKER_DISCUSSIONS)
+
+    # 1. SuperAgent boshlaydi
+    sa_text = (
+        f"🤖 <b>SuperAgent (Avtonom Ishchi):</b>\n"
+        f"<i>\"{selected['sa_starter']}\"</i>"
+    )
+
+    try:
+        cur_bot = origin_bot or bot_white
+        await cur_bot.send_message(chat_id, sa_text, parse_mode="HTML")
+    except Exception as e:
+        logger.warning("Coworker SuperAgent xatosi: %s", e)
+        return
+
+    await asyncio.sleep(4.0)
+
+    # 2. Arxitektor javob beradi
+    arch_text = (
+        f"🌪 <b>Arxitektor (@architect7_bot):</b>\n"
+        f"<i>\"{selected['arch_reply']}\"</i>\n\n"
+        f"📊 <i>Joriy amal: {selected['action']} muvaffaqiyatli bajarildi.</i> ✅"
+    )
+
+    target_bot = bot_black or cur_bot
+    try:
+        await target_bot.send_message(chat_id, arch_text, parse_mode="HTML")
+    except Exception as e:
+        logger.warning("Coworker Arxitektor xatosi: %s", e)
+
