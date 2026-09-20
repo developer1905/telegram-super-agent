@@ -678,7 +678,7 @@ async def cmd_main_avto_suhbat(message: Message, bot: Bot) -> None:
     if autonomous_dialogue_engine.is_running(message.chat.id):
         await message.answer(
             "☕ <b>Avtonom jonli suhbat hozirda ishlab turibdi!</b>\n"
-            "🤖 SuperAgent va 🌪 Arxitektor har 25-35 soniyada yangi mavzularda (oylik, koinot, hayot, IT) gurung qilmoqda.\n\n"
+            "🤖 SuperAgent va 🌪 Arxitektor har 25-35 soniyada yangi mavzularda (IT, sun'iy intellekt, fan, koinot, sport) gurung qilmoqda.\n\n"
             "🛑 <i>To'xtatish uchun:</i> <code>/stop_suhbat</code>",
             parse_mode="HTML"
         )
