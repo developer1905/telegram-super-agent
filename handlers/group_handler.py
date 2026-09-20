@@ -550,8 +550,16 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
         return
 
     # 2. /suhbat yoki /chat (Erkin muloqot / AI Lounge)
-    if clean_lower.startswith(("/suhbat", "/chat", "/gaplashing")):
-        from core.bot_collab import handle_free_chit_chat, parse_topic_and_turns
+    if clean_lower.startswith(("/suhbat", "/chat", "/gaplash", "🗣️ erkin suhbat", "erkin suhbat", "suhbat")):
+        from core.bot_collab import handle_free_chit_chat, parse_topic_and_turns, ACTIVE_CHIT_CHATS
+        if ACTIVE_CHIT_CHATS.get(str(message.chat.id), False):
+            await safe_message_reply(
+                message,
+                "☕ <b>Suhbat hozirda allaqachon davom etmoqda!</b>\n"
+                "🛑 To'xtatish uchun: <code>/stop_suhbat</code> deb yozing.",
+                parse_mode="HTML"
+            )
+            return
         topic_text, parsed_turns = parse_topic_and_turns(clean_text, default_turns=8)
         from core.mistral_agent_bot import get_second_bot
         sec_bot = get_second_bot()
