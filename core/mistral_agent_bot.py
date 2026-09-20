@@ -53,8 +53,13 @@ def get_second_bot() -> Optional[Bot]:
 def get_main_bot_instance() -> Optional[Bot]:
     """Asosiy Jarvis bot obyektini qaytaradi."""
     global _main_bot_instance
-    if _main_bot_instance is None and BOT_TOKEN:
-        _main_bot_instance = Bot(token=BOT_TOKEN)
+    if (_main_bot_instance is None or (_main_bot_instance.session and _main_bot_instance.session.closed)) and BOT_TOKEN:
+        from aiogram.client.default import DefaultBotProperties
+        from aiogram.enums import ParseMode
+        _main_bot_instance = Bot(
+            token=BOT_TOKEN,
+            default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+        )
     return _main_bot_instance
 
 
