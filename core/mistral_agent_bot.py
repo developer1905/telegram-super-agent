@@ -75,11 +75,17 @@ def get_architect_keyboard() -> ReplyKeyboardMarkup:
             KeyboardButton(text="🗣️ Erkin Suhbat"),
         ],
         [
+            KeyboardButton(text="☕ Avto-Suhbat"),
             KeyboardButton(text="⚔️ Intellektual Bahs"),
-            KeyboardButton(text="♟️ AI Shaxmat Bahsi"),
         ],
         [
+            KeyboardButton(text="♟️ AI Shaxmat Bahsi"),
             KeyboardButton(text="🤖 AI Modellar"),
+        ],
+        [
+            KeyboardButton(text="🎭 Xarakter & Uslub"),
+        ],
+        [
             KeyboardButton(text="ℹ️ Arxitektor Haqida"),
         ],
     ]
@@ -111,6 +117,7 @@ async def setup_architect_bot(bot: Bot) -> None:
             BotCommand(command="collab", description="SuperAgent bilan vazifa bajarish (CAMEL/MAPR)"),
             BotCommand(command="avtopilot", description="Tungi chuqur vazifa (bitmaguncha ishlash)"),
             BotCommand(command="suhbat", description="SuperAgent bilan erkin muloqot (AI Lounge)"),
+            BotCommand(command="avto_suhbat", description="Uzluksiz avtonom suhbat (yozmasangiz ham gaplashadi)"),
             BotCommand(command="bahs", description="SuperAgent bilan rasmiy bahs & hakam ovozi"),
             BotCommand(command="profile", description="Shaxsiy foydalanuvchi bilimlari profili (Mem0)"),
             BotCommand(command="stop_suhbat", description="Suhbat yoki bahsni to'xtatish"),
@@ -403,6 +410,65 @@ async def cmd_free_chat_trigger(message: Message, bot: Bot) -> None:
     asyncio.create_task(handle_free_chit_chat(topic_text, message.chat.id, bot_white=main_bot, bot_black=sec_bot, origin_bot=bot, turns=parsed_turns))
 
 
+@second_bot_router.message(Command("avto_suhbat", "jonli_suhbat", "avto_gaplash"))
+@second_bot_router.message(F.text.lower().startswith(("/avto_suhbat", "/jonli_suhbat", "☕ avto-suhbat", "avto suhbat")))
+async def cmd_architect_avto_suhbat(message: Message, bot: Bot) -> None:
+    """Arxitektor bot orqali uzluksiz avtonom suhbatni boshlash."""
+    from core.bot_skills import start_continuous_living_conversation, autonomous_dialogue_engine
+    import asyncio
+
+    if autonomous_dialogue_engine.is_running(message.chat.id):
+        await safe_reply(
+            message,
+            "☕ <b>Avtonom jonli suhbat hozirda ishlab turibdi!</b>\n"
+            "🤖 SuperAgent va 🌪 Arxitektor har 25-35 soniyada yangi mavzularda gurung qilmoqda.\n\n"
+            "🛑 <i>To'xtatish uchun:</i> <code>/stop_suhbat</code>",
+            parse_mode="HTML"
+        )
+        return
+
+    main_bot = get_main_bot_instance() or bot
+    task = asyncio.create_task(
+        start_continuous_living_conversation(
+            chat_id=message.chat.id,
+            bot_white=main_bot,
+            bot_black=bot,
+            origin_bot=bot
+        )
+    )
+    autonomous_dialogue_engine.active_tasks[message.chat.id] = task
+    try:
+        from core.database import db
+        await db.save_fact(f"auto_chat_{message.chat.id}", "1", category="auto_chat")
+    except Exception:
+        pass
+
+
+@second_bot_router.message(Command("stop_suhbat", "stop_chat", "toxtat_suhbat"))
+@second_bot_router.message(F.text.lower().startswith(("/stop_suhbat", "/toxtat_suhbat", "/avto_suhbat off")))
+async def cmd_architect_stop_suhbat(message: Message) -> None:
+    """Arxitektor bot orqali erkin va avtonom suhbatni to'xtatish."""
+    from core.bot_collab import stop_chit_chat
+    from core.bot_skills import autonomous_dialogue_engine
+    stopped_auto = autonomous_dialogue_engine.stop_chat(message.chat.id)
+    stopped_chit = stop_chit_chat(str(message.chat.id))
+    try:
+        from core.database import db
+        await db.save_fact(f"auto_chat_{message.chat.id}", "0", category="auto_chat")
+    except Exception:
+        pass
+
+    if stopped_auto or stopped_chit:
+        await safe_reply(
+            message,
+            "🛑 <b>Avtonom jonli suhbat to'xtatildi.</b>\n"
+            "Qayta ishga tushirish uchun: <code>/avto_suhbat</code>",
+            parse_mode="HTML"
+        )
+    else:
+        await safe_reply(message, "⚠️ Hozirda faol suhbat mavjud emas.", parse_mode="HTML")
+
+
 @second_bot_router.message(Command("bahs", "debate", "tortishuv"))
 @second_bot_router.message(F.text.lower().startswith(("/bahs", "/debate", "/tortishuv", "⚔️ intellektual bahs")))
 async def cmd_debate_trigger(message: Message, bot: Bot) -> None:
@@ -467,6 +533,38 @@ async def cb_architect_collab_vote(callback: CallbackQuery) -> None:
 
     target_name = "SuperAgent" if choice == "superagent" else ("Arxitektor" if choice == "architect" else "Durang")
     await callback.answer(f"✅ Ovozingiz qabul qilindi: {target_name} ({total} ta ovoz berildi)!", show_alert=False)
+
+
+@second_bot_router.message(Command("persona", "character", "xarakter", "uslub"))
+@second_bot_router.message(F.text == "🎭 Xarakter & Uslub")
+async def cmd_architect_persona(message: Message) -> None:
+    """Arxitektor botning gapirish uslubi va xarakterini tanlash."""
+    from core.bot_skills import build_persona_keyboard, get_agent_persona
+    cur_p = get_agent_persona("architect", message.chat.id)
+    text = (
+        f"🎭 <b>Arxitektor Agentning Gapirish Uslubi & Xarakteri</b>\n\n"
+        f"📌 <b>Hozirgi xarakter:</b> {cur_p['name']}\n"
+        f"📝 <i>{cur_p['desc']}</i>\n\n"
+        f"Quyidagi xarakterlardan birini tanlang. Arxitektor barcha suhbatlar va javoblarda ushbu uslubda gapiradi:"
+    )
+    await safe_reply(message, text, reply_markup=build_persona_keyboard("architect", message.chat.id))
+
+
+@second_bot_router.callback_query(F.data.startswith("set_persona:architect:"))
+async def cb_set_architect_persona(callback: CallbackQuery) -> None:
+    """Arxitektor xarakterini almashtirish callbacki."""
+    parts = callback.data.split(":")
+    if len(parts) == 3:
+        p_key = parts[2]
+        from core.bot_skills import set_agent_persona, build_persona_keyboard, BOT_PERSONAS
+        ok = set_agent_persona("architect", callback.message.chat.id, p_key)
+        if ok:
+            p_name = BOT_PERSONAS[p_key]["name"]
+            await callback.answer(f"✅ Arxitektor xarakteri tanlandi: {p_name}", show_alert=True)
+            try:
+                await callback.message.edit_reply_markup(reply_markup=build_persona_keyboard("architect", callback.message.chat.id))
+            except Exception:
+                pass
 
 
 @second_bot_router.message(Command("stop_suhbat", "stop_chat", "toxtat_suhbat"))
