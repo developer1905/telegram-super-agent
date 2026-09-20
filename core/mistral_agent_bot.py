@@ -401,18 +401,28 @@ async def cb_architect_select_model(callback: CallbackQuery) -> None:
 
 
 @second_bot_router.message(Command("suhbat", "chat", "gaplash"))
-@second_bot_router.message(F.text.lower().startswith(("/suhbat", "/chat", "/gaplash", "🗣️ erkin suhbat")))
+@second_bot_router.message(F.text.lower().startswith(("/suhbat", "/chat", "/gaplash", "🗣️ erkin suhbat", "erkin suhbat")))
 async def cmd_free_chat_trigger(message: Message, bot: Bot) -> None:
     """SuperAgent bilan erkin mavzuda jonli muloqot (AI Lounge)."""
     raw_text = (message.text or "").strip()
     if message.chat.id < 0:
         cmd_mention = re.match(r"^/\w+@(\w+)", raw_text)
-        bot_info = await bot.get_me()
-        target_uname = (bot_info.username or "architect7_bot").lower()
-        if not cmd_mention or cmd_mention.group(1).lower() != target_uname:
-            return
+        if cmd_mention:
+            bot_info = await bot.get_me()
+            target_uname = (bot_info.username or "architect7_bot").lower()
+            if cmd_mention.group(1).lower() != target_uname:
+                return
 
-    from core.bot_collab import handle_free_chit_chat, parse_topic_and_turns
+    from core.bot_collab import handle_free_chit_chat, parse_topic_and_turns, ACTIVE_CHIT_CHATS
+    if ACTIVE_CHIT_CHATS.get(str(message.chat.id), False):
+        await safe_reply(
+            message,
+            "☕ <b>Suhbat hozirda allaqachon davom etmoqda!</b>\n"
+            "🛑 To'xtatish uchun: <code>/stop_suhbat</code> deb yozing.",
+            parse_mode="HTML"
+        )
+        return
+
     topic_text, parsed_turns = parse_topic_and_turns(raw_text, default_turns=8)
 
     main_bot = get_main_bot_instance() or bot
@@ -420,8 +430,8 @@ async def cmd_free_chat_trigger(message: Message, bot: Bot) -> None:
     asyncio.create_task(handle_free_chit_chat(topic_text, message.chat.id, bot_white=main_bot, bot_black=sec_bot, origin_bot=bot, turns=parsed_turns))
 
 
-@second_bot_router.message(Command("avto_suhbat", "jonli_suhbat", "avto_gaplash"))
-@second_bot_router.message(F.text.lower().startswith(("/avto_suhbat", "/jonli_suhbat", "☕ avto-suhbat", "avto suhbat")))
+@second_bot_router.message(Command("avto_suhbat", "avtosuhbat", "jonli_suhbat", "avto_gaplash", "avto"))
+@second_bot_router.message(F.text.lower().startswith(("/avto_suhbat", "/avtosuhbat", "/jonli_suhbat", "☕ avto-suhbat", "avto suhbat", "avtosuhbat", "jonli suhbat")))
 async def cmd_architect_avto_suhbat(message: Message, bot: Bot) -> None:
     """Arxitektor bot orqali uzluksiz avtonom suhbatni boshlash."""
     from core.bot_skills import start_continuous_living_conversation, autonomous_dialogue_engine
@@ -454,8 +464,8 @@ async def cmd_architect_avto_suhbat(message: Message, bot: Bot) -> None:
         pass
 
 
-@second_bot_router.message(Command("stop_suhbat", "stop_chat", "toxtat_suhbat"))
-@second_bot_router.message(F.text.lower().startswith(("/stop_suhbat", "/toxtat_suhbat", "/avto_suhbat off")))
+@second_bot_router.message(Command("stop_suhbat", "stop_chat", "toxtat_suhbat", "stop_avto"))
+@second_bot_router.message(F.text.lower().startswith(("/stop_suhbat", "/stop_chat", "/toxtat_suhbat", "/avto_suhbat off", "/avtosuhbat off", "toxtat", "to'xtat suhbat")))
 async def cmd_architect_stop_suhbat(message: Message) -> None:
     """Arxitektor bot orqali erkin va avtonom suhbatni to'xtatish."""
     from core.bot_collab import stop_chit_chat
@@ -467,16 +477,15 @@ async def cmd_architect_stop_suhbat(message: Message) -> None:
         await db.save_fact(f"auto_chat_{message.chat.id}", "0", category="auto_chat")
     except Exception:
         pass
-
     if stopped_auto or stopped_chit:
         await safe_reply(
             message,
-            "🛑 <b>Avtonom jonli suhbat to'xtatildi.</b>\n"
-            "Qayta ishga tushirish uchun: <code>/avto_suhbat</code>",
+            "🛑 <b>Suhbat / Avtonom muloqot to'xtatildi.</b>\n"
+            "Qayta yoqish uchun: <code>/avtosuhbat</code> yoki <code>/suhbat</code> deb yozing.",
             parse_mode="HTML"
         )
     else:
-        await safe_reply(message, "⚠️ Hozirda faol suhbat mavjud emas.", parse_mode="HTML")
+        await safe_reply(message, "⚠️ Hozirda faol suhbat yoki avtonom muloqot mavjud emas.", parse_mode="HTML")
 
 
 @second_bot_router.message(Command("bahs", "debate", "tortishuv"))
@@ -734,8 +743,13 @@ async def handle_second_bot_text(message: Message, bot: Bot) -> None:
         asyncio.create_task(handle_agent_collaboration(task or clean_text, message.chat.id, bot_white=main_bot, bot_black=bot, origin_bot=bot))
         return
 
+    # Avto-suhbat tekshiruvi
+    if clean_text.lower().startswith(("/avto_suhbat", "/avtosuhbat", "avto_suhbat", "avtosuhbat", "☕ avto-suhbat")):
+        await cmd_architect_avto_suhbat(message, bot)
+        return
+
     # Erkin suhbat tekshiruvi
-    if clean_text.lower().startswith(("/suhbat", "/chat", "gaplashing", "birga gaplashing")):
+    if clean_text.lower().startswith(("/suhbat", "/chat", "gaplashing", "birga gaplashing", "🗣️ erkin suhbat", "erkin suhbat", "suhbat")):
         from core.bot_collab import handle_free_chit_chat, parse_topic_and_turns
         topic_text, parsed_turns = parse_topic_and_turns(clean_text, default_turns=8)
         main_bot = get_main_bot_instance() or bot
