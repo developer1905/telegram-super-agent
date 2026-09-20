@@ -595,7 +595,7 @@ async def run_autonomous_coworker_pulse(
         return
 
     # Insoniy pauza (Arxitektor o'ylaydi)
-    await asyncio.sleep(4.0)
+    await asyncio.sleep(1.0)
 
     # 2. Arxitektor javobini dinamik AI orqali generatsiya qilish
     p_arch = (
@@ -772,7 +772,7 @@ async def handle_user_joining_coworker_discussion(
             except Exception:
                 pass
 
-    await asyncio.sleep(3.0)
+    await asyncio.sleep(1.0)
 
     # 2. Arxitektor javobi
     p_arch = (
