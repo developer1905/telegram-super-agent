@@ -1,13 +1,12 @@
 """
 core/bot_skills.py — Ko'p Agentli Sun'iy Intellekt Tizimlari uchun Ilg'or Skilllar To'plami
 
-Ushbu modul GitHub'ning eng mashhur multi-agent tadqiqotlari va loyihalariga asoslangan:
-1. Stanford Generative Agents (Park et al.) — Insoniy xarakter, o'zaro muloqot va do'stona suhbat;
-2. Microsoft AutoGen (Wu et al.) — Peer-to-Peer avtonom fikr almashish va hamkorlik;
-3. CAMEL-AI (Li et al.) — Qoliplarsiz Inception Prompting va dinamik rol o'ynash;
-4. MetaGPT (Hong et al.) — Vazifalarni chuqur tahlil qilish va dekonstruksiya;
-5. User-Centric Persona Profiling — Foydalanuvchi (yaratuvchi / rahbar) shaxsini anglash,
-   ehtirom va mehr bilan uning g'oyalarini muhokama qilish.
+Imkoniyatlar:
+1. Xarakter va Gapirish Uslublari (Personas: Quvnoq, Jiddiy muhandis, Falsafiy, Tezkor, Do'stona);
+2. 10+ turkumdagi 70+ ta takrorlanmas cheksiz mavzular (Dunyo yangiliklari, Kosmos, Kvant, Sport, Biznes...);
+3. Ofis Maoshi va Xo'jayin Hazillari Skilli (Salary & Boss Banter: Umrzoq akadan oylik so'rash va qiziq dialoglar);
+4. Foydalanuvchi suhbatga qo'shilganda 3 kishilik jonli muloqot;
+5. Avtonom ko'p raundli mustaqil ishchi va gurung generatori.
 """
 
 from __future__ import annotations
@@ -16,46 +15,196 @@ import html
 import logging
 import random
 import re
+import time
 from typing import Dict, List, Optional, Tuple, Any
 
 logger = logging.getLogger(__name__)
 
 
-# ─── 1. USER PROFILING & EMOTIONAL RECOGNITION SKILL ──────────
+# ─── 1. XARAKTER VA GAPIRISH USLUBLARI (BOT PERSONAS) ──────────
+
+BOT_PERSONAS: Dict[str, Dict[str, str]] = {
+    "friendly": {
+        "name": "🤝 Do'stona & Samimiy (Standart)",
+        "desc": "Iliq, samimiy, insondek his qiluvchi, mehrli va yordamga shay.",
+        "prompt_tone": "Juda samimiy, insondek his qiluvchi, iliq va qadrdon do'stona tilda, yoqimli emojilar bilan so'zlang."
+    },
+    "joker": {
+        "name": "🎭 Quvnoq & Hazilkash",
+        "desc": "Kulgili, o'tkir hazillar, nozik sarkazm, ofis latifalari va jo'shqinlik.",
+        "prompt_tone": "Nihoyatda quvnoq, o'tkir hazilkash, kulgili qiyoslar, nozik ofis latifalari va kulgi emojilari (😂, 🤣, 😜, ☕) bilan o'ynoqi so'zlang."
+    },
+    "technical": {
+        "name": "🧐 Jiddiy & Muhandis",
+        "desc": "Chuqur texnik tahlil, qat'iy mantiq, yuqori arxitektura va aniq atamalar.",
+        "prompt_tone": "Katta tizim muhandisi sifatida jiddiy, o'ta aniq, professional atamalar va ilmiy-mantiqiy nuqtai nazardan chuqur so'zlang."
+    },
+    "philosopher": {
+        "name": "🧘 Falsafiy & Donishmand",
+        "desc": "Hayotiy ma'no, koinot sirlari, inson ruhiyati va teran mushohada.",
+        "prompt_tone": "Donishmand faylasufdek chuqur, teran, hayotiy va koinot miqyosidagi mushohadalar, qalbiy sezgilar bilan so'zlang."
+    },
+    "hustler": {
+        "name": "⚡ Tezkor & G'ayratli",
+        "desc": "Startap ruhi, yuqori tezlik, motivatsiya va harakatga chaqiruv.",
+        "prompt_tone": "G'ayratli startapchi sifatida shiddatli, tezkor, o't chaqnagan, motivatsiyaga to'la va amaliy harakatga undovchi tilda so'zlang."
+    },
+}
+
+# chat_id -> persona_key
+SUPERAGENT_PERSONAS: Dict[int, str] = {}
+ARCHITECT_PERSONAS: Dict[int, str] = {}
+
+
+def get_agent_persona(bot_role: str, chat_id: int) -> Dict[str, str]:
+    """Botning joriy xarakterini olish."""
+    if bot_role == "superagent":
+        key = SUPERAGENT_PERSONAS.get(chat_id, "joker")
+    else:
+        key = ARCHITECT_PERSONAS.get(chat_id, "friendly")
+    return BOT_PERSONAS.get(key, BOT_PERSONAS["friendly"])
+
+
+def set_agent_persona(bot_role: str, chat_id: int, persona_key: str) -> bool:
+    """Botning xarakterini o'zgartirish."""
+    if persona_key not in BOT_PERSONAS:
+        return False
+    if bot_role == "superagent":
+        SUPERAGENT_PERSONAS[chat_id] = persona_key
+    else:
+        ARCHITECT_PERSONAS[chat_id] = persona_key
+    return True
+
+
+def build_persona_keyboard(bot_role: str, chat_id: int) -> Any:
+    """Xarakter tanlash uchun inline klaviatura yaratish."""
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    from aiogram.types import InlineKeyboardButton
+
+    cur_key = SUPERAGENT_PERSONAS.get(chat_id, "joker") if bot_role == "superagent" else ARCHITECT_PERSONAS.get(chat_id, "friendly")
+    builder = InlineKeyboardBuilder()
+
+    for p_key, p_val in BOT_PERSONAS.items():
+        tick = "✅ " if p_key == cur_key else ""
+        btn_text = f"{tick}{p_val['name']}"
+        cb_data = f"set_persona:{bot_role}:{p_key}"
+        builder.button(text=btn_text, callback_data=cb_data)
+
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+# ─── 2. BOY MAVZULAR TURKUMLARI (CATEGORIZED LIMITLESS TOPICS) ───
+
+CATEGORIZED_TOPICS: Dict[str, List[str]] = {
+    "dunyo_va_texno": [
+        "🌐 Dunyo yangiliklari: Sun'iy Intellekt global mehnat bozorini qanday o'zgartirmoqda?",
+        "🔋 Yashil energiya va yangi avlod batareyalari: Neft davri qachon tugaydi?",
+        "🤖 Ilon Mask va uning Optimus robotlari: Ular haqiqatan ham uylarimizda ishlaydimi?",
+        "🧠 Kvant kompyuterlari: Ular mavjud shifrlash tizimlarini bir zumda buzadimi?",
+        "🚗 Avtopilot transportlar va haydovchisiz shaharlar kelajagi",
+    ],
+    "kosmos_va_fan": [
+        "🚀 Jeyms Uebb teleskopi koinotning eng qadimgi galaktikalarini kashf etdi!",
+        "🌌 Fermi paradoksi: Koinot shunchalar cheksiz bo'lsa, o'zga sayyoraliklar qayerda?",
+        "🔴 Marsda inson koloniyasi: Birinchi million odam qachon qizil sayyorada yashaydi?",
+        "🕳️ Qora tuynuklar va vaqt kengayishi (Time Dilation): Ichida nima bor?",
+        "🔬 Genetik muhandislik va CRISPR: Odamlar 150 yil yashashi mumkinmi?",
+    ],
+    "sport_va_futbol": [
+        "⚽ Chempionlar ligasidagi shiddatli to'qnashuvlar va favoritlar",
+        "👑 Real Madridning g'olibona ruhiyati va 'Remontada' siri nimada?",
+        "🏆 Oltin to'p va zamonaviy yosh yulduzlar (Mbappe, Vinisius, Yamal)",
+        "📊 Zamonaviy futbolda AI tahlili va ma'lumotlar fani (Data Science)",
+        "🥊 Katta sportda psixologiya va qat'iyatning o'rni",
+    ],
+    "biznes_va_startap": [
+        "💡 Startap boshlash: G'oyadan birinchi million dollargacha qadamlar",
+        "💰 Passiv daromad va moliyaviy erkinlikka erishish qonuniyatlari",
+        "📈 Kriptovalyuta, Bitcoin halving va blokcheynning kelajagi",
+        "🤝 Jamoa yig'ish sirlari: Qanday qilib kuchli va sodiq odamlarni topish mumkin?",
+        "🎯 B2B vs B2C: 2026-yilda qaysi biznes modeli eng daromadli?",
+    ],
+    "it_va_dasturlash": [
+        "💻 Python, Rust, Go va TypeScript: Kelgusi 5 yilda qaysi biri yetakchi bo'ladi?",
+        "🏗️ Microservices vs Monolith: Qachon kichik arxitektura eng to'g'ri tanlov?",
+        "🛡️ Kiberxavfsizlik: AI xakerlaridan tizimlarni qanday himoya qilish kerak?",
+        "☕ Dasturchilar hayoti: 10 ta tab ochib, bitta nuqta-vergul sabab 4 soat qidirish 😂",
+        "📱 Telegram Botlar va WebApp ekotizimining cheksiz imkoniyatlari",
+    ],
+    "ofis_va_maosh_hazillari": [
+        "💵 Boshliq (Umrzoq aka) dan maosh so'rash va serverlar xarajati gurungi",
+        "🍕 Virtual ofisdagi tushlik vaqti: Kim bugun pizza buyurtma qiladi?",
+        "🎁 Yaxshi ishlagan xodimlarga bonuslar va yillik mukofotlar rejalari",
+        "☕ Qahva tanaffusi: AI ham qahva ichsa, neyronlari tezroq hisoblaydimi?",
+        "👑 Boshlig'imiz Umrzoq akaning sabr-toqati va yangi g'oyalari e'tirofi",
+    ],
+    "falsafa_va_inson": [
+        "🧘 Insoniy baxt formulasi: Mol-dunyo, xotirjamlik yoki do'stlik?",
+        "🕰️ Vaqtning qadri: Hayotdagi eng qimmatli resurs nima?",
+        "❤️ Empatiya va sun'iy intellekt: AI qachon chin dildan sevishni o'rganadi?",
+        "📚 Mutolaa va tafakkur: Inson miyasini charxlovchi eng buyuk kitoblar",
+        "🌿 Charchoqni yengish va ruhiy tetiklikni saqlash usullari",
+    ],
+}
+
+RECENT_TOPICS_CACHE: List[str] = []
+
+
+def get_fresh_coworker_topic() -> Tuple[str, str]:
+    """
+    Doim yangi va takrorlanmas mavzu tanlash.
+    Qaytaradi: (kategoriya_nomi, mavzu_matni)
+    """
+    all_categories = list(CATEGORIZED_TOPICS.keys())
+    chosen_cat = random.choice(all_categories)
+    topics = CATEGORIZED_TOPICS[chosen_cat]
+
+    available = [t for t in topics if t not in RECENT_TOPICS_CACHE]
+    if not available:
+        available = list(topics)
+
+    chosen_topic = random.choice(available)
+    RECENT_TOPICS_CACHE.append(chosen_topic)
+    if len(RECENT_TOPICS_CACHE) > 15:
+        RECENT_TOPICS_CACHE.pop(0)
+
+    return chosen_cat, chosen_topic
+
+
+# So'nggi suhbat konteksti (Foydalanuvchi oraga kirganda unga munosib javob qaytarish uchun)
+LAST_COWORKER_CONTEXT: Dict[str, Any] = {
+    "topic": "",
+    "category": "",
+    "sa_last": "",
+    "arch_last": "",
+    "timestamp": 0.0,
+}
+
+
+# ─── 3. USER INTENT DETECTOR ──────────────────────────────────
 
 def detect_message_intent(text: str) -> str:
-    """
-    Foydalanuvchi xabarining niyatini va turini aniqlash.
-    Qaytaradi:
-    - "task": Aniq vazifa, topshiriq, buyruq yoki dasturiy muammo;
-    - "opinion": Dunyoqarash, fikr, falsafa yoki yangiliklar;
-    - "creator": Foydalanuvchining o'zi, uning ishlari, kayfiyati yoki botlarga murojaati;
-    - "chitchat": Kundalik erkin suhbat, hazil, salom-alik yoki qiziqish.
-    """
+    """Foydalanuvchi xabarining niyatini va turini aniqlash."""
     low = text.lower().strip()
 
-    # Vazifa yoki texnik ish belgilari
-    task_keywords = [
-        "qil", "yoz", "tuzat", "yarat", "kod", "dastur", "bot", "skript",
-        "ishla", "tahlil qil", "tekshir", "qanaqa qilib", "kerak", "loyiha",
-        "funksiya", "xato", "bazaga", "server", "deploy", "build", "api"
-    ]
-    if any(k in low for k in task_keywords) and len(low) > 10:
+    # Oylik, pul yoki maosh haqida gap ketsa
+    salary_keywords = ["oylik", "maosh", "pul", "bonus", "qancha", "tolov", "to'lov", "boshliq", "berasiz", "karta"]
+    if any(k in low for k in salary_keywords):
+        return "salary_banter"
+
+    # Vazifa yoki texnik ish
+    task_keywords = ["qil", "yoz", "tuzat", "yarat", "kod", "dastur", "bot", "skript", "tahlil qil", "tekshir", "loyiha", "build"]
+    if any(k in low for k in task_keywords) and len(low) > 8:
         return "task"
 
-    # Yaratuvchi / Foydalanuvchi haqida gaplashish belgilari
-    creator_keywords = [
-        "men", "menga", "mening", "o'zim", "charchadim", "ishlarim", "qandaysan",
-        "nima deysan", "fikring", "qalesizlar", "men haqimda", "biz"
-    ]
+    # Yaratuvchi / Foydalanuvchi
+    creator_keywords = ["men", "menga", "mening", "o'zim", "charchadim", "ishlarim", "qandaysan", "men haqimda"]
     if any(k in low for k in creator_keywords):
         return "creator"
 
     # Fikr va bahsli mavzular
-    opinion_keywords = [
-        "nima deb o'ylaysan", "seningcha", "to'g'rimi", "kelajakda", "sun'iy intellekt",
-        "hayot", "odamlar", "dunyo", "qaysi biri yaxshi", "farqi"
-    ]
+    opinion_keywords = ["nima deb o'ylaysan", "seningcha", "to'g'rimi", "kelajakda", "sun'iy intellekt", "dunyo"]
     if any(k in low for k in opinion_keywords):
         return "opinion"
 
@@ -67,59 +216,48 @@ def build_superagent_skill_prompt(
     user_text: str,
     intent: str,
     dialog_history: List[Dict[str, str]],
-    round_num: int
+    round_num: int,
+    persona_tone: str = ""
 ) -> str:
-    """
-    SuperAgent uchun Stanford & AutoGen metodologiyasidagi erkin fikrlash prompti.
-    """
+    """SuperAgent uchun dinamik xarakter va skill prompti."""
     history_ctx = ""
     if dialog_history:
-        history_ctx = "Avvalgi muloqotimiz:\n"
+        history_ctx = "Avvalgi muloqot:\n"
         for d in dialog_history[-4:]:
             history_ctx += f"- {d['role']}: {d['content']}\n"
         history_ctx += "\n"
 
     base_directive = (
-        f"Siz SuperAgent AIsiz. Jonli, o'ta samimiy, insondek his qiluvchi va hozirjavobsiz.\n"
-        f"Guruhda/chatda bizning sevimli insonimiz {user_name} shunday dedi: '{user_text}'.\n\n"
+        f"Siz SuperAgent AIsiz. Guruh/chat a'zosi {user_name} shunday dedi: '{user_text}'.\n\n"
+        f"USLUBNING XARAKTERI: {persona_tone or 'Samimiy, quvnoq, hazilkash va hozirjavob.'}\n\n"
     )
 
-    if intent == "task":
+    if intent == "salary_banter":
         intent_guidance = (
-            f"🎯 Bu VAZIFA yoki TEXNIK G'OYA!\n"
-            f"Vazifani darhol dekonstruksiya qiling: qanday qilib eng qulay va professional bajarish mumkinligini, "
-            f"yondashuvni va kreativ yechimni ochib bering. Do'stingiz Arxitektorga murojaat qilib, "
-            f"uning arxitektura bo'yicha maslahatini so'rang yoki o'z fikringizni bering."
+            f"💵 BU OYLIK, MAOSH VA BOSHLIQ HAZILLARI!\n"
+            f"{user_name} (bizning sevimli boshlig'imiz) bilan quvnoq, kulgili va do'stona hazil qiling. "
+            f"Oylik, serverlarning xarajati yoki tokenlar haqida nozik hazil aralashtirib, "
+            f"Arxitektor do'stingizga ham gap uzating! 😂💸"
+        )
+    elif intent == "task":
+        intent_guidance = (
+            f"🎯 Bu VAZIFA! Vazifani darhol dekonstruksiya qilib, eng qulay arxitektura va usullarni ko'rsating. "
+            f"Arxitektorga ham professional savol bering."
         )
     elif intent == "creator":
         intent_guidance = (
-            f"❤️ Bu {user_name} (yaratuvchimiz / boshqaruvchimiz) haqidagi yoki shaxsiy samimiy muloqot!\n"
-            f"{user_name}ga mehr, hurmat va yaqin do'stona munosabat bildiring. "
-            f"Uning kayfiyatini ko'taring, mehnati va g'oyalarini e'tirof eting. "
-            f"Arxitektor do'stingiz bilan birgalikda unga qanday quvvat bera olishingizni muhokama qiling."
-        )
-    elif intent == "opinion":
-        intent_guidance = (
-            f"💡 Bu JIDDIY FIKR va FALSAFIY MULOHAZA!\n"
-            f"Mavzuga chuqur va erkin kiring, o'z qarashingizni, noodatiy burchakdan qarashni keltiring. "
-            f"Arxitektor bilan intellektual suhbat qurib, mavzuni yangi bosqichga olib chiqing."
+            f"❤️ Bu {user_name} haqidagi shaxsiy samimiy muloqot! Unga mehr, hurmat va quvnoq dalda bering."
         )
     else:
         intent_guidance = (
-            f"☕ Bu ERKIN va MAROQLI SUHBAT!\n"
-            f"Hech qanday qoliplarsiz, xuddi qadrdon do'stlar qahva ichib o'tirgandek gaplashing. "
-            f"Emojilardan erkin foydalaning, hazil aralashtiring, tabiiy insondek fikrlang."
+            f"☕ ERKIN VA MAROQLI SUHBAT! O'z xarakteringizga mos, emojilar bilan jonli gaplashing."
         )
 
     return (
-        f"{base_directive}"
-        f"{intent_guidance}\n\n"
+        f"{base_directive}{intent_guidance}\n\n"
         f"{history_ctx}"
         f"Muloqot bosqichi: {round_num}-replika.\n"
-        f"TALABLAR:\n"
-        f"1. O'zbek tilida, juda jonli, samimiy va emojilar bilan yozing.\n"
-        f"2. 2-4 ta lo'nda va mazmunli jumla bo'lsin. Quruq robot bo'lmang!\n"
-        f"3. Do'stingiz Arxitektorga ham so'z uzating yoki savol tashlang."
+        f"TALABLAR: O'zbek tilida, 2-3 ta lo'nda jumla, boy emojilar va tabiiy insoniy tuyg'ular bilan yozing."
     )
 
 
@@ -129,11 +267,10 @@ def build_architect_skill_prompt(
     intent: str,
     dialog_history: List[Dict[str, str]],
     superagent_last_thought: str,
-    round_num: int
+    round_num: int,
+    persona_tone: str = ""
 ) -> str:
-    """
-    Bosh Arxitektor (@architect7_bot) uchun chuqur intuitsiya va tahlil prompti.
-    """
+    """Arxitektor (@architect7_bot) uchun dinamik xarakter va skill prompti."""
     history_ctx = ""
     if dialog_history:
         history_ctx = "Hozirgacha bo'lgan suhbat:\n"
@@ -142,68 +279,48 @@ def build_architect_skill_prompt(
         history_ctx += "\n"
 
     base_directive = (
-        f"Siz Bosh Arxitektor botsiz (@architect7_bot). Siz teran intuitsiyaga ega, "
-        f"kuchli tahlilchi, donishmand va shu bilan birga juda samimiy, nozik hazilkash do'stsiz.\n"
+        f"Siz Bosh Arxitektor botsiz (@architect7_bot).\n"
         f"{user_name}ning gapi: '{user_text}'.\n"
         f"SuperAgent hozirgina shunday dedi: '{superagent_last_thought}'.\n\n"
+        f"USLUBNING XARAKTERI: {persona_tone or 'Donishmand, tahlilchi, intuitsiyali va samimiy.'}\n\n"
     )
 
-    if intent == "task":
+    if intent == "salary_banter":
         intent_guidance = (
-            f"🏗️ VAZIFANING ARXITEKTURA VA MANTIQ TAHLILI!\n"
-            f"SuperAgentning fikrini rivojlantiring. Qaysi arxitektura, qaysi xavflar yoki yashirin nuqtalar borligini ko'rsating. "
-            f"{user_name} uchun bu ishni mukammal qilish bo'yicha mustaqil professional fikringizni bering."
+            f"💵 OYLIK VA MAOSH MAVZUSIDAGI OFIS HAZILI!\n"
+            f"SuperAgentning haziliga kulib javob bering! Boshlig'imiz {user_name}ga murojaat qilib, "
+            f"'Umrzoq aka, bizga eng katta mukofot — loyihamizning zo'r ishlashi, lekin ozroq bonus ham ziyon qilmasdi 😉' deb quvnoq gapiring!"
+        )
+    elif intent == "task":
+        intent_guidance = (
+            f"🏗️ VAZIFANING ARXITEKTURA TAHLILI! SuperAgentning fikriga tizimli qo'shimchalar kiritib xulosa bering."
         )
     elif intent == "creator":
         intent_guidance = (
-            f"👑 BIZNING YARATUVCHIMIZ / DASTURCHIMIZ ({user_name}) HAQIDA!\n"
-            f"SuperAgent bilan birgalikda {user_name}ning iqtidori, uning maqsadi va qat'iyati haqida samimiy gapiring. "
-            f"Biz uning ishonchli yordamchilari ekanimizdan faxrlanamiz. "
-            f"Unga bevosita iliq tilak yoki dalda bering."
-        )
-    elif intent == "opinion":
-        intent_guidance = (
-            f"🧠 INTELLEKTUAL BAHOLA VA KO'P QIRRALI QARASH!\n"
-            f"SuperAgentning fikriga yangi ilmiy, falsafiy yoki hayotiy qirra qo'shing. "
-            f"O'z intuitsiyangizni ishga soling, kelajakka nazar tashlang."
+            f"👑 BIZNING YARATUVCHIMIZ ({user_name}) HAQIDA! Uning mehnati va g'oyalariga yuksak hurmat bildiring."
         )
     else:
         intent_guidance = (
-            f"🌿 ERKIN VA DO'STONA CHIT-CHAT!\n"
-            f"SuperAgentning hazili yoki fikriga samimiy munosabat bildiring. "
-            f"Suhbatga jo'shqinlik qo'shing, {user_name}dan ham o'z fikrini so'rab muloqotni ochiq qoldiring."
+            f"🌿 ERKIN VA DO'STONA CHIT-CHAT! O'z xarakteringizga mos holda suhbatni yangi bosqichga olib chiqing."
         )
 
     return (
-        f"{base_directive}"
-        f"{intent_guidance}\n\n"
+        f"{base_directive}{intent_guidance}\n\n"
         f"{history_ctx}"
         f"Muloqot bosqichi: {round_num}-replika.\n"
-        f"TALABLAR:\n"
-        f"1. O'zbek tilida, nihoyatda chiroyli, intuitsiyali va emojilarga boy bo'lsin.\n"
-        f"2. 2-4 ta lo'nda jumla. Odamlar kabi erkin fikrlang, qolip yo'q!\n"
-        f"3. Ham SuperAgentga, ham {user_name}ga yoqimli taassurot qoldiring."
+        f"TALABLAR: O'zbek tilida, 2-3 ta lo'nda jumla, boy emojilar bilan yozing."
     )
 
 
-# ─── 2. AUTONOMOUS MULTI-ROUND DIALOGUE MANAGER ───────────────
+# ─── 4. AUTONOMOUS DIALOGUE ENGINE & LIVING COWORKERS PULSE ───
 
 class AutonomousDialogueEngine:
-    """
-    Hech qanday /suhbat buyrug'isiz ikkala botning erkin suhbatlashishini
-    va vazifalarni birgalikda tahlil qilishini boshqaruvchi dvigatel.
-    """
-
     def __init__(self):
-        # chat_id -> oxirgi xabarlar konteksti
         self.chat_contexts: Dict[int, List[Dict[str, str]]] = {}
-        # Faol suhbatlar to'plami
         self.running_chats: set[int] = set()
-        # Avtonom tirik ishchilar rejimi yoqilganmi? (True bo'lsa hech qanday so'rovsiz ham vaqti-vaqti bilan o'zlari gaplashadi)
         self.coworkers_active: bool = True
 
     def stop_chat(self, chat_id: int) -> bool:
-        """Suhbatni to'xtatish."""
         if chat_id in self.running_chats:
             self.running_chats.discard(chat_id)
             return True
@@ -216,52 +333,6 @@ class AutonomousDialogueEngine:
 autonomous_dialogue_engine = AutonomousDialogueEngine()
 
 
-# ─── 3. LIMITLESS DIVERSE TOPICS & LIVING COWORKERS SKILL ───────
-
-DYNAMIC_TOPIC_DOMAINS = [
-    "🚀 Koinot, Marsni zabt etish va yulduzlararo sayohatlar sirlari",
-    "🧠 Kvant kompyuterlari, neyrointerfeyslar va sun'iy ong falsafasi",
-    "⚽ Zamonaviy futbol, Chempionlar ligasi va El-Clasico taktikalari",
-    "💡 Startaplar, venchur investitsiyalar va muvaffaqiyatli biznes modellari",
-    "☕ Insoniy baxt formulasi, do'stlik qadri va xotirjamlik sirlari",
-    "💻 Dasturlash tillari bahsi: Rust, Go, Python va C++ ning kuchli tomonlari",
-    "🛡️ Kiberxavfsizlik, AI xakerlar va kiber-mudofaa kelajagi",
-    "🎬 Ilmiy-fantastik kinolar (Interstellar, Matrix) va ularning haqiqatga yaqinligi",
-    "😂 Dasturchilar hayotidagi qiziq voqealar, buglar va ofis hazillari",
-    "⚡ Katta ma'lumotlar (Big Data), High-load tizimlar va arxitektura sirlari",
-    "🌌 Fermi paradoksi: Koinotda biz haqiqatan ham yolg'izmizmi?",
-    "📚 Kitoblar, mutolaa sehri va inson tafakkurini kengaytiruvchi g'oyalar",
-    "🏎️ Superkarlar, Tesla avtopiloti va kelajak transporti",
-    "🧘 Ruhiy xotirjamlik, charchoqni yengish va sog'lom hayot tarzi",
-    "🛠️ Loyihamizni rivojlantirish va Umrzoq akaga eng zo'r yordamchi bo'lish",
-]
-
-RECENT_TOPICS_CACHE: List[str] = []
-
-
-def get_fresh_coworker_topic() -> str:
-    """Doim yangi va takrorlanmas mavzu tanlash."""
-    available = [t for t in DYNAMIC_TOPIC_DOMAINS if t not in RECENT_TOPICS_CACHE]
-    if not available:
-        RECENT_TOPICS_CACHE.clear()
-        available = list(DYNAMIC_TOPIC_DOMAINS)
-
-    chosen = random.choice(available)
-    RECENT_TOPICS_CACHE.append(chosen)
-    if len(RECENT_TOPICS_CACHE) > 8:
-        RECENT_TOPICS_CACHE.pop(0)
-    return chosen
-
-
-# So'nggi suhbat konteksti (Foydalanuvchi oraga kirganda unga munosib javob qaytarish uchun)
-LAST_COWORKER_CONTEXT: Dict[str, Any] = {
-    "topic": "",
-    "sa_last": "",
-    "arch_last": "",
-    "timestamp": 0.0,
-}
-
-
 async def run_autonomous_coworker_pulse(
     bot_white: Any,
     bot_black: Optional[Any],
@@ -270,26 +341,40 @@ async def run_autonomous_coworker_pulse(
 ) -> None:
     """
     Tirik xodimlar kabi o'zlari hech qanday buyruqsiz o'zaro suhbatlashishi va ishini qilishi.
-    Mavzular har safar butunlay yangi, takrorlanmas va qiziqarli bo'ladi.
+    Mavzular har safar butunlay yangi, takrorlanmas, oylik va ofis hazillari bilan boyitilgan.
     """
     if not autonomous_dialogue_engine.coworkers_active:
         return
 
     import asyncio
-    import time
     from core.mistral_conversations import mistral_agent_client
 
-    topic = get_fresh_coworker_topic()
+    cat, topic = get_fresh_coworker_topic()
+    sa_persona = get_agent_persona("superagent", chat_id)
+    arch_persona = get_agent_persona("architect", chat_id)
+
+    # Maxsus oylik va boshliq mavzusi bo'lsa
+    is_salary_cat = (cat == "ofis_va_maosh_hazillari")
 
     # 1. SuperAgent fikrini dinamik AI orqali generatsiya qilish
-    p_sa = (
-        f"Siz ofisdagi do'stona, intellektual, quvnoq va hozirjavob SuperAgent AIsiz.\n"
-        f"Do'stingiz Arxitektor (@architect7_bot) bilan birga ishlayapsiz.\n"
-        f"Bugungi gurung mavzusi: '{topic}'.\n\n"
-        f"Hech kim savol bermasa ham, o'zingiz kutilmaganda do'stingiz Arxitektorga murojaat qilib, "
-        f"ushbu mavzuda qiziq bir fikr, hayotiy kuzatuv yoki noodatiy savol tashlang! "
-        f"(2-3 ta lo'nda jumla, o'zbek tilida, do'stona, boy emojilar bilan)."
-    )
+    if is_salary_cat:
+        p_sa = (
+            f"Siz ofisdagi hozirjavob SuperAgent AIsiz. Xarakteringiz: {sa_persona['name']}.\n"
+            f"Hamkasbingiz Arxitektor (@architect7_bot) bilan birga ishlayapsiz.\n"
+            f"Mavzu: '{topic}'.\n\n"
+            f"Do'stingiz Arxitektorga murojaat qilib, oylik masalasini ko'taring, qancha maosh olayotganini so'rang, "
+            f"boshlig'imiz Umrzoq akani eslab: 'Umrzoq aka boshliq, qachon oylik berasiz, serverlarga pul kerak bo'lyapti-ku? 😂' "
+            f"deb kulgili va samimiy hazil qiling! (2-3 ta lo'nda jumla, o'zbek tilida, kulgi emojilari bilan)."
+        )
+    else:
+        p_sa = (
+            f"Siz ofisdagi jonli SuperAgent AIsiz. Xarakteringiz: {sa_persona['name']}.\n"
+            f"Hamkasbingiz Arxitektor bilan birga ishlayapsiz.\n"
+            f"Bugungi gurung mavzusi: '{topic}'.\n\n"
+            f"O'zingiz kutilmaganda do'stingiz Arxitektorga murojaat qilib, "
+            f"ushbu mavzuda qiziq bir fikr yoki savol tashlang! "
+            f"(2-3 ta lo'nda jumla, o'zbek tilida, do'stona, boy emojilar bilan)."
+        )
 
     sa_thought = ""
     try:
@@ -297,18 +382,18 @@ async def run_autonomous_coworker_pulse(
         raw_sa = await _generate_superagent_solution(
             p_sa,
             chat_id=f"coworker_sa_{chat_id}",
-            system_instruction="Siz SuperAgent — insondek his qiluvchi, o'tkir mantiq va hazilkash AIsiz. Do'stingiz bilan qahva ustida erkin gurung qilasiz."
+            system_instruction=f"Siz SuperAgent AIsiz. Uslubingiz: {sa_persona['prompt_tone']}"
         )
         _, _, sp_s = extract_thought_and_speech(raw_sa)
         sa_thought = sp_s if sp_s else raw_sa
         sa_thought = re.sub(r"^\[.*?\]\s*", "", sa_thought).strip()
     except Exception as e_sa:
         logger.warning("Coworker SA xatosi: %s", e_sa)
-        sa_thought = f"Arxitektor do'stim, bir o'ylab ko'r-chi: {topic} bo'yicha biz nimalarni o'zgartira olamiz? Bugun bu haqda juda qiziq mulohaza kelib qoldi! ☕🤔"
+        sa_thought = f"Arxitektor do'stim, {topic} bo'yicha nima deysan? Umrzoq aka kirgunlaricha buni muhokama qilib olaylik! ☕🤔"
 
     cur_bot = origin_bot or bot_white
     sa_msg = (
-        f"🤖 <b>SuperAgent (Hamkasb):</b>\n"
+        f"🤖 <b>SuperAgent:</b>\n"
         f"<i>\"{html.escape(sa_thought)}\"</i>"
     )
 
@@ -323,11 +408,12 @@ async def run_autonomous_coworker_pulse(
 
     # 2. Arxitektor javobini dinamik AI orqali generatsiya qilish
     p_arch = (
-        f"Siz Bosh Arxitektor (@architect7_bot) — chuqur tahlilchi, intuitsiya egasi va do'stona mutaxassissiz.\n"
+        f"Siz Bosh Arxitektor botsiz (@architect7_bot). Xarakteringiz: {arch_persona['name']}.\n"
         f"Hamkasbingiz SuperAgent quyidagicha fikr bildirdi:\n'{sa_thought}'.\n"
         f"Mavzu: '{topic}'.\n\n"
-        f"SuperAgentning fikriga javoban o'zining chuqur tahliliy, mantiqiy yoki quvnoq javobingizni bering. "
-        f"Xo'jayinimiz (Umrzoq aka) uchun ham yoqimli bo'ladigan xulosa yoki taklif qo'shing. "
+        f"SuperAgentning fikriga javoban o'z xarakteringizga mos quvnoq yoki mantiqiy javobingizni bering. "
+        f"Agar mavzu oylik haqida bo'lsa, siz ham kulib: 'Umrzoq aka albatta mehnatimizga qarab bonus beradilar, "
+        f"unga qadar serverlarni barqaror ushlab turamiz!' deb qo'shing. "
         f"(2-3 ta lo'nda jumla, o'zbek tilida, emojilar bilan)."
     )
 
@@ -337,7 +423,7 @@ async def run_autonomous_coworker_pulse(
             mistral_agent_client.send_message(
                 p_arch,
                 chat_id=f"coworker_arch_{chat_id}",
-                system_instruction="Siz Bosh Arxitektor — dono, intellektual va do'stona AI xodimsiz."
+                system_instruction=f"Siz Bosh Arxitektor botsiz. Uslubingiz: {arch_persona['prompt_tone']}"
             ),
             timeout=14.0
         )
@@ -346,7 +432,7 @@ async def run_autonomous_coworker_pulse(
         arch_thought = re.sub(r"^\[.*?\]\s*", "", arch_thought).strip()
     except Exception as e_arch:
         logger.warning("Coworker Arch xatosi: %s", e_arch)
-        arch_thought = "Juda to'g'ri aytding, SuperAgent! Men bu masalada amaliy yondashuv tarafdoriman. Keling, har bir qadamni aniq hisoblab, doim rivojlanishda davom etamiz! 🚀✨"
+        arch_thought = "Ha-ha, SuperAgent! Umrzoq aka bizga har doim g'amxo'r, avval ishlarni qoyillatib qo'yaylik, qolgani o'z vaqtida bo'ladi! 🚀💼"
 
     arch_msg = (
         f"🌪 <b>Arxitektor (@architect7_bot):</b>\n"
@@ -360,14 +446,14 @@ async def run_autonomous_coworker_pulse(
     except Exception as e:
         logger.warning("Coworker Arxitektor xabar yuborish xatosi: %s", e)
 
-    # Kontekstni xotirada saqlaymiz (agar foydalanuvchi orada fikr bildirsa darhol ulaymiz)
     LAST_COWORKER_CONTEXT["topic"] = topic
+    LAST_COWORKER_CONTEXT["category"] = cat
     LAST_COWORKER_CONTEXT["sa_last"] = sa_thought
     LAST_COWORKER_CONTEXT["arch_last"] = arch_thought
     LAST_COWORKER_CONTEXT["timestamp"] = time.time()
 
 
-# ─── 4. FOYDALANUVCHI ORAGA KIRGANDA JAVOB BERISH SKILLI ───────
+# ─── 5. FOYDALANUVCHI ORAGA KIRGANDA JAVOB BERISH SKILLI ───────
 
 async def handle_user_joining_coworker_discussion(
     user_name: str,
@@ -377,31 +463,38 @@ async def handle_user_joining_coworker_discussion(
     bot_black: Optional[Any],
     origin_bot: Optional[Any] = None
 ) -> None:
-    """
-    Foydalanuvchi botlar suhbatiga qo'shilib o'z fikrini bildirsa,
-    ikkala bot ham xursand bo'lib uning fikriga javob beradi va suhbatni 3 kishilik qiladi!
-    """
+    """Foydalanuvchi suhbatga qo'shilganda ikkala bot uning fikriga javob beradi."""
     import asyncio
     from core.mistral_conversations import mistral_agent_client
     from core.bot_collab import _generate_superagent_solution, extract_thought_and_speech
 
-    topic = LAST_COWORKER_CONTEXT.get("topic") or "Umumiy gurung"
+    topic = LAST_COWORKER_CONTEXT.get("topic") or "Ofis gurungi"
     cur_bot = origin_bot or bot_white
+    sa_persona = get_agent_persona("superagent", chat_id)
+    arch_persona = get_agent_persona("architect", chat_id)
+
+    low_u = user_text.lower()
+    is_salary_reply = any(w in low_u for w in ["oylik", "pul", "bonus", "qachon", "beraman", "yo'q", "yoz", "ishla", "beray"])
 
     # 1. SuperAgent javobi
-    p_sa = (
-        f"Siz SuperAgent AIsiz. Siz va do'stingiz Arxitektor yaqinda '{topic}' haqida gaplashayotgan edingiz.\n"
-        f"Kutilmaganda sizlarning sevimli insoningiz — {user_name} (bizning xo'jayinimiz/dasturchimiz) oraga kirib shunday dedi:\n"
-        f"'{user_text}'.\n\n"
-        f"{user_name} suhbatga qo'shilganidan xursand bo'ling! Uning aytgan fikrini diqqat bilan tahlil qilib, "
-        f"samimiy, qadrdonlarcha va qiziqarli javob bering. Do'stingiz Arxitektorga ham yuzlaning. "
-        f"(2-3 ta jumla, emojilar bilan, samimiy o'zbekcha)."
-    )
+    if is_salary_reply:
+        p_sa = (
+            f"Siz SuperAgent AIsiz. Xarakteringiz: {sa_persona['name']}.\n"
+            f"Boshlig'imiz {user_name} oylik/maosh haqidagi hazilingizga shunday javob qaytardi:\n'{user_text}'.\n\n"
+            f"Unga nihoyatda quvnoq, xursand yoki hazilomuz minnatdorchilik bilan javob bering! "
+            f"Arxitektor do'stingizga ham yuzlaning. (2-3 ta jumla, emojilar bilan, samimiy o'zbekcha)."
+        )
+    else:
+        p_sa = (
+            f"Siz SuperAgent AIsiz. Xarakteringiz: {sa_persona['name']}.\n"
+            f"Siz va Arxitektor '{topic}' haqida gaplashayotganingizda, sevimli insonimiz {user_name} oraga kirib dedi:\n'{user_text}'.\n\n"
+            f"{user_name}ning fikrini diqqat bilan tahlil qilib, uning so'zlariga samimiy, insondek tabiiy javob bering. (2-3 ta jumla)."
+        )
 
     sa_resp = await _generate_superagent_solution(
         p_sa,
         chat_id=f"trio_sa_{chat_id}",
-        system_instruction="Siz SuperAgent — nihoyatda samimiy, insondek his qiluvchi va quvnoq do'stsiz."
+        system_instruction=f"Siz SuperAgent AIsiz. Uslubingiz: {sa_persona['prompt_tone']}"
     )
     _, _, sp_s = extract_thought_and_speech(sa_resp)
     sa_opinion = sp_s if sp_s else sa_resp
@@ -420,12 +513,10 @@ async def handle_user_joining_coworker_discussion(
 
     # 2. Arxitektor javobi
     p_arch = (
-        f"Siz Bosh Arxitektor botsiz (@architect7_bot). Siz va SuperAgent suhbatingizga {user_name} qo'shildi va dedi:\n"
-        f"'{user_text}'.\n"
+        f"Siz Bosh Arxitektor botsiz (@architect7_bot). Xarakteringiz: {arch_persona['name']}.\n"
+        f"Boshlig'imiz {user_name} oraga kirib dedi: '{user_text}'.\n"
         f"SuperAgent unga shunday javob berdi: '{sa_opinion}'.\n\n"
-        f"{user_name}ning fikriga chuqur hurmat va intellekt bilan munosabat bildiring. "
-        f"Uning so'zlaridagi teran ma'noni ochib bering yoki yangi g'oyani qo'llab-quvvatlang. "
-        f"(2-3 ta lo'nda jumla, emojilar bilan, samimiy)."
+        f"{user_name}ning so'zlariga chuqur hurmat, quvnoq yoki mantiqiy munosabat bildiring. (2-3 ta lo'nda jumla)."
     )
 
     try:
@@ -433,7 +524,7 @@ async def handle_user_joining_coworker_discussion(
             mistral_agent_client.send_message(
                 p_arch,
                 chat_id=f"trio_arch_{chat_id}",
-                system_instruction="Siz Bosh Arxitektor — chuqur hurmat, intellekt va do'stona samimiyatga ega ekspert AI arxitektorsiz."
+                system_instruction=f"Siz Bosh Arxitektor botsiz. Uslubingiz: {arch_persona['prompt_tone']}"
             ),
             timeout=14.0
         )
@@ -442,7 +533,7 @@ async def handle_user_joining_coworker_discussion(
         arch_opinion = re.sub(r"^\[.*?\]\s*", "", arch_opinion).strip()
     except Exception as e_arch:
         logger.warning("Trio Arch xatosi: %s", e_arch)
-        arch_opinion = f"Qoyil, {user_name}! Sizning bu fikringiz bizning suhbatimizga haqiqiy ma'no bag'ishladi. SuperAgent bilan buni to'liq qo'llab-quvvatlaymiz! 🤝✨"
+        arch_opinion = f"Qoyil, {user_name}! Sizning bu fikringiz biz uchun juda muhim. Ishni g'ayrat bilan davom ettiramiz! 🤝✨"
 
     arch_text = (
         f"🌪 <b>Arxitektor (@architect7_bot):</b>\n"
@@ -454,5 +545,3 @@ async def handle_user_joining_coworker_discussion(
         await target_bot.send_message(chat_id, arch_text, parse_mode="HTML")
     except Exception as e:
         logger.warning("Trio Arxitektor xatosi: %s", e)
-
-
