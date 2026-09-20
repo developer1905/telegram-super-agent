@@ -37,10 +37,24 @@ _second_bot_instance: Optional[Bot] = None
 _main_bot_instance: Optional[Bot] = None
 
 
+def _is_bot_active(b: Optional[Bot]) -> bool:
+    if b is None:
+        return False
+    try:
+        sess = getattr(b, "session", None)
+        if sess is not None:
+            raw_sess = getattr(sess, "_session", None)
+            if raw_sess is not None and getattr(raw_sess, "closed", False):
+                return False
+        return True
+    except Exception:
+        return True
+
+
 def get_second_bot() -> Optional[Bot]:
     """2-Bot obyektini qaytaradi (agar SECOND_BOT_TOKEN mavjud bo'lsa)."""
     global _second_bot_instance
-    if (_second_bot_instance is None or (_second_bot_instance.session and _second_bot_instance.session.closed)) and SECOND_BOT_TOKEN:
+    if not _is_bot_active(_second_bot_instance) and SECOND_BOT_TOKEN:
         from aiogram.client.default import DefaultBotProperties
         from aiogram.enums import ParseMode
         _second_bot_instance = Bot(
@@ -53,7 +67,7 @@ def get_second_bot() -> Optional[Bot]:
 def get_main_bot_instance() -> Optional[Bot]:
     """Asosiy Jarvis bot obyektini qaytaradi."""
     global _main_bot_instance
-    if (_main_bot_instance is None or (_main_bot_instance.session and _main_bot_instance.session.closed)) and BOT_TOKEN:
+    if not _is_bot_active(_main_bot_instance) and BOT_TOKEN:
         from aiogram.client.default import DefaultBotProperties
         from aiogram.enums import ParseMode
         _main_bot_instance = Bot(
@@ -407,14 +421,13 @@ async def cmd_free_chat_trigger(message: Message, bot: Bot) -> None:
     raw_text = (message.text or "").strip()
     if message.chat.id < 0:
         cmd_mention = re.match(r"^/\w+@(\w+)", raw_text)
-        if cmd_mention:
-            bot_info = await bot.get_me()
-            target_uname = (bot_info.username or "architect7_bot").lower()
-            if cmd_mention.group(1).lower() != target_uname:
-                return
+        bot_info = await bot.get_me()
+        target_uname = (bot_info.username or "architect7_bot").lower()
+        if not cmd_mention or cmd_mention.group(1).lower() != target_uname:
+            return
 
-    from core.bot_collab import handle_free_chit_chat, parse_topic_and_turns, ACTIVE_CHIT_CHATS
-    if ACTIVE_CHIT_CHATS.get(str(message.chat.id), False):
+    from core.bot_collab import handle_free_chit_chat, parse_topic_and_turns, is_chit_chat_running, ACTIVE_CHIT_CHAT_TASKS
+    if is_chit_chat_running(str(message.chat.id)):
         await safe_reply(
             message,
             "☕ <b>Suhbat hozirda allaqachon davom etmoqda!</b>\n"
@@ -427,25 +440,28 @@ async def cmd_free_chat_trigger(message: Message, bot: Bot) -> None:
 
     main_bot = get_main_bot_instance() or bot
     sec_bot = bot
-    asyncio.create_task(handle_free_chit_chat(topic_text, message.chat.id, bot_white=main_bot, bot_black=sec_bot, origin_bot=bot, turns=parsed_turns))
+    task = asyncio.create_task(handle_free_chit_chat(topic_text, message.chat.id, bot_white=main_bot, bot_black=sec_bot, origin_bot=bot, turns=parsed_turns))
+    ACTIVE_CHIT_CHAT_TASKS[str(message.chat.id)] = task
 
 
 @second_bot_router.message(Command("avto_suhbat", "avtosuhbat", "jonli_suhbat", "avto_gaplash", "avto"))
 @second_bot_router.message(F.text.lower().startswith(("/avto_suhbat", "/avtosuhbat", "/jonli_suhbat", "☕ avto-suhbat", "avto suhbat", "avtosuhbat", "jonli suhbat")))
 async def cmd_architect_avto_suhbat(message: Message, bot: Bot) -> None:
     """Arxitektor bot orqali uzluksiz avtonom suhbatni boshlash."""
+    raw_text = (message.text or "").strip()
+    if message.chat.id < 0:
+        cmd_mention = re.match(r"^/\w+@(\w+)", raw_text)
+        bot_info = await bot.get_me()
+        target_uname = (bot_info.username or "architect7_bot").lower()
+        if not cmd_mention or cmd_mention.group(1).lower() != target_uname:
+            return
+
     from core.bot_skills import start_continuous_living_conversation, autonomous_dialogue_engine
     import asyncio
 
     if autonomous_dialogue_engine.is_running(message.chat.id):
-        await safe_reply(
-            message,
-            "☕ <b>Avtonom jonli suhbat hozirda ishlab turibdi!</b>\n"
-            "🤖 SuperAgent va 🌪 Arxitektor har 25-35 soniyada yangi mavzularda gurung qilmoqda.\n\n"
-            "🛑 <i>To'xtatish uchun:</i> <code>/stop_suhbat</code>",
-            parse_mode="HTML"
-        )
-        return
+        autonomous_dialogue_engine.stop_chat(message.chat.id)
+        await asyncio.sleep(0.5)
 
     main_bot = get_main_bot_instance() or bot
     task = asyncio.create_task(
@@ -468,6 +484,19 @@ async def cmd_architect_avto_suhbat(message: Message, bot: Bot) -> None:
 @second_bot_router.message(F.text.lower().startswith(("/stop_suhbat", "/stop_chat", "/toxtat_suhbat", "/avto_suhbat off", "/avtosuhbat off", "toxtat", "to'xtat suhbat")))
 async def cmd_architect_stop_suhbat(message: Message) -> None:
     """Arxitektor bot orqali erkin va avtonom suhbatni to'xtatish."""
+    raw_text = (message.text or "").strip()
+    if message.chat.id < 0:
+        cmd_mention = re.match(r"^/\w+@(\w+)", raw_text)
+        bot_info = await message.bot.get_me()
+        target_uname = (bot_info.username or "architect7_bot").lower()
+        if not cmd_mention or cmd_mention.group(1).lower() != target_uname:
+            # Guruhda oddiy /stop_suhbat bo'lsa, SuperAgent javob beradi. Arxitektor faqat jarayonni to'xtatadi.
+            from core.bot_collab import stop_chit_chat
+            from core.bot_skills import autonomous_dialogue_engine
+            autonomous_dialogue_engine.stop_chat(message.chat.id)
+            stop_chit_chat(str(message.chat.id))
+            return
+
     from core.bot_collab import stop_chit_chat
     from core.bot_skills import autonomous_dialogue_engine
     stopped_auto = autonomous_dialogue_engine.stop_chat(message.chat.id)
