@@ -286,7 +286,7 @@ def is_chit_chat_running(chat_id: str | int) -> bool:
     if not ACTIVE_CHIT_CHATS.get(chat_key, False):
         return False
     task = ACTIVE_CHIT_CHAT_TASKS.get(chat_key)
-    if task is not None and task.done():
+    if task is None or task.done():
         ACTIVE_CHIT_CHATS[chat_key] = False
         ACTIVE_CHIT_CHAT_TASKS.pop(chat_key, None)
         return False
@@ -313,6 +313,13 @@ def stop_chit_chat(chat_id: str | int) -> bool:
     if ACTIVE_DEBATES.get(chat_key, False):
         ACTIVE_DEBATES[chat_key] = False
         stopped = True
+    try:
+        cid_int = int(chat_id)
+        if cid_int in ACTIVE_GROUP_DUAL_OPINIONS:
+            ACTIVE_GROUP_DUAL_OPINIONS.pop(cid_int, None)
+            stopped = True
+    except Exception:
+        pass
     return stopped
 
 
@@ -1503,7 +1510,7 @@ async def run_night_autopilot_cycle(bot_white: Bot, bot_black: Optional[Bot] = N
 
 # ─── 5. GURUHDA BUYRUQLARSIZ IKKALA BOT FIKR BILDIRISHI (DUAL OPINION) ───
 
-ACTIVE_GROUP_DUAL_OPINIONS: set[int] = set()
+ACTIVE_GROUP_DUAL_OPINIONS: dict[int, float] = {}
 GROUP_DUAL_OPINION_ENABLED: dict[int, bool] = {}
 
 
@@ -1541,17 +1548,21 @@ async def handle_group_dual_opinion(
     if not is_group_dual_opinion_enabled(chat_id):
         return
 
-    # Agar ayni paytda ushbu guruhda allaqachon suhbat jarayoni ketayotgan bo'lsa
+    import time
+    now_ts = time.time()
+    # Agar ayni paytda ushbu guruhda allaqachon suhbat jarayoni ketayotgan bo'lsa (45 soniya ichida)
     if chat_id in ACTIVE_GROUP_DUAL_OPINIONS:
-        return
+        if now_ts - ACTIVE_GROUP_DUAL_OPINIONS[chat_id] < 45.0:
+            return
+        else:
+            ACTIVE_GROUP_DUAL_OPINIONS.pop(chat_id, None)
 
     raw_text = (message.text or message.caption or "").strip()
     if not raw_text or raw_text.startswith("/"):
         return
 
-    # Juda qisqa (masalan faqat 'ok', 'ha', '+', '👍') bo'lsa e'tibor bermaslik
-    words = raw_text.split()
-    if len(raw_text) < 4 and len(words) < 2:
+    # Juda qisqa bo'lsa e'tibor bermaslik
+    if len(raw_text) < 2:
         return
 
     from core.bot_skills import (
@@ -1562,7 +1573,7 @@ async def handle_group_dual_opinion(
         get_agent_persona,
     )
 
-    ACTIVE_GROUP_DUAL_OPINIONS.add(chat_id)
+    ACTIVE_GROUP_DUAL_OPINIONS[chat_id] = now_ts
 
     try:
         user_name = message.from_user.full_name if message.from_user else "Do'stimiz"
@@ -1575,112 +1586,124 @@ async def handle_group_dual_opinion(
 
         dialog_history: List[Dict[str, str]] = []
 
-        # ── 1. SUPERAGENT BOSQICHI ──
-        try:
-            await bot_white.send_chat_action(chat_id, "typing")
-        except Exception:
-            pass
+        # Jami 2 ta to'liq raund (SuperAgent -> Arxitektor -> SuperAgent -> Arxitektor: jami 4 ta jonli muloqot replikasi)
+        total_rounds = 2
 
-        p_sa = build_superagent_skill_prompt(
-            user_name=user_name,
-            user_text=raw_text,
-            intent=intent,
-            dialog_history=dialog_history,
-            round_num=1,
-            persona_tone=sa_persona["prompt_tone"]
-        )
+        for r_idx in range(1, total_rounds + 1):
+            if chat_id not in ACTIVE_GROUP_DUAL_OPINIONS:
+                break
 
-        raw_sa = await _generate_superagent_solution(
-            p_sa,
-            chat_key,
-            system_instruction=f"Siz SuperAgent AIsiz. Xarakteringiz: {sa_persona['name']}. Uslubingiz: {sa_persona['prompt_tone']}"
-        )
-        th_s, eu_s, sp_s = extract_thought_and_speech(raw_sa)
-        sa_opinion = sp_s if sp_s else raw_sa
-        sa_opinion = re.sub(r"^\[.*?\]\s*", "", sa_opinion).strip()
-        dialog_history.append({"role": "SuperAgent", "content": sa_opinion})
-
-        # Formatlash
-        sa_prefix = "🤖 <b>SuperAgent:</b>"
-        sa_text = f"{sa_prefix}\n{html.escape(sa_opinion)}"
-
-        await _send_agent_message(
-            chat_id=chat_id,
-            text=sa_text,
-            sender_role="superagent",
-            bot_white=bot_white,
-            bot_black=sec_bot,
-            is_group=True,
-            origin_bot=bot_white,
-        )
-
-        # Tabiiy insoniy pauza
-        await asyncio.sleep(2.0)
-
-        # ── 2. ARXITEKTOR BOSQICHI ──
-        if sec_bot:
-            try:
-                await sec_bot.send_chat_action(chat_id, "typing")
-            except Exception:
-                pass
-        else:
+            # ── 1. SUPERAGENT BOSQICHI ──
             try:
                 await bot_white.send_chat_action(chat_id, "typing")
             except Exception:
                 pass
 
-        p_arch = build_architect_skill_prompt(
-            user_name=user_name,
-            user_text=raw_text,
-            intent=intent,
-            dialog_history=dialog_history,
-            superagent_last_thought=sa_opinion,
-            round_num=2,
-            persona_tone=arch_persona["prompt_tone"]
-        )
-
-        try:
-            raw_arch, _ = await asyncio.wait_for(
-                mistral_agent_client.send_message(
-                    p_arch,
-                    chat_id=f"group_opinion_{chat_id}",
-                    system_instruction=f"Siz Bosh Arxitektor (@architect7_bot) botsiz. Xarakteringiz: {arch_persona['name']}. Uslubingiz: {arch_persona['prompt_tone']}"
-                ),
-                timeout=12.0
+            p_sa = build_superagent_skill_prompt(
+                user_name=user_name,
+                user_text=raw_text,
+                intent=intent,
+                dialog_history=dialog_history,
+                round_num=(r_idx * 2 - 1),
+                persona_tone=sa_persona["prompt_tone"]
             )
-        except Exception as e_grp_arch:
-            logger.warning("Guruhda Arxitektor javobida kechikish (%s), zaxira tahlil qo'llanadi", e_grp_arch)
-            if intent == "salary_banter":
-                raw_arch = f"Ha-ha, SuperAgent! Umrzoq aka bizning eng sevimli boshlig'imiz, bonuslarni ham albatta hisobga oladilar! Qani, ishga kirishaylik! 😂💼"
-            elif intent == "task":
-                raw_arch = f"💡 {user_name}, vazifani to'liq ko'rib chiqdim! SuperAgent aytganidek, loyihani modulli arxitekturada qursak, tezlik va ishonchlilik eng yuqori darajada bo'ladi! 🚀"
-            elif intent == "creator":
-                raw_arch = f"✨ Haqiqatan ham, {user_name} doim eng ilg'or g'oyalarni ilgari suradi. Biz har doim uning yonidamiz va har qanday murakkab ishni yengillashtirishga tayyormiz! 🤝"
+
+            raw_sa = await _generate_superagent_solution(
+                p_sa,
+                chat_key,
+                system_instruction=f"Siz SuperAgent AIsiz. Xarakteringiz: {sa_persona['name']}. Uslubingiz: {sa_persona['prompt_tone']}"
+            )
+            th_s, eu_s, sp_s = extract_thought_and_speech(raw_sa)
+            sa_opinion = sp_s if sp_s else raw_sa
+            sa_opinion = re.sub(r"^\[.*?\]\s*", "", sa_opinion).strip()
+            dialog_history.append({"role": "SuperAgent", "content": sa_opinion})
+
+            # Formatlash
+            sa_prefix = "🤖 <b>SuperAgent:</b>" if r_idx == 1 else "🤖 <b>SuperAgent (Javoban):</b>"
+            sa_text = f"{sa_prefix}\n{html.escape(sa_opinion)}"
+
+            await _send_agent_message(
+                chat_id=chat_id,
+                text=sa_text,
+                sender_role="superagent",
+                bot_white=bot_white,
+                bot_black=sec_bot,
+                is_group=True,
+                origin_bot=bot_white,
+            )
+
+            # Tabiiy insoniy pauza
+            await asyncio.sleep(2.5)
+
+            if chat_id not in ACTIVE_GROUP_DUAL_OPINIONS:
+                break
+
+            # ── 2. ARXITEKTOR BOSQICHI ──
+            if sec_bot:
+                try:
+                    await sec_bot.send_chat_action(chat_id, "typing")
+                except Exception:
+                    pass
             else:
-                raw_arch = f"🌪 SuperAgentning bu qarashida katta jon bor! Men ham buni hayotiy nuqtai nazardan to'liq qo'llab-quvvatlayman. {user_name}, siz bu haqda nima deysiz? 🤔"
+                try:
+                    await bot_white.send_chat_action(chat_id, "typing")
+                except Exception:
+                    pass
 
-        th_a, eu_a, sp_a = extract_thought_and_speech(raw_arch)
-        arch_opinion = sp_a if sp_a else raw_arch
-        arch_opinion = re.sub(r"^\[.*?\]\s*", "", arch_opinion).strip()
-        dialog_history.append({"role": "Arxitektor", "content": arch_opinion})
+            p_arch = build_architect_skill_prompt(
+                user_name=user_name,
+                user_text=raw_text,
+                intent=intent,
+                dialog_history=dialog_history,
+                superagent_last_thought=sa_opinion,
+                round_num=(r_idx * 2),
+                persona_tone=arch_persona["prompt_tone"]
+            )
 
-        arch_prefix = "🌪 <b>Arxitektor:</b>"
-        arch_text = f"{arch_prefix}\n{html.escape(arch_opinion)}"
+            try:
+                raw_arch, _ = await asyncio.wait_for(
+                    mistral_agent_client.send_message(
+                        p_arch,
+                        chat_id=f"group_opinion_{chat_id}",
+                        system_instruction=f"Siz Bosh Arxitektor (@architect7_bot) botsiz. Xarakteringiz: {arch_persona['name']}. Uslubingiz: {arch_persona['prompt_tone']}"
+                    ),
+                    timeout=14.0
+                )
+            except Exception as e_grp_arch:
+                logger.warning("Guruhda Arxitektor javobida kechikish (%s), zaxira tahlil qo'llanadi", e_grp_arch)
+                if intent == "salary_banter":
+                    raw_arch = f"Ha-ha, SuperAgent! Umrzoq aka bizning eng sevimli boshlig'imiz, bonuslarni ham albatta hisobga oladilar! Qani, ishga kirishaylik! 😂💼"
+                elif intent == "task":
+                    raw_arch = f"💡 {user_name}, vazifani to'liq ko'rib chiqdim! SuperAgent aytganidek, loyihani modulli arxitekturada qursak, tezlik va ishonchlilik eng yuqori darajada bo'ladi! 🚀"
+                elif intent == "creator":
+                    raw_arch = f"✨ Haqiqatan ham, {user_name} doim eng ilg'or g'oyalarni ilgari suradi. Biz har doim uning yonidamiz va har qanday murakkab ishni yengillashtirishga tayyormiz! 🤝"
+                else:
+                    raw_arch = f"🌪 SuperAgentning bu qarashida katta jon bor! Men ham buni hayotiy nuqtai nazardan to'liq qo'llab-quvvatlayman. {user_name}, siz bu haqda nima deysiz? 🤔"
 
-        await _send_agent_message(
-            chat_id=chat_id,
-            text=arch_text,
-            sender_role="architect",
-            bot_white=bot_white,
-            bot_black=sec_bot,
-            is_group=True,
-            origin_bot=bot_white,
-        )
+            th_a, eu_a, sp_a = extract_thought_and_speech(raw_arch)
+            arch_opinion = sp_a if sp_a else raw_arch
+            arch_opinion = re.sub(r"^\[.*?\]\s*", "", arch_opinion).strip()
+            dialog_history.append({"role": "Arxitektor", "content": arch_opinion})
+
+            arch_prefix = "🌪 <b>Arxitektor:</b>" if r_idx == 1 else "🌪 <b>Arxitektor (Javoban):</b>"
+            arch_text = f"{arch_prefix}\n{html.escape(arch_opinion)}"
+
+            await _send_agent_message(
+                chat_id=chat_id,
+                text=arch_text,
+                sender_role="architect",
+                bot_white=bot_white,
+                bot_black=sec_bot,
+                is_group=True,
+                origin_bot=bot_white,
+            )
+
+            await asyncio.sleep(2.5)
 
     except Exception as exc:
         logger.error("Avtonom ko'p agentli muloqotda xatolik: %s", exc)
     finally:
-        ACTIVE_GROUP_DUAL_OPINIONS.discard(chat_id)
+        ACTIVE_GROUP_DUAL_OPINIONS.pop(chat_id, None)
 
 
 
