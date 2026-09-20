@@ -80,7 +80,10 @@ async def _send_agent_message(
         except Exception:
             bot_white = origin_bot
 
-    if sender_role == "architect":
+    if not is_group:
+        # Shaxsiy chatda (DM) har doim xabar aynan shu chat ochilgan origin_bot orqali yuboriladi
+        target_bot = origin_bot or bot_white
+    elif sender_role == "architect":
         target_bot = bot_black or origin_bot
     elif sender_role == "superagent":
         target_bot = bot_white or origin_bot
@@ -108,7 +111,7 @@ async def _send_agent_message(
         if fallback_bot and target_bot != fallback_bot:
             logger.info("target_bot (%s) yubora olmadi, fallback_bot orqali xabar yuborilmoqda...", sender_role)
             notice = ""
-            if sender_role == "architect":
+            if sender_role == "architect" and is_group:
                 notice = (
                     "⚠️ <i>[Diqqat: @architect7_bot ushbu guruhga qo'shilmagan yoki yozish huquqi yo'q! "
                     "Arxitektor o'z profilidan yozishi uchun @architect7_bot ni guruhga a'zo qilib, Administrator qiling!]</i>\n\n"
@@ -143,11 +146,11 @@ def _get_shared_ai_manager():
 
 
 async def _generate_superagent_solution(prompt: str, chat_id: str, system_instruction: Optional[str] = None) -> str:
-    """SuperAgent yechimini tezkor generatsiya qilish (AIManager -> Mistral/OpenRouter/Gemini Fallback)."""
+    """SuperAgent yechimini tezkor generatsiya qilish (AIManager -> Mistral/Gemini/Codestral Fallback)."""
     try:
         ai_mgr = _get_shared_ai_manager()
         full_p = f"{system_instruction}\n\n{prompt}" if system_instruction else prompt
-        resp = await asyncio.wait_for(ai_mgr.generate(full_p, save_history=False), timeout=25.0)
+        resp = await asyncio.wait_for(ai_mgr.generate(full_p, save_history=False), timeout=12.0)
         if resp and not resp.startswith("❌") and not resp.startswith("⚠️"):
             return resp
     except Exception as e:
@@ -858,6 +861,17 @@ async def handle_free_chit_chat(
     chat_key = str(chat_id)
     if ACTIVE_CHIT_CHATS.get(chat_key, False):
         logger.warning("Chat %s da allaqachon faol erkin suhbat ketmoqda, yangisi boshlanmaydi", chat_id)
+        cur_bot = origin_bot or bot_white
+        if cur_bot:
+            try:
+                await cur_bot.send_message(
+                    chat_id,
+                    "☕ <b>Suhbat hozirda davom etmoqda!</b>\n"
+                    "🛑 To'xtatish uchun: <code>/stop_suhbat</code> deb yozing.",
+                    parse_mode="HTML"
+                )
+            except Exception:
+                pass
         return
     ACTIVE_CHIT_CHATS[chat_key] = True
 
