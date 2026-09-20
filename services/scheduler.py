@@ -545,8 +545,29 @@ def setup_scheduler(bot: "Bot", ai_manager: "AIManager") -> AsyncIOScheduler:
         misfire_grace_time=300,
     )
 
+    # 8. Tirik Ishchilar Rejimi (Living Coworkers Pulse — har 45 daqiqada o'zaro gurung va avtonom ish)
+    async def coworkers_pulse_job():
+        try:
+            from core.bot_skills import run_autonomous_coworker_pulse
+            from core.mistral_agent_bot import get_second_bot
+            sec_bot = get_second_bot()
+            target_chat = LOG_CHANNEL_ID if LOG_CHANNEL_ID != 0 else ADMIN_ID
+            if target_chat:
+                await run_autonomous_coworker_pulse(bot_white=bot, bot_black=sec_bot, chat_id=target_chat)
+        except Exception as cw_err:
+            logger.debug("Coworkers pulse job xatosi: %s", cw_err)
+
+    scheduler.add_job(
+        coworkers_pulse_job,
+        trigger=IntervalTrigger(minutes=45, timezone="Asia/Tashkent"),
+        id="autonomous_coworkers_pulse",
+        name="Tirik Hamkasblar Avtonom Muloqoti",
+        replace_existing=True,
+        misfire_grace_time=120,
+    )
+
     logger.info(
-        "Scheduler sozlandi: Hisobot %02d:%02d da, Email har %d daqiqada, Uptime har %d daqiqada faol",
+        "Scheduler sozlandi: Hisobot %02d:%02d da, Email har %d daqiqada, Uptime har %d daqiqada, Coworkers har 45 daqiqada faol",
         REPORT_HOUR, REPORT_MINUTE, EMAIL_CHECK_INTERVAL, UPTIME_CHECK_INTERVAL,
     )
     return scheduler
