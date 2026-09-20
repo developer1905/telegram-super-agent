@@ -649,8 +649,8 @@ async def cmd_main_profile(message: Message) -> None:
 async def cmd_main_suhbat(message: Message, bot: Bot) -> None:
     """Ikki AI o'rtasida erkin jonli suhbat: /suhbat [N] [mavzu]."""
     raw_text = message.text or ""
-    from core.bot_collab import handle_free_chit_chat, parse_topic_and_turns, ACTIVE_CHIT_CHATS
-    if ACTIVE_CHIT_CHATS.get(str(message.chat.id), False):
+    from core.bot_collab import handle_free_chit_chat, parse_topic_and_turns, is_chit_chat_running, ACTIVE_CHIT_CHAT_TASKS
+    if is_chit_chat_running(str(message.chat.id)):
         await message.answer(
             "☕ <b>Suhbat hozirda allaqachon davom etmoqda!</b>\n"
             "🛑 To'xtatish uchun: <code>/stop_suhbat</code> deb yozing.",
@@ -661,7 +661,8 @@ async def cmd_main_suhbat(message: Message, bot: Bot) -> None:
     from core.mistral_agent_bot import get_second_bot
     sec_bot = get_second_bot()
     import asyncio
-    asyncio.create_task(handle_free_chit_chat(topic, message.chat.id, bot_white=bot, bot_black=sec_bot, origin_bot=bot, turns=turns))
+    task = asyncio.create_task(handle_free_chit_chat(topic, message.chat.id, bot_white=bot, bot_black=sec_bot, origin_bot=bot, turns=turns))
+    ACTIVE_CHIT_CHAT_TASKS[str(message.chat.id)] = task
 
 
 @router.message(Command("stop_collab", "stop_task", "toxtat_vazifa"))
