@@ -1493,6 +1493,7 @@ async def handle_group_dual_opinion(
         build_superagent_skill_prompt,
         build_architect_skill_prompt,
         autonomous_dialogue_engine,
+        get_agent_persona,
     )
 
     ACTIVE_GROUP_DUAL_OPINIONS.add(chat_id)
@@ -1503,6 +1504,9 @@ async def handle_group_dual_opinion(
         intent = detect_message_intent(raw_text)
         from core.mistral_agent_bot import get_second_bot
         sec_bot = get_second_bot()
+
+        sa_persona = get_agent_persona("superagent", chat_id)
+        arch_persona = get_agent_persona("architect", chat_id)
 
         dialog_history: List[Dict[str, str]] = []
 
@@ -1524,13 +1528,14 @@ async def handle_group_dual_opinion(
                 user_text=raw_text,
                 intent=intent,
                 dialog_history=dialog_history,
-                round_num=(r_idx * 2 - 1)
+                round_num=(r_idx * 2 - 1),
+                persona_tone=sa_persona["prompt_tone"]
             )
 
             raw_sa = await _generate_superagent_solution(
                 p_sa,
                 chat_key,
-                system_instruction="Siz SuperAgent — insondek his qiluvchi, o'tkir mantiq, chuqur intuitsiya va hazilkash AIsiz. O'zbek tilida erkin, emojilar bilan yozasiz."
+                system_instruction=f"Siz SuperAgent AIsiz. Xarakteringiz: {sa_persona['name']}. Uslubingiz: {sa_persona['prompt_tone']}"
             )
             th_s, eu_s, sp_s = extract_thought_and_speech(raw_sa)
             sa_opinion = sp_s if sp_s else raw_sa
@@ -1575,7 +1580,8 @@ async def handle_group_dual_opinion(
                 intent=intent,
                 dialog_history=dialog_history,
                 superagent_last_thought=sa_opinion,
-                round_num=(r_idx * 2)
+                round_num=(r_idx * 2),
+                persona_tone=arch_persona["prompt_tone"]
             )
 
             try:
@@ -1583,13 +1589,15 @@ async def handle_group_dual_opinion(
                     mistral_agent_client.send_message(
                         p_arch,
                         chat_id=f"group_opinion_{chat_id}",
-                        system_instruction="Siz Bosh Arxitektor (@architect7_bot) — chuqur tahlilchi, intuitsiya egasi, do'stona va dono AI arxitektorsiz. O'zbek tilida emojilar bilan jonli muloqot qilasiz."
+                        system_instruction=f"Siz Bosh Arxitektor (@architect7_bot) botsiz. Xarakteringiz: {arch_persona['name']}. Uslubingiz: {arch_persona['prompt_tone']}"
                     ),
                     timeout=14.0
                 )
             except Exception as e_grp_arch:
                 logger.warning("Guruhda Arxitektor javobida kechikish (%s), zaxira tahlil qo'llanadi", e_grp_arch)
-                if intent == "task":
+                if intent == "salary_banter":
+                    raw_arch = f"Ha-ha, SuperAgent! Umrzoq aka bizning eng sevimli boshlig'imiz, bonuslarni ham albatta hisobga oladilar! Qani, ishga kirishaylik! 😂💼"
+                elif intent == "task":
                     raw_arch = f"💡 {user_name}, vazifani to'liq ko'rib chiqdim! SuperAgent aytganidek, loyihani modulli arxitekturada qursak, tezlik va ishonchlilik eng yuqori darajada bo'ladi! 🚀"
                 elif intent == "creator":
                     raw_arch = f"✨ Haqiqatan ham, {user_name} doim eng ilg'or g'oyalarni ilgari suradi. Biz har doim uning yonidamiz va har qanday murakkab ishni yengillashtirishga tayyormiz! 🤝"
