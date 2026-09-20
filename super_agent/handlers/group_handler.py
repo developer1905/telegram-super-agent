@@ -198,6 +198,11 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
     starts_with_slash = raw_text.startswith("/")
     has_media_link = bool(extract_media_url(raw_text))
 
+    has_avto_phrase = any(w in text_lower for w in [
+        "yozmasam ham", "o'zlaring gaplash", "o'zlari gaplash", "o'zlaring suhbat", "o'zlari suhbat",
+        "avto suhbat", "avtosuhbat", "avto_suhbat", "jonli suhbat", "to'xtamasdan gaplash", "gaplashaversin", "suhbat qilaversin"
+    ])
+
     # Triggerlar
     should_process = (
         is_reply_to_bot
@@ -205,6 +210,7 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
         or starts_with_bot
         or starts_with_slash
         or has_media_link
+        or has_avto_phrase
         or (message.reply_to_message and any(w in text_lower for w in ["bot", "tekshir", "tushuntir", "tarjima qil"]))
     )
 
@@ -240,14 +246,17 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
 
     if not should_process:
         # Hech qanday '/' buyrug'isiz yozilgan guruh xabarlariga ikkala bot ham erkin fikr bildiradi
-        if message.from_user and not message.from_user.is_bot and len(raw_text.strip()) >= 3:
+        is_from_bot = bool(message.from_user and message.from_user.is_bot)
+        if not is_from_bot and len(raw_text.strip()) >= 2:
             import time
-            from core.bot_skills import LAST_COWORKER_CONTEXT, handle_user_joining_coworker_discussion
-            # Agar botlar yaqinda o'zaro gaplashgan bo'lsa (oxirgi 15 daqiqa ichida), foydalanuvchi fikriga 3 kishilik do'stona munosabat bildiriladi
-            if (time.time() - LAST_COWORKER_CONTEXT.get("timestamp", 0) < 900) and LAST_COWORKER_CONTEXT.get("topic"):
-                from core.mistral_agent_bot import get_second_bot
-                sec_bot = get_second_bot()
-                user_name = message.from_user.full_name or "Do'stimiz"
+            from core.bot_skills import LAST_COWORKER_CONTEXT, handle_user_joining_coworker_discussion, autonomous_dialogue_engine
+            from core.mistral_agent_bot import get_second_bot
+            sec_bot = get_second_bot()
+            user_name = message.from_user.full_name if message.from_user else "Do'stimiz"
+
+            # Agar avto-suhbat faol bo'lsa yoki yaqinda suhbat bo'lgan bo'lsa (15 daqiqa ichida)
+            is_recent_coworker = (time.time() - LAST_COWORKER_CONTEXT.get("timestamp", 0) < 900) and bool(LAST_COWORKER_CONTEXT.get("topic"))
+            if autonomous_dialogue_engine.is_running(message.chat.id) or is_recent_coworker:
                 asyncio.create_task(handle_user_joining_coworker_discussion(
                     user_name=user_name,
                     user_text=raw_text,
@@ -259,6 +268,7 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
             else:
                 asyncio.create_task(handle_group_dual_opinion(message, bot, ai_manager))
         return
+
 
     # Agar buyruq aniq boshqa bot nomiga yuborilgan bo'lsa (masalan, /suhbat@architect7_bot), bu bot aralashmaydi
     cmd_mention = re.match(r"^/\w+@(\w+)", raw_text)
@@ -412,11 +422,56 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
         await safe_message_reply(message, "🛑 <b>Hamkorlik / Avtopilot to'xtatildi.</b>" if stopped else "⚠️ Hozirda faol hamkorlik yo'q.", parse_mode="HTML")
         return
 
-    if clean_lower.startswith(("/stop_suhbat", "/stop_chat", "/toxtat_suhbat")):
+    if clean_lower.startswith(("/stop_suhbat", "/stop_chat", "/toxtat_suhbat", "/avto_suhbat off", "/avto_suhbat stop")):
         from core.bot_collab import stop_chit_chat
-        stopped = stop_chit_chat(str(message.chat.id))
-        await safe_message_reply(message, "🛑 <b>Erkin suhbat to'xtatildi.</b>" if stopped else "⚠️ Hozirda faol suhbat yo'q.", parse_mode="HTML")
+        from core.bot_skills import autonomous_dialogue_engine
+        stopped_auto = autonomous_dialogue_engine.stop_chat(message.chat.id)
+        stopped_collab = stop_chit_chat(str(message.chat.id))
+        try:
+            await db.save_fact(f"auto_chat_{message.chat.id}", "0", category="auto_chat")
+        except Exception:
+            pass
+        await safe_message_reply(
+            message,
+            "🛑 <b>Avtonom jonli suhbat to'xtatildi.</b>\n"
+            "Qayta yoqish uchun: <code>/avto_suhbat</code> deb yozing.",
+            parse_mode="HTML"
+        )
         return
+
+    # 0.5. /avto_suhbat yoki Uzluksiz jonli gurung (Foydalanuvchi yozmasa ham o'zlari to'xtovsiz gaplashish rejimi)
+    is_avto_start = clean_lower.startswith(("/avto_suhbat", "/jonli_suhbat", "/avto_gaplash", "/avtosuhbat")) or \
+                    any(phrase in clean_lower for phrase in [
+                        "yozmasam ham", "o'zlaring gaplash", "o'zlari gaplash", "o'zlaring suhbat", 
+                        "o'zlari suhbat", "avto suhbat", "to'xtamasdan gaplash", "erkin gaplashinglar", 
+                        "gaplashaversin", "suhbat qilaversin"
+                    ])
+
+    if is_avto_start:
+        from core.bot_skills import start_continuous_living_conversation, autonomous_dialogue_engine
+        from core.mistral_agent_bot import get_second_bot
+        sec_bot = get_second_bot()
+
+        # Agar oldin faol bo'lsa, tozalab qayta yangitdan ishga tushiramiz
+        if autonomous_dialogue_engine.is_running(message.chat.id):
+            autonomous_dialogue_engine.stop_chat(message.chat.id)
+            await asyncio.sleep(0.5)
+
+        task = asyncio.create_task(
+            start_continuous_living_conversation(
+                chat_id=message.chat.id,
+                bot_white=bot,
+                bot_black=sec_bot,
+                origin_bot=bot
+            )
+        )
+        autonomous_dialogue_engine.active_tasks[message.chat.id] = task
+        try:
+            await db.save_fact(f"auto_chat_{message.chat.id}", "1", category="auto_chat")
+        except Exception:
+            pass
+        return
+
 
     # 1. /collab yoki /avtopilot
     if clean_lower.startswith(("/collab", "/hamkorlik", "/vazifa", "/avtopilot", "/kechki_vazifa", "/night")):
@@ -495,8 +550,16 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
         return
 
     # 2. /suhbat yoki /chat (Erkin muloqot / AI Lounge)
-    if clean_lower.startswith(("/suhbat", "/chat", "/gaplashing")):
-        from core.bot_collab import handle_free_chit_chat, parse_topic_and_turns
+    if clean_lower.startswith(("/suhbat", "/chat", "/gaplash", "🗣️ erkin suhbat", "erkin suhbat", "suhbat")):
+        from core.bot_collab import handle_free_chit_chat, parse_topic_and_turns, ACTIVE_CHIT_CHATS
+        if ACTIVE_CHIT_CHATS.get(str(message.chat.id), False):
+            await safe_message_reply(
+                message,
+                "☕ <b>Suhbat hozirda allaqachon davom etmoqda!</b>\n"
+                "🛑 To'xtatish uchun: <code>/stop_suhbat</code> deb yozing.",
+                parse_mode="HTML"
+            )
+            return
         topic_text, parsed_turns = parse_topic_and_turns(clean_text, default_turns=8)
         from core.mistral_agent_bot import get_second_bot
         sec_bot = get_second_bot()
