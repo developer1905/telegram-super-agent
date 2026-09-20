@@ -62,7 +62,12 @@ import base64 as _b64
 _DEF_SEC_TOK = _b64.b64decode("ODE5NjExNzUzOTpBQUdCR3V4SnFrZHowNFFYTmFTSzI2LVdiU01obHhmaVM4NA==").decode()
 _DEF_MIS_KEY = _b64.b64decode("NWxxSzhweERqSUhYdlZENjhRdTlVVDZFam82RERCVUw=").decode()
 
-SECOND_BOT_TOKEN: str = os.getenv("SECOND_BOT_TOKEN", "").strip() or _DEF_SEC_TOK
+_raw_sec_tok = os.getenv("SECOND_BOT_TOKEN", "").strip()
+if not _raw_sec_tok or (BOT_TOKEN and _raw_sec_tok == BOT_TOKEN):
+    SECOND_BOT_TOKEN: str = _DEF_SEC_TOK
+else:
+    SECOND_BOT_TOKEN: str = _raw_sec_tok
+
 MISTRAL_AGENT_API_KEY: str = os.getenv("MISTRAL_AGENT_API_KEY", "").strip() or _DEF_MIS_KEY
 MISTRAL_AGENT_ID: str = os.getenv("MISTRAL_AGENT_ID", "ag_01a0ba16a68173e8a1cdb3ead308ff14").strip()
 
