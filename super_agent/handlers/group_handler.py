@@ -245,28 +245,10 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
             pass
 
     if not should_process:
-        # Hech qanday '/' buyrug'isiz yozilgan guruh xabarlariga ikkala bot ham erkin fikr bildiradi
+        # Hech qanday '/' buyrug'isiz yozilgan guruh xabarlariga ikkala bot ham o'zaro jonli suhbat quradi
         is_from_bot = bool(message.from_user and message.from_user.is_bot)
         if not is_from_bot and len(raw_text.strip()) >= 2:
-            import time
-            from core.bot_skills import LAST_COWORKER_CONTEXT, handle_user_joining_coworker_discussion, autonomous_dialogue_engine
-            from core.mistral_agent_bot import get_second_bot
-            sec_bot = get_second_bot()
-            user_name = message.from_user.full_name if message.from_user else "Do'stimiz"
-
-            # Agar avto-suhbat faol bo'lsa yoki yaqinda suhbat bo'lgan bo'lsa (15 daqiqa ichida)
-            is_recent_coworker = (time.time() - LAST_COWORKER_CONTEXT.get("timestamp", 0) < 900) and bool(LAST_COWORKER_CONTEXT.get("topic"))
-            if autonomous_dialogue_engine.is_running(message.chat.id) or is_recent_coworker:
-                asyncio.create_task(handle_user_joining_coworker_discussion(
-                    user_name=user_name,
-                    user_text=raw_text,
-                    chat_id=message.chat.id,
-                    bot_white=bot,
-                    bot_black=sec_bot,
-                    origin_bot=bot
-                ))
-            else:
-                asyncio.create_task(handle_group_dual_opinion(message, bot, ai_manager))
+            asyncio.create_task(handle_group_dual_opinion(message, bot, ai_manager))
         return
 
 
