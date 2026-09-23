@@ -30,10 +30,9 @@ logger = logging.getLogger(__name__)
 # initData 5 daqiqadan eski bo'lsa rad etiladi
 INIT_DATA_MAX_AGE_SECONDS: int = 300  # 5 daqiqa
 
-# Xavfsizlik headerlari
+# Xavfsizlik headerlari (Telegram Mini App iframe yuklana olishi uchun X-Frame-Options olib tashlangan)
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
-    "X-Frame-Options": "SAMEORIGIN",
     "X-XSS-Protection": "1; mode=block",
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "Content-Security-Policy": "default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:; frame-ancestors 'self' https://web.telegram.org https://*.telegram.org https://telegram.org;",
