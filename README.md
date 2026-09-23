@@ -187,40 +187,65 @@ super_agent/
 
 ## 🛠 O'rnatish va Ishga Tushirish
 
-### 1. Bog'liqliklarni o'rnatish
+### 🖥️ AWS EC2 Serverda Terminal orqali o'rnatish (`superagent`)
+
+#### A. Birinchi marta yangidan o'rnatish:
 ```bash
-git clone https://github.com/developer1905/telegram-super-agent.git
-cd telegram-super-agent
+# 1. superagent papkasini ochish va ichiga kirish
+mkdir -p ~/superagent && cd ~/superagent
+
+# 2. GitHub dan loyihani yuklab olish (nuqta joriy papkaga yuklaydi)
+git clone https://github.com/developer1905/telegram-super-agent.git .
+
+# 3. Python virtual muhitini yaratish va faollashtirish
+python3 -m venv venv
+source venv/bin/activate
+
+# 4. Kerakli paketlarni o'rnatish
+pip install --upgrade pip
 pip install -r requirements.txt
+
+# 5. Konfiguratsiyani sozlash (.env)
+cp .env.example .env
+nano .env   # Bot token va kerakli API kalitlarni kiriting
+
+# 6. Avtomatik HTTPS (Caddy) va 24/7 Systemd servisni yoqish
+chmod +x aws_setup.sh
+sudo ./aws_setup.sh
 ```
 
-### 2. Muhit o'zgaruvchilarini sozlash (`.env`)
-`.env.example` faylidan nusxa olib `.env` yarating:
-```env
-# Telegram Bot
-BOT_TOKEN=your_bot_token_here
-ADMIN_ID=your_telegram_id_here
-LOG_CHANNEL_ID=-100xxxxxxxxxx
-
-# Telethon Userbot
-API_ID=your_api_id
-API_HASH=your_api_hash
-USERBOT_SESSION=your_string_session
-
-# AI Kalitlar
-GEMINI_API_KEY=your_gemini_key
-OPENROUTER_API_KEY=your_openrouter_key
-
-# Email Pochta (16 xonali Google App Password)
-EMAIL_USER=your_email@gmail.com
-EMAIL_PASS=your_16_digit_app_password
-
-# Web App URL
-WEBAPP_URL=https://your-domain.com/webapp
-```
-
-### 3. Loyihani ishga tushirish
+#### B. Mavjud `superagent` loyihasini GitHub dan yangilash (Update / Pull):
 ```bash
+# 1. superagent papkasiga kirish
+cd ~/superagent
+
+# 2. GitHub dan so'nggi o'zgarishlarni yuklash
+git pull origin main
+
+# 3. Virtual muhitda yangi kutubxonalarni yangilash
+source venv/bin/activate
+pip install -r requirements.txt
+
+# 4. Tizim servisini qayta ishga tushirish
+sudo systemctl restart superagent
+
+# 5. Jonli loglarni kuzatish
+sudo journalctl -u superagent -f
+```
+
+---
+
+### 💻 Lokal Kompyuterda Ishga Tushirish
+```bash
+git clone https://github.com/developer1905/telegram-super-agent.git superagent
+cd superagent
+python -m venv venv
+# Windows:
+venv\Scripts\activate
+# Linux/Mac:
+# source venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
 python main.py
 ```
 

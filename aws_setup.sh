@@ -5,7 +5,10 @@ echo "=================================================="
 echo "🚀 Super-Agent AWS EC2 Avtomatik Sozlash Skripti"
 echo "=================================================="
 
-APP_DIR="/home/ubuntu/telegram-super-agent"
+APP_DIR="/home/ubuntu/superagent"
+if [ ! -d "$APP_DIR" ]; then
+    APP_DIR="/home/ubuntu/telegram-super-agent"
+fi
 if [ ! -d "$APP_DIR" ]; then
     APP_DIR="$(pwd)"
 fi
