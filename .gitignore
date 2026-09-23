@@ -47,10 +47,31 @@ data/
 *.log
 logs/
 
-# Test fayllar
-test_imports.py
+# Test artifacts (lekin tests/ papkasi o'zi ignore qilinmaydi)
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+*.pytest_cache
+
+# Xavfsizlikka sezgir fayllar (hech qachon GitHub ga tushmasin!)
+*_credentials*.json
+*_service_account*.json
+secrets.json
+credentials.json
+# Sandbox temp fayllar
+sandbox_*.py
 
 # OS fayllar
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# MAINTENANCE papkasidagi audit hisoblari (ixtiyoriy)
+# MAINTENANCE/
+
+# Scratch/temp fayllar
+scratch_*.txt
+scratch_*.py
+*.bak
+*.tmp

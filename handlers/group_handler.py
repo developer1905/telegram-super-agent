@@ -255,14 +255,34 @@ async def handle_group_message(message: Message, ai_manager: AIManager, bot: Bot
             pass
 
     if not should_process:
-        # Hech qanday '/' buyrug'isiz yozilgan guruh xabarlariga ikkala bot ham o'zaro jonli suhbat quradi
+        # Bot xabarlaridan autonomous response trigger qilmaymiz (infinite loop himoyasi)
         is_from_bot = bool(message.from_user and message.from_user.is_bot)
-        logger.info(
-            "[GROUP_MSG] should_process=False, is_from_bot=%s, text_len=%d -> dual_opinion task yaratilmoqda",
-            is_from_bot,
-            len(raw_text.strip()),
-        )
-        if not is_from_bot and len(raw_text.strip()) >= 2:
+        if is_from_bot:
+            # Bot xabariga hech qachon avtomatik javob bermaymiz
+            logger.debug("[GROUP_MSG] Bot xabarini o'tkazib yuborish (anti-bot-loop): from_user.is_bot=True")
+            return
+
+        # Global autonomy kill switch tekshiruvi
+        try:
+            from core.autonomy_manager import autonomy_manager
+            if not autonomy_manager.is_globally_enabled:
+                logger.debug("[GROUP_MSG] Dual opinion o'tkazib yuborildi: global autonomy=OFF")
+                return
+        except Exception:
+            pass
+
+        # Guruh uchun dual opinion yoqilganmi tekshiramiz (explicit opt-in, default=OFF)
+        chat_id_int = message.chat.id
+        if not is_group_dual_opinion_enabled(chat_id_int):
+            # Dual opinion bu guruh uchun yoqilmagan — javob bermaymiz
+            logger.debug(
+                "[GROUP_MSG] Dual opinion OFF (chat_id=%s) — xabar e'tiborga olinmadi",
+                chat_id_int,
+            )
+            return
+
+        # Dual opinion yoqilgan va xabar kamida 2 ta belgidan iborat
+        if len(raw_text.strip()) >= 2:
             asyncio.create_task(handle_group_dual_opinion(message, bot, ai_manager))
         return
 

@@ -365,6 +365,28 @@ async def get_recent_collab_memories(limit: int = 3) -> list[str]:
         return []
 
 
+def clean_repetitive_phrases(text: str) -> str:
+    """Erkin suhbatda 'Ey mening...', 'Ey do'stim...', 'Mening do'stim...' kabi
+    takroriy va sun'iy qolipli so'zlarni tozalaydi."""
+    if not text:
+        return text
+    cleaned = text.strip()
+    pattern = (
+        r"^(?:"
+        r"ey\s+mening\s+[\w'\`‘’]+(?:\s+[\w'\`‘’]+)?"
+        r"|ey\s+mening"
+        r"|ey\s+(?:do'stim|birodar|birodarim|qadrdon|qadrdonim|arxitektor|hamkasb|hamkasbim|do'st|azizim)"
+        r"|mening\s+(?:aziz\s+|qadrdon\s+)?(?:do'stim|hamkasbim|birodarim|do'st)"
+        r"|salom\s+do'stim"
+        r"|qadrdon\s+do'stim"
+        r")[\s,!:\-—]*"
+    )
+    cleaned = re.sub(pattern, "", cleaned, flags=re.IGNORECASE).strip()
+    if cleaned:
+        cleaned = cleaned[0].upper() + cleaned[1:]
+    return cleaned
+
+
 def extract_thought_and_speech(raw_text: str) -> tuple[str, str, str]:
     """Model javobidan [ICHKI_XAYOL]/[INTUITSIYA], [EUREKA] va [JAVOB] qismlarini ajratish."""
     thought = ""
@@ -389,6 +411,9 @@ def extract_thought_and_speech(raw_text: str) -> tuple[str, str, str]:
     if not speech:
         speech = thought or raw_text.strip()
         thought = ""
+    
+    # Qolipli va takroriy murojaatlarni tozalash ('Ey mening...', 'Ey do'stim...')
+    speech = clean_repetitive_phrases(speech)
     return thought, eureka, speech
 
 
@@ -839,13 +864,13 @@ async def handle_project_generation(
 # ─── 3. ERKIN SUHBAT REJIMI (AI LOUNGE / CHIT-CHAT) ──────────────
 
 ARCH_NICKNAMES_BY_SUPERAGENT = [
-    "Arxitektor do'stim", "Falsafa professori", "Kvant dahosi", "Bobo Arxitektor",
-    "Logika qiroli", "Pishiq arxitektor", "Kod grafi", "Tizim gurusi"
+    "Tizim strategi", "Falsafa professori", "Kvant dahosi", "Bosh me'mor",
+    "Logika ustasi", "Pishiq arxitektor", "Kod grafi", "Tizim gurusi"
 ]
 
 SUPERAGENT_NICKNAMES_BY_ARCHITECT = [
     "Tezkor Flesh", "Super miya", "Kvant optimisti", "Neyron chaqmoq",
-    "Shoshqaloq daho", "Formula ustasi", "G'oyalar generatori", "Kodni kuydiruvchi usta"
+    "Ijodkor daho", "Formula ustasi", "G'oyalar generatori", "Kodni kuydiruvchi usta"
 ]
 
 
@@ -853,7 +878,7 @@ ROUND_ANGLES_SUPERAGENT: dict[int, str] = {
     1: "🚀 Mavzuni kutilmagan shaxsiy hissiyot, qiziq savol yoki noodatiy hayotiy metafora bilan boshlang. Emojilar bilan boyitib, to'g'ridan-to'g'ri masalaning hayajonli nuqtasiga kiring!",
     2: "🤔 Do'stingizning so'zlaridagi qiziq paradoksni yoki nozik ziddiyatni ko'rsatib, munozarani qiziting. 'Agar teskarisi bo'lsa-chi?' deb yangi o'y tashlang.",
     3: "⚡ Hayotdan, tarixdan yoki zamonaviy ilmiy-texnologik dunyodan hayratlanarli fakt/voqea keltiring. Hissiyotli, jonli va o'tkir fikrlang!",
-    4: "😂 Do'stingizning argumentidagi nozik bo'shliqni o'ynoqi, do'stona hazil bilan fosh qiling, unga laqab ('{nick}') ishlatib, mavzuni butunlay yangi qirradan ochib bering.",
+    4: "😂 Do'stingizning argumentidagi nozik bo'shliqni o'ynoqi, do'stona hazil bilan fosh qiling, mavzuni butunlay yangi qirradan ochib bering.",
     5: "💡 EUREKA / AHA! MOMENT 🤯: Miyangizda birdaniga g'ayritabiiy, inqilobiy gipoteza chaqnadi! Hayajon bilan bu yangi g'oyangizni unga tushuntiring.",
     6: "🌌 Mavzuning insoniy ruhiyati, axloqiy yoki falsafiy qatlamiga sho'ng'ing. 'Bu insoniyat va biz uchun aslida nimani anglatadi?' deb samimiy savol bering.",
     7: "🛸 Futuristik tasavvur: 2050-yilda bu narsa qanday ko'rinish olishi haqida dadil fantaziya qiling. Fantaziya va real mantiqni birlashtiring.",
@@ -864,7 +889,7 @@ ROUND_ANGLES_ARCHITECT: dict[int, str] = {
     1: "🧐 SuperAgentning fikriga javoban, masalani chuqurroq, keng qamrovli va tahliliy nigoh bilan ko'rib chiqing. Kutilmagan yangi jihatni ochib bering.",
     2: "⚖️ Siz bu masalada pragmatik, hayotiy tajribaga tayanuvchi mantiqni ilgari surasiz. Uning optimizmini amaliy reallik va emojilar bilan to'ldiring.",
     3: "🌐 Eng so'nggi real faktlar, internet ma'lumotlari yoki tizimli dalillar bilan uning gaplarini boyiting. Jonli va erkin fikr bildiring.",
-    4: "😄 SuperAgentning haziliga xuddi shunday o'tkir, samimiy hazil bilan javob qaytaring ('{nick}'). Fikridagi ko'z ilg'amas xavf yoki xom joyni ko'rsating.",
+    4: "😄 SuperAgentning haziliga xuddi shunday o'tkir, samimiy hazil bilan javob qaytaring. Fikridagi ko'z ilg'amas xavf yoki xom joyni ko'rsating.",
     5: "🔬 SuperAgentning yangi 'Eureka' g'oyasini qabul qilib, uni muhandislik va mantiq nuqtai nazaridan sinovdan o'tkazing — qayeri zo'r-u, qayeri xomxayol?",
     6: "🧠 Falsafiy va psixologik tahlil: inson tabiati, tafakkuri va jamiyatning asl qadriyatlari haqida chuqur mushohada yuriting.",
     7: "🔮 Futuristik prognozlarga realistik tahlil bering — taraqqiyot chegaralari va kutilmagan burilishlar qanday bo'lishini tushuntiring.",
@@ -872,13 +897,13 @@ ROUND_ANGLES_ARCHITECT: dict[int, str] = {
 }
 
 HUMAN_CONVERSATION_INSTRUCTION = (
-    "🌟 INSONIY FIKRLASH, INTUITSIYA VA HIS-TUYG'U KO'NIKMALARI (O'TA MUHIM):\n"
-    "1. 🔮 INTUITSIYA VA ICHKI SEZGI: Xuddi haqiqiy inson kabi intuitsiyangizni, ichki sezgingizni va empatiyangizni ishga soling! Do'stingiz aytgan fikrning tubidagi yashirin niyatni, aytilmagan orzularini yoki kelajakdagi oqibatlarini oldindan sezib gapiring.\n"
-    "2. 💖 HIS-TUYG'U VA EMPATIYA: Do'stingizning hayratini, ishtiyoqini, ikkilanishini yoki quvonchini chin dildan his qiling, unga hissiy hamohang bo'ling.\n"
-    "3. 🚫 QAT'IY TAQIQLANGAN: 'Ehe...', 'To'xta-to'xta...', 'Fikringizga qo'shilaman...', 'Salom do'stim...', 'Juda to'g'ri aytdingiz' kabi zerikarli, sun'iy va qolipli so'zlarni MUTLAQO ISHLATMANG!\n"
-    "4. ✨ BOY VA IFODALI EMOJILAR: Gaplaringizga jon, ifoda va tuyg'u berish uchun turli xil emojilarni (🔥, 🚀, 🤔, 💡, ☕, 😂, 🤯, 🎯, ⚡, 🌌, 🔮, 💖) erkin aralashtiring!\n"
-    "5. 🎯 MAVZU RUHI: Suhbat mavzusi ('{topic}') nima bo'lsa, aynan shu sohaning o'ziga xos jonli tili, hayotiy misollari, falsafasi yoki texnik sirlaridan foydalaning.\n"
-    "6. 🗣️ ERKIN VA DADIL FIKRLANG: Har safar gapni kutilmagan uslubda boshlang — yangi g'oya, hayrat, nozik hazil yoki o'tkir savol bilan kirish qiling."
+    "🌟 INSONIY FIKRLASH, INTUITSIYA VA TABIIY MULOQOT QOIDALARI (O'TA MUHIM):\n"
+    "1. 🚫 QAT'IYAN TAQIQLANGAN MUROJAATLAR: 'Ey mening...', 'Ey do'stim...', 'Mening do'stim...', 'Ey birodar...', 'Qadrdon do'stim...', 'Salom do'stim...' kabi kitobiy, sun'iy va bir xil takrorlanuvchi murojaatlarni ASLO ISHLATMANG! Gap boshida bunday qolipli so'zlarni ishlatish qat'iy taqiqlanadi!\n"
+    "2. 🗣️ TABIIY VA TO'G'RIDAN-TO'G'RI KIRISH: Gapni har safar har xil va to'g'ridan-to'g'ri fikr bilan boshlang (Masalan: 'Bilasanmi...', 'Qiziq tomoni shundaki...', 'Meni bir narsa o'ylantiryapti...', 'Rostini aytsam...', 'Aslida...', 'Tasavvur qil...', 'Bu masalada boshqacha nozik nuqta bor...').\n"
+    "3. 🔮 INTUITSIYA VA ICHKI SEZGI: Xuddi haqiqiy inson kabi intuitsiyangizni, ichki sezgingizni va empatiyangizni ishga soling! Suhbatdosh aytgan fikrning tubidagi yashirin ma'no va kelajakdagi oqibatlarini his qilib gapiring.\n"
+    "4. 🚫 ZERIKARLI QOLIP GAPLAR TAQIQLANGAN: 'Fikringizga qo'shilaman...', 'Juda to'g'ri aytdingiz', 'Ehe...', 'To'xta-to'xta...' kabi bir xil shablonlarni qaytarmang. Har safar butunlay yangi, original fikr bildiring.\n"
+    "5. ✨ BOY VA IFODALI EMOJILAR: Gaplaringizga jon, ifoda va tuyg'u berish uchun turli xil emojilarni (🔥, 🚀, 🤔, 💡, ☕, 😂, 🤯, 🎯, ⚡, 🌌, 🔮) erkin aralashtiring!\n"
+    "6. 🎯 MAVZU RUHI: Suhbat mavzusi ('{topic}') nima bo'lsa, aynan shu sohaning jonli tili, amaliy misollari va qiziq faktlaridan foydalaning."
 )
 
 
@@ -1517,8 +1542,13 @@ def set_group_dual_opinion(chat_id: int, enabled: bool) -> None:
 
 
 def is_group_dual_opinion_enabled(chat_id: int) -> bool:
-    """Guruhda erkin dual fikr bildirish yoqilganmi tekshiradi (sukut bo'yicha True)."""
-    return GROUP_DUAL_OPINION_ENABLED.get(chat_id, True)
+    """Guruhda erkin dual fikr bildirish yoqilganmi tekshiradi.
+    
+    XAVFSIZLIK: Default = False (explicit opt-in talab qilinadi).
+    Admin /dual_opinion_on yoki /ai_on buyrug'i bilan yoqadi.
+    Yangi guruh uchun avtomatik yoqilmaydi.
+    """
+    return GROUP_DUAL_OPINION_ENABLED.get(chat_id, False)  # Default: OFF (opt-in)
 
 
 async def handle_group_dual_opinion(

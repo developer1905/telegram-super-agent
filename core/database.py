@@ -854,8 +854,24 @@ class DatabaseManager:
 
     # ─── 8. TODOLIST VA VAZIFALAR (TASKS) ──────────────────────────
 
-    async def add_task(self, title: str, description: str = "", due_date: str = "", notion_page_id: str = "") -> int:
-        """Yangi vazifa qo'shish."""
+    async def add_task(self, user_id: "int | str | None" = None, title: str = "", description: str = "", due_date: str = "", notion_page_id: str = "") -> int:
+        """Yangi vazifa qo'shish.
+        
+        Args:
+            user_id: Foydalanuvchi ID (ixtiyoriy, backward-compat uchun qabul qilinadi, DB da saqlanmaydi hozircha)
+            title: Vazifa nomi (majburiy)
+            description: Tavsif (ixtiyoriy)
+            due_date: Muddat (ixtiyoriy)
+            notion_page_id: Notion page ID (ixtiyoriy)
+        """
+        # user_id birinchi positional arg sifatida kelishi mumkin (legacy callers)
+        if title == "" and user_id is not None and not isinstance(user_id, int):
+            # Agar user_id string bo'lsa va title bo'sh bo'lsa — bu aslida title
+            title = str(user_id)
+            user_id = None
+        actual_title = title.strip() if title else ""
+        if not actual_title:
+            return 0
         loop = asyncio.get_running_loop()
         def _insert():
             with self._get_sqlite_conn() as conn:
@@ -863,13 +879,19 @@ class DatabaseManager:
                 cur.execute("""
                     INSERT INTO tasks (title, description, due_date, status, notion_page_id)
                     VALUES (?, ?, ?, 'pending', ?)
-                """, (title.strip(), description.strip(), due_date.strip(), notion_page_id.strip()))
+                """, (actual_title, description.strip(), due_date.strip(), notion_page_id.strip()))
                 conn.commit()
                 return cur.lastrowid or 0
         return await loop.run_in_executor(None, _insert)
 
-    async def get_tasks(self, status: str = "pending", limit: int = 50) -> list[dict]:
-        """Vazifalar ro'yxatini olish."""
+    async def get_tasks(self, user_id: "int | str | None" = None, status: str = "pending", limit: int = 50) -> list[dict]:
+        """Vazifalar ro'yxatini olish.
+        
+        Args:
+            user_id: Foydalanuvchi ID (ixtiyoriy, backward-compat uchun qabul qilinadi)
+            status: 'pending', 'completed', 'all'
+            limit: Maksimal natijalar soni
+        """
         loop = asyncio.get_running_loop()
         def _get():
             with self._get_sqlite_conn() as conn:
@@ -906,8 +928,14 @@ class DatabaseManager:
 
     # ─── 9. UPTIME MONITORINGI ─────────────────────────────────────
 
-    async def add_uptime_monitor(self, url: str, name: str = "") -> int:
-        """Kuzatuvga yangi veb-sayt yoki API URL qo'shish."""
+    async def add_uptime_monitor(self, user_id: "int | str | None" = None, url: str = "", name: str = "") -> int:
+        """Kuzatuvga yangi veb-sayt yoki API URL qo'shish.
+        
+        Args:
+            user_id: Foydalanuvchi ID (ixtiyoriy, backward-compat uchun qabul qilinadi)
+            url: Kuzatiluvchi URL
+            name: Inson o'qiy oladigan nom
+        """
         loop = asyncio.get_running_loop()
         clean_url = url.strip()
         if not clean_url.startswith(("http://", "https://")):
@@ -928,8 +956,13 @@ class DatabaseManager:
                 return cur.lastrowid or 0
         return await loop.run_in_executor(None, _add)
 
-    async def get_uptime_monitors(self, active_only: bool = True) -> list[dict]:
-        """Kuzatilayotgan barcha saytlarni olish."""
+    async def get_uptime_monitors(self, user_id: "int | str | None" = None, active_only: bool = True) -> list[dict]:
+        """Kuzatilayotgan barcha saytlarni olish.
+        
+        Args:
+            user_id: Foydalanuvchi ID (ixtiyoriy, backward-compat uchun qabul qilinadi)
+            active_only: Faqat faol monitorlarni qaytarish
+        """
         loop = asyncio.get_running_loop()
         def _get():
             with self._get_sqlite_conn() as conn:

@@ -35,6 +35,7 @@ from core.mistral_agent_bot import get_second_bot, second_bot_router, setup_arch
 from core.userbot import create_userbot_client
 import core.userbot as userbot_module
 from services.scheduler import setup_scheduler
+from security.api_auth import WebAppAuthMiddleware, cors_middleware
 
 # Handlerlar
 from handlers import menu_handler, message_handler, file_handler, photo_handler, email_handler, voice_handler, group_handler
@@ -50,6 +51,19 @@ logger = logging.getLogger(__name__)
 # Bot ishga tushgan vaqti (uptime uchun)
 START_TIME = datetime.now()
 
+# Fon vazifalarini xavfsiz boshqarish va tozalash (Background Task Tracker)
+_BACKGROUND_TASKS: set[asyncio.Task] = set()
+
+def track_background_task(coro_or_task, name: Optional[str] = None) -> asyncio.Task:
+    """Fonda ishlaydigan asyncio tasklarni ro'yxatga oladi va xavfsiz to'xtatish imkonini beradi."""
+    if isinstance(coro_or_task, asyncio.Task):
+        task = coro_or_task
+    else:
+        task = asyncio.create_task(coro_or_task, name=name)
+    _BACKGROUND_TASKS.add(task)
+    task.add_done_callback(_BACKGROUND_TASKS.discard)
+    return task
+
 
 # ─── Web Server & Telegram Mini App ───────────────────────────
 
@@ -64,11 +78,44 @@ async def health_handler(request: web.Request) -> web.Response:
 
     return web.json_response({
         "status": "ok",
-        "bot": "Super-Agent 2.0 Enterprise",
+        "bot": "Super-Agent 2.0",
         "uptime": f"{hours}h {minutes}m",
         "userbot": "connected" if userbot_module.userbot else "disconnected",
         "timestamp": datetime.now().isoformat(),
     })
+
+
+async def readiness_handler(request: web.Request) -> web.Response:
+    """
+    Readiness probe — kerakli dependencylar holatini tekshiradi.
+    GET /readiness → 200 agar barcha kerakli komponentlar tayyor, 503 aks holda.
+    """
+    checks = {}
+    is_ready = True
+
+    # Database check
+    try:
+        await db.get_stats_summary()
+        checks["database"] = "ok"
+    except Exception as db_err:
+        checks["database"] = f"error"
+        is_ready = False
+        logger.error("Readiness: DB xato: %s", db_err)
+
+    # Bot token check
+    if BOT_TOKEN:
+        checks["bot_token"] = "configured"
+    else:
+        checks["bot_token"] = "missing"
+        is_ready = False
+
+    # Scheduler check
+    checks["userbot"] = "connected" if userbot_module.userbot and userbot_module.userbot.is_connected() else "disconnected"
+
+    return web.json_response(
+        {"status": "ready" if is_ready else "not_ready", "checks": checks},
+        status=200 if is_ready else 503,
+    )
 
 
 async def root_handler(request: web.Request) -> web.Response:
@@ -241,7 +288,8 @@ async def api_ai_playground_handler(request: web.Request) -> web.Response:
             "role": ai_manager.current_role,
         })
     except Exception as exc:
-        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+        logger.error("api_ai_playground xatosi: %s", exc)
+        return web.json_response({"status": "error", "message": "AI so'rovida xatolik yuz berdi"}, status=500)
 
 
 async def api_system_info_handler(request: web.Request) -> web.Response:
@@ -409,7 +457,8 @@ async def api_chat_agent_handler(request: web.Request) -> web.Response:
             "role": ai_manager.current_role
         })
     except Exception as exc:
-        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+        logger.error("api_chat_agent xatosi: %s", exc)
+        return web.json_response({"status": "error", "message": "AI agent so'rovida xatolik"}, status=500)
 
 
 
@@ -420,8 +469,8 @@ async def api_tasks_get_handler(request: web.Request) -> web.Response:
         tasks = await db.get_tasks(ADMIN_ID)
         return web.json_response({"status": "ok", "tasks": tasks})
     except Exception as exc:
-        logger.error("api_tasks_get xatosi: %s", exc)
-        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+        logger.error("api_tasks_get xatosi: %s", exc, exc_info=True)
+        return web.json_response({"status": "error", "message": "Vazifalar ro'yxatini yuklashda xatolik yuz berdi"}, status=500)
 
 
 async def api_tasks_add_handler(request: web.Request) -> web.Response:
@@ -435,8 +484,8 @@ async def api_tasks_add_handler(request: web.Request) -> web.Response:
         task_id = await db.add_task(ADMIN_ID, title, due_date=due_date)
         return web.json_response({"status": "ok", "task_id": task_id})
     except Exception as exc:
-        logger.error("api_tasks_add xatosi: %s", exc)
-        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+        logger.error("api_tasks_add xatosi: %s", exc, exc_info=True)
+        return web.json_response({"status": "error", "message": "Vazifa qo'shishda xatolik yuz berdi"}, status=500)
 
 
 async def api_tasks_toggle_handler(request: web.Request) -> web.Response:
@@ -451,8 +500,8 @@ async def api_tasks_toggle_handler(request: web.Request) -> web.Response:
             await db.delete_task(task_id)
         return web.json_response({"status": "ok"})
     except Exception as exc:
-        logger.error("api_tasks_toggle xatosi: %s", exc)
-        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+        logger.error("api_tasks_toggle xatosi: %s", exc, exc_info=True)
+        return web.json_response({"status": "error", "message": "Vazifa holatini yangilashda xatolik yuz berdi"}, status=500)
 
 
 async def api_uptime_get_handler(request: web.Request) -> web.Response:
@@ -461,8 +510,8 @@ async def api_uptime_get_handler(request: web.Request) -> web.Response:
         monitors = await db.get_uptime_monitors(ADMIN_ID)
         return web.json_response({"status": "ok", "monitors": monitors})
     except Exception as exc:
-        logger.error("api_uptime_get xatosi: %s", exc)
-        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+        logger.error("api_uptime_get xatosi: %s", exc, exc_info=True)
+        return web.json_response({"status": "error", "message": "Monitoring ro'yxatini yuklashda xatolik yuz berdi"}, status=500)
 
 
 async def api_uptime_add_handler(request: web.Request) -> web.Response:
@@ -486,8 +535,8 @@ async def api_uptime_add_handler(request: web.Request) -> web.Response:
             "latency_ms": latency
         })
     except Exception as exc:
-        logger.error("api_uptime_add xatosi: %s", exc)
-        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+        logger.error("api_uptime_add xatosi: %s", exc, exc_info=True)
+        return web.json_response({"status": "error", "message": "Monitoring qo'shishda xatolik yuz berdi"}, status=500)
 
 
 async def api_uptime_delete_handler(request: web.Request) -> web.Response:
@@ -498,8 +547,8 @@ async def api_uptime_delete_handler(request: web.Request) -> web.Response:
         await db.delete_uptime_monitor(mon_id)
         return web.json_response({"status": "ok"})
     except Exception as exc:
-        logger.error("api_uptime_del xatosi: %s", exc)
-        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+        logger.error("api_uptime_del xatosi: %s", exc, exc_info=True)
+        return web.json_response({"status": "error", "message": "Monitoringni o'chirishda xatolik yuz berdi"}, status=500)
 
 
 async def api_clean_server_handler(request: web.Request) -> web.Response:
@@ -510,8 +559,8 @@ async def api_clean_server_handler(request: web.Request) -> web.Response:
         storage = get_system_storage_info()
         return web.json_response({"status": "ok", "cleaned": res, "storage": storage})
     except Exception as exc:
-        logger.error("api_clean_server xatosi: %s", exc)
-        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+        logger.error("api_clean_server xatosi: %s", exc, exc_info=True)
+        return web.json_response({"status": "error", "message": "Serverni tozalashda xatolik yuz berdi"}, status=500)
 
 
 async def api_profile_handler(request: web.Request) -> web.Response:
@@ -528,8 +577,8 @@ async def api_profile_handler(request: web.Request) -> web.Response:
             "total_facts": len(facts)
         })
     except Exception as exc:
-        logger.error("api_profile xatosi: %s", exc)
-        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+        logger.error("api_profile xatosi: %s", exc, exc_info=True)
+        return web.json_response({"status": "error", "message": "Profil ma'lumotlarini olishda xatolik yuz berdi"}, status=500)
 
 
 async def api_generate_image_handler(request: web.Request) -> web.Response:
@@ -561,8 +610,8 @@ async def api_generate_image_handler(request: web.Request) -> web.Response:
             })
         return web.json_response({"status": "error", "message": "Rasm yaratishda xatolik"}, status=500)
     except Exception as exc:
-        logger.error("api_generate_image xatosi: %s", exc)
-        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+        logger.error("api_generate_image xatosi: %s", exc, exc_info=True)
+        return web.json_response({"status": "error", "message": "Rasm yaratish jarayonida xatolik yuz berdi"}, status=500)
 
 
 async def api_download_video_handler(request: web.Request) -> web.Response:
@@ -587,8 +636,8 @@ async def api_download_video_handler(request: web.Request) -> web.Response:
             })
         return web.json_response({"status": "error", "message": "Video yuklab bo'lmadi yoki hajm 50MB dan katta"}, status=400)
     except Exception as exc:
-        logger.error("api_download_video xatosi: %s", exc)
-        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+        logger.error("api_download_video xatosi: %s", exc, exc_info=True)
+        return web.json_response({"status": "error", "message": "Video yuklab olishda xatolik yuz berdi"}, status=500)
 
 
 async def api_video_stream_handler(request: web.Request) -> web.StreamResponse:
@@ -644,8 +693,8 @@ async def api_agent_research_handler(request: web.Request) -> web.Response:
         report = await agent.conduct_research(topic)
         return web.json_response({"status": "ok", "report": report})
     except Exception as exc:
-        logger.error("api_agent_research xatosi: %s", exc)
-        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+        logger.error("api_agent_research xatosi: %s", exc, exc_info=True)
+        return web.json_response({"status": "error", "message": "Tadqiqot o'tkazishda xatolik yuz berdi"}, status=500)
 
 
 async def api_agent_code_review_handler(request: web.Request) -> web.Response:
@@ -662,8 +711,8 @@ async def api_agent_code_review_handler(request: web.Request) -> web.Response:
         report = await agent.review_code(code_text, language=language)
         return web.json_response({"status": "ok", "report": report})
     except Exception as exc:
-        logger.error("api_agent_code_review xatosi: %s", exc)
-        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+        logger.error("api_agent_code_review xatosi: %s", exc, exc_info=True)
+        return web.json_response({"status": "error", "message": "Kodni tahlil qilishda xatolik yuz berdi"}, status=500)
 
 
 async def api_agent_inspect_doc_handler(request: web.Request) -> web.Response:
@@ -679,8 +728,8 @@ async def api_agent_inspect_doc_handler(request: web.Request) -> web.Response:
         report = await agent.analyze_document(doc_text)
         return web.json_response({"status": "ok", "report": report})
     except Exception as exc:
-        logger.error("api_agent_inspect_doc xatosi: %s", exc)
-        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+        logger.error("api_agent_inspect_doc xatosi: %s", exc, exc_info=True)
+        return web.json_response({"status": "error", "message": "Hujjatni tahlil qilishda xatolik yuz berdi"}, status=500)
 
 
 async def api_agent_smm_creator_handler(request: web.Request) -> web.Response:
@@ -697,8 +746,8 @@ async def api_agent_smm_creator_handler(request: web.Request) -> web.Response:
         report = await agent.generate_content(topic, platform=platform)
         return web.json_response({"status": "ok", "report": report})
     except Exception as exc:
-        logger.error("api_agent_smm_creator xatosi: %s", exc)
-        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+        logger.error("api_agent_smm_creator xatosi: %s", exc, exc_info=True)
+        return web.json_response({"status": "error", "message": "SMM kontent yaratish jarayonida xatolik yuz berdi"}, status=500)
 
 
 async def api_tts_voice_handler(request: web.Request) -> web.Response:
@@ -720,8 +769,8 @@ async def api_tts_voice_handler(request: web.Request) -> web.Response:
             })
         return web.json_response({"status": "error", "message": "Ovoz sintezida xatolik"}, status=500)
     except Exception as exc:
-        logger.error("api_tts_voice xatosi: %s", exc)
-        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+        logger.error("api_tts_voice xatosi: %s", exc, exc_info=True)
+        return web.json_response({"status": "error", "message": "Ovoz sintez qilish jarayonida xatolik yuz berdi"}, status=500)
 
 
 async def api_astrology_calculate_handler(request: web.Request) -> web.Response:
@@ -756,8 +805,8 @@ async def api_astrology_calculate_handler(request: web.Request) -> web.Response:
             "solar": solar,
         })
     except Exception as exc:
-        logger.error("api_astrology_calculate xatosi: %s", exc)
-        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+        logger.error("api_astrology_calculate xatosi: %s", exc, exc_info=True)
+        return web.json_response({"status": "error", "message": "Natal kartani hisoblashda xatolik yuz berdi"}, status=500)
 
 
 async def api_astrology_profile_handler(request: web.Request) -> web.Response:
@@ -783,8 +832,8 @@ async def api_astrology_profile_handler(request: web.Request) -> web.Response:
             })
         return web.json_response({"status": "not_found", "message": "Profil mavjud emas"})
     except Exception as exc:
-        logger.error("api_astrology_profile xatosi: %s", exc)
-        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+        logger.error("api_astrology_profile xatosi: %s", exc, exc_info=True)
+        return web.json_response({"status": "error", "message": "Astrologiya profilini yuklashda xatolik yuz berdi"}, status=500)
 
 
 async def api_astrology_interpret_handler(request: web.Request) -> web.Response:
@@ -829,8 +878,8 @@ async def api_astrology_interpret_handler(request: web.Request) -> web.Response:
             "lots_count": len(custom_lots),
         })
     except Exception as exc:
-        logger.error("api_astrology_interpret xatosi: %s", exc)
-        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+        logger.error("api_astrology_interpret xatosi: %s", exc, exc_info=True)
+        return web.json_response({"status": "error", "message": "Astrologik tahlilda xatolik yuz berdi"}, status=500)
 
 
 async def api_astrology_lots_handler(request: web.Request) -> web.Response:
@@ -853,24 +902,29 @@ async def api_astrology_lots_handler(request: web.Request) -> web.Response:
             "message": f"Muvaffaqiyatli! {len(parsed)} ta Arab Loti xotiraga saqlandi va AI tahliliga ulandi."
         })
     except Exception as exc:
-        logger.error("api_astrology_lots xatosi: %s", exc)
-        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+        logger.error("api_astrology_lots xatosi: %s", exc, exc_info=True)
+        return web.json_response({"status": "error", "message": "Arab lotlarini saqlashda xatolik yuz berdi"}, status=500)
 
 
 async def start_web_server(ai_manager: AIManager, bot: Optional[Bot] = None) -> web.AppRunner:
     """aiohttp web server va Mini App endpointlarini ishga tushiradi."""
-    app = web.Application()
+    # Middleware zanjiri: cors -> auth -> handler
+    app = web.Application(middlewares=[
+        cors_middleware,
+        WebAppAuthMiddleware.middleware,
+    ])
     app["ai_manager"] = ai_manager
     if bot:
         app["bot"] = bot
 
-    # Ham root ("/"), ham "/webapp" Mini Appni ochadi (404 va adashishlarning oldini oladi)
+    # Public (auth talab qilinmaydigan) sahifalar
     app.router.add_get("/", webapp_page_handler)
     app.router.add_get("/webapp", webapp_page_handler)
     app.router.add_get("/webapp/", webapp_page_handler)
     app.router.add_get("/landing", landing_page_handler)
     app.router.add_get("/landing/", landing_page_handler)
     app.router.add_get("/health", health_handler)
+    app.router.add_get("/readiness", readiness_handler)
     app.router.add_get("/api/stats", api_stats_handler)
     app.router.add_post("/api/switch_model", api_switch_model_handler)
     app.router.add_post("/api/switch_role", api_switch_role_handler)
@@ -1010,7 +1064,7 @@ async def main() -> None:
                 except Exception as sync_err:
                     logger.debug("Avtomatik Telegram xotira sinxronlash: %s", sync_err)
 
-            asyncio.create_task(_auto_sync_telegram_history())
+            track_background_task(_auto_sync_telegram_history(), name="auto_sync_telegram_history")
     except Exception as exc:
         logger.error("⚠️ Userbot ulanmadi: %s", exc)
 
@@ -1073,7 +1127,7 @@ async def main() -> None:
             except Exception as sec_err:
                 logger.error("2-Bot polling xatosi: %s", sec_err, exc_info=True)
 
-        second_bot_task = asyncio.create_task(_run_second_bot_isolated())
+        second_bot_task = track_background_task(_run_second_bot_isolated(), name="second_bot_isolated")
 
     # 6. Smart Inbox Triage kuzatuvchisini faollashtirish
     if userbot_module.userbot and userbot_module.userbot.is_connected():
@@ -1097,13 +1151,14 @@ async def main() -> None:
                             c_id = int(k.replace("auto_chat_", ""))
                             from core.bot_skills import start_continuous_living_conversation, autonomous_dialogue_engine
                             if not autonomous_dialogue_engine.is_running(c_id):
-                                task = asyncio.create_task(
+                                task = track_background_task(
                                     start_continuous_living_conversation(
                                         chat_id=c_id,
                                         bot_white=bot,
                                         bot_black=second_bot,
                                         origin_bot=bot
-                                    )
+                                    ),
+                                    name=f"living_dialogue_{c_id}"
                                 )
                                 autonomous_dialogue_engine.active_tasks[c_id] = task
                                 logger.info("☕ Avto-suhbat avtomatik qayta tiklandi: chat_id=%s", c_id)
@@ -1112,7 +1167,7 @@ async def main() -> None:
         except Exception as e_all:
             logger.warning("_resume_auto_chat_conversations xatosi: %s", e_all)
 
-    asyncio.create_task(_resume_auto_chat_conversations())
+    track_background_task(_resume_auto_chat_conversations(), name="resume_auto_chat")
 
     # 8. Adminga ishga tushdi xabari
     from core.safe_send import safe_send_message
@@ -1196,6 +1251,17 @@ async def main() -> None:
                 await web_runner.cleanup()
             except Exception as wr_err:
                 logger.debug("Web runner tozalashda xatolik: %s", wr_err)
+
+        # Qolgan barcha fon vazifalarini to'xtatish (Tracked Background Tasks)
+        running_bg_tasks = [t for t in _BACKGROUND_TASKS if not t.done()]
+        for t in running_bg_tasks:
+            t.cancel()
+        if running_bg_tasks:
+            try:
+                await asyncio.wait(running_bg_tasks, timeout=5.0)
+            except Exception as wait_err:
+                logger.debug("Fon vazifalarini to'xtatishda kutish xatosi: %s", wait_err)
+
         try:
             await bot.session.close()
         except Exception as bot_err:

@@ -62,10 +62,8 @@ MISTRAL_FALLBACK_MODELS: list[str] = [
 ]
 
 # ─── 2-Bot: Mistral Arxitektor Agent Bot (@architect7_bot) ───
-import base64 as _b64
-_DEF_SEC_TOK = _b64.b64decode("ODE5NjExNzUzOTpBQUdCR3V4SnFrZHowNFFYTmFTSzI2LVdiU01obHhmaVM4NA==").decode()
-_DEF_MIS_KEY = _b64.b64decode("NWxxSzhweERqSUhYdlZENjhRdTlVVDZFam82RERCVUw=").decode()
-
+# XAVFSIZLIK: Hech qanday embedded/hardcoded token yoki API key yo'q.
+# Agar SECOND_BOT_TOKEN berilmasa, 2-bot xususiyati o'chirilgan holda ishlaydi.
 _raw_sec_tok = (
     os.getenv("SECOND_BOT_TOKEN")
     or os.getenv("second_bot_token")
@@ -76,21 +74,20 @@ _raw_sec_tok = (
     or ""
 ).strip()
 
-if not _raw_sec_tok or (BOT_TOKEN and _raw_sec_tok == BOT_TOKEN):
-    SECOND_BOT_TOKEN: str = _DEF_SEC_TOK
-else:
-    SECOND_BOT_TOKEN: str = _raw_sec_tok
+# Agar token berilmasa yoki asosiy bot tokeni bilan bir xil bo'lsa — 2-bot o'chiriladi
+SECOND_BOT_TOKEN: str = _raw_sec_tok if (_raw_sec_tok and _raw_sec_tok != BOT_TOKEN) else ""
 
+# Agar MISTRAL_AGENT_API_KEY berilmasa, Mistral Agent xususiyati o'chiriladi
 MISTRAL_AGENT_API_KEY: str = (
     os.getenv("MISTRAL_AGENT_API_KEY")
     or os.getenv("mistral_agent_api_key")
     or os.getenv("MISTRAL_API_KEY")
     or ""
-).strip() or _DEF_MIS_KEY
+).strip()
 MISTRAL_AGENT_ID: str = (
     os.getenv("MISTRAL_AGENT_ID")
     or os.getenv("mistral_agent_id")
-    or "ag_01a0ba16a68173e8a1cdb3ead308ff14"
+    or ""
 ).strip()
 
 # ─── OmniRoute AI Gateway (https://github.com/diegosouzapw/OmniRoute) ────
@@ -100,11 +97,12 @@ OMNIROUTE_API_KEY: str = os.getenv("OMNIROUTE_API_KEY", "omniroute")
 OMNIROUTE_MODEL: str = os.getenv("OMNIROUTE_MODEL", "auto")
 
 # ─── Midjourney / FLUX / AI Image Generation ────────────────
+# XAVFSIZLIK: Barcha API kalitlari faqat environment variable orqali olinadi.
+# Agar kalit berilmasa, tegishli xususiyat o'chiriladi.
 MIDJOURNEY_API_KEY: str = os.getenv("MIDJOURNEY_API_KEY", "")
 MIDJOURNEY_API_URL: str = os.getenv("MIDJOURNEY_API_URL", "https://api.goapi.ai/api/v1/task")
-_hf_chunks = ["h", "f_", "hHIwemFAvgDUqbc", "FguHIeLjvfrewGPQFzy"]
-POLLINATIONS_API_KEY: str = os.getenv("POLLINATIONS_API_KEY") or "sk_rxjymssWbXEDF7Fn6awf3iwNI82aeAfZ"
-HUGGINGFACE_API_KEY: str = os.getenv("HUGGINGFACE_API_KEY") or "".join(_hf_chunks)
+POLLINATIONS_API_KEY: str = os.getenv("POLLINATIONS_API_KEY", "")
+HUGGINGFACE_API_KEY: str = os.getenv("HUGGINGFACE_API_KEY", "")
 CLOUDFLARE_ACCOUNT_ID: str = os.getenv("CLOUDFLARE_ACCOUNT_ID", "")
 CLOUDFLARE_API_TOKEN: str = os.getenv("CLOUDFLARE_API_TOKEN", "")
 CLOUDFLARE_IMAGE_MODEL: str = os.getenv("CLOUDFLARE_IMAGE_MODEL", "@cf/black-forest-labs/flux-1-schnell")
@@ -117,8 +115,14 @@ VOICE_OPTIONS: dict[str, str] = {
     "dmitry":   "ru-RU-DmitryNeural",    # Ruscha (Erkak)
     "jenny":    "en-US-JennyNeural",     # Inglizcha (Ayol)
     "guy":      "en-US-GuyNeural",       # Inglizcha (Erkak)
+    "uz-madina": "uz-UZ-MadinaNeural",
+    "uz-sardor": "uz-UZ-SardorNeural",
+    "ru-dmitry": "ru-RU-DmitryNeural",
+    "ru-svetl": "ru-RU-SvetlanaNeural",
+    "en-guy": "en-US-GuyNeural",
+    "en-jenny": "en-US-JennyNeural",
 }
-ENABLE_VOICE_REPLIES: bool = os.getenv("ENABLE_VOICE_REPLIES", "true").lower() == "true"
+ENABLE_VOICE_REPLIES: bool = os.getenv("ENABLE_VOICE_REPLIES", "true").strip().lower() in ("true", "1", "yes")
 
 # ─── Watermark ───────────────────────────────────────────────
 WATERMARK_TEXT: str = os.getenv("WATERMARK_TEXT", "© SuperAgent")
@@ -237,22 +241,7 @@ UPTIME_TIMEOUT: int = int(os.getenv("UPTIME_TIMEOUT", "10"))  # soniya
 # ─── RSS & Yangiliklar ──────────────────────────────────────
 NEWS_MAX_ITEMS: int = int(os.getenv("NEWS_MAX_ITEMS", "5"))
 
-# ─── Ovozli Agent & TTS (Text-to-Speech & Speech-to-Text) ───
-DEFAULT_VOICE: str = os.getenv("DEFAULT_VOICE", "uz-UZ-MadinaNeural")
-VOICE_OPTIONS: dict[str, str] = {
-    "uz-madina": "uz-UZ-MadinaNeural",
-    "uz-sardor": "uz-UZ-SardorNeural",
-    "ru-dmitry": "ru-RU-DmitryNeural",
-    "ru-svetl": "ru-RU-SvetlanaNeural",
-    "en-guy": "en-US-GuyNeural",
-    "en-jenny": "en-US-JennyNeural",
-}
-ENABLE_VOICE_REPLIES: bool = os.getenv("ENABLE_VOICE_REPLIES", "true").strip().lower() in ("true", "1", "yes")
-
-# ─── Rasm Generatsiyasi (Midjourney & Imagen) ───────────────
-MIDJOURNEY_API_KEY: str = os.getenv("MIDJOURNEY_API_KEY", "")
-MIDJOURNEY_API_URL: str = os.getenv("MIDJOURNEY_API_URL", "https://api.midjourneyapi.xyz/v2/imagine")
-WATERMARK_TEXT: str = os.getenv("WATERMARK_TEXT", "@SuperAgentAI")
+# (Ovozli agent va TTS sozlamalari yuqorida — 111-125 qatorlarda bir marta aniqlangan)
 
 # ─── Xatoliklarni tekshirish ─────────────────────────────────
 def validate_config() -> list[str]:

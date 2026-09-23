@@ -192,13 +192,60 @@ async def generate_and_send_report(bot: "Bot", ai_manager: "AIManager") -> None:
 
 # ─── Email Avtomatik Tekshiruv ────────────────────────────────
 
-_seen_email_ids: set[str] = set()
+# _seen_email_ids endi in-memory yo'q. DB orqali persistent.
+# core/database.py knowledge_base jadvaliga 'email_seen_ids' categoriyasida saqlanadi.
+
+_email_seen_cache: set[str] = set()  # In-memory kesh (restart bo'lguncha)
+_email_seen_loaded: bool = False      # Bir marta DB dan yuklanganligini belgilaydi
+
+
+async def _load_seen_email_ids_from_db() -> set[str]:
+    """DB dan ko'rilgan email ID larini yuklaymiz (startup da bir marta)."""
+    global _email_seen_cache, _email_seen_loaded
+    if _email_seen_loaded:
+        return _email_seen_cache
+    try:
+        from core.database import db
+        facts = await db.get_all_facts()
+        for f in facts:
+            if f.get("category") == "email_seen_ids":
+                stored = f.get("content", "")
+                if stored:
+                    for msg_id in stored.split(","):
+                        msg_id = msg_id.strip()
+                        if msg_id:
+                            _email_seen_cache.add(msg_id)
+        _email_seen_loaded = True
+        logger.info("Email seen IDs DB dan yuklandi: %d ta", len(_email_seen_cache))
+    except Exception as exc:
+        logger.warning("Email seen IDs DB dan yuklanmadi: %s", exc)
+        _email_seen_loaded = True  # Xato bo'lsa ham flag ni qo'yamiz (retry bo'lmasin)
+    return _email_seen_cache
+
+
+async def _save_seen_email_ids_to_db(new_ids: list[str]) -> None:
+    """Ko'rilgan yangi email IDlarini DB ga saqlaymiz."""
+    global _email_seen_cache
+    for msg_id in new_ids:
+        _email_seen_cache.add(msg_id)
+    try:
+        from core.database import db
+        # Faqat so'nggi 500 ta ID ni saqlaymiz (DB ni to'ldirmaslik uchun)
+        recent_ids = list(_email_seen_cache)[-500:]
+        await db.save_fact(
+            "seen_email_ids_list",
+            ",".join(recent_ids),
+            category="email_seen_ids"
+        )
+    except Exception as exc:
+        logger.warning("Email seen IDs DB ga saqlanmadi: %s", exc)
 
 
 async def check_new_emails_job(bot: "Bot", ai_manager: "AIManager") -> None:
     """
     Davriy ravishda yangi kelgan xatlarni tekshiradi.
     Yangi muhim xat kelsa, adminga AI xulosasi bilan xabar beradi.
+    Ko'rilgan email IDlari DB da persistently saqlanadi (restartdan keyin duplicate bo'lmaydi).
     """
     from core.email_agent import EmailAgent
 
@@ -207,18 +254,20 @@ async def check_new_emails_job(bot: "Bot", ai_manager: "AIManager") -> None:
         return
 
     try:
+        # DB dan seen IDs ni yuklaymiz (birinchi marta)
+        seen_ids = await _load_seen_email_ids_from_db()
+
         unread = await agent.fetch_unread(limit=5)
         if not unread:
             return
 
-        global _seen_email_ids
-        new_items = [e for e in unread if e.msg_id not in _seen_email_ids]
+        new_items = [e for e in unread if e.msg_id not in seen_ids]
 
         if not new_items:
             return
 
-        for item in new_items:
-            _seen_email_ids.add(item.msg_id)
+        # Yangi ko'rilgan IDlarni DB ga saqlaymiz
+        await _save_seen_email_ids_to_db([e.msg_id for e in new_items])
 
         # Xabarnoma tayyorlash
         summary = await agent.analyze_inbox(new_items, ai_manager)
