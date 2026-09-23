@@ -32,7 +32,7 @@ fi
 if ! command -v caddy &> /dev/null; then
     echo "📥 Caddy server o'rnatilmoqda..."
     sudo apt update -qq
-    sudo apt install -y -qq debian-keyring debian-archive-keyring apt-transport-https curl ffmpeg
+    sudo apt install -y -qq debian-keyring debian-archive-keyring apt-transport-https curl ffmpeg psmisc
     curl -1sLF 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg --yes 2>/dev/null
     curl -1sLF 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list > /dev/null
     sudo apt update -qq
@@ -52,7 +52,7 @@ echo "🌐 Server Public IP: $PUBLIC_IP"
 echo "🔒 HTTPS va Caddy sozlanmoqda..."
 sudo tee /etc/caddy/Caddyfile > /dev/null <<EOF
 $PUBLIC_IP.nip.io {
-    reverse_proxy localhost:8080
+    reverse_proxy 127.0.0.1:8080
 }
 EOF
 

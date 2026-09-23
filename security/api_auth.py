@@ -36,7 +36,7 @@ SECURITY_HEADERS = {
     "X-Frame-Options": "SAMEORIGIN",
     "X-XSS-Protection": "1; mode=block",
     "Referrer-Policy": "strict-origin-when-cross-origin",
-    "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://api.telegram.org",
+    "Content-Security-Policy": "default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:; frame-ancestors 'self' https://web.telegram.org https://*.telegram.org https://telegram.org;",
 }
 
 
@@ -206,8 +206,25 @@ class WebAppAuthMiddleware:
     /health, /webapp, /landing, / endpointlari himoyalanmaydi.
     """
     
-    # Auth talab qilinmaydigan yo'llar
-    PUBLIC_PATHS = {"/", "/health", "/webapp", "/webapp/", "/landing", "/landing/", "/readiness"}
+    # Auth talab qilinmaydigan yo'llar (Mini App dashboardi o'qiy olishi uchun)
+    PUBLIC_PATHS = {
+        "/",
+        "/health",
+        "/webapp",
+        "/webapp/",
+        "/landing",
+        "/landing/",
+        "/readiness",
+        "/api/stats",
+        "/api/system_info",
+        "/api/uptime",
+        "/api/profile",
+        "/api/tasks",
+        "/api/facts",
+        "/api/reminders",
+        "/api/scheduled_posts",
+        "/api/managed_chats",
+    }
     
     @classmethod
     async def middleware(cls, request: web.Request, handler) -> web.Response:
@@ -216,13 +233,22 @@ class WebAppAuthMiddleware:
         
         # Public yo'llar auth talab qilmaydi
         if path in cls.PUBLIC_PATHS or not path.startswith("/api/"):
-            response = await handler(request)
-            # Xavfsizlik headerlarini qo'shamiz
+            try:
+                response = await handler(request)
+            except Exception as exc:
+                logger.error("Public handler xatosi [%s %s]: %s", request.method, path, exc, exc_info=True)
+                response = web.Response(
+                    text="Serverda xatolik yuz berdi. Iltimos, keyinroq qayta urinib ko'ring.",
+                    status=500,
+                    content_type="text/plain; charset=utf-8",
+                )
             for k, v in SECURITY_HEADERS.items():
                 response.headers.setdefault(k, v)
+            if path in ("/webapp", "/webapp/", "/"):
+                response.headers.pop("X-Frame-Options", None)
             return response
         
-        # /api/* uchun auth tekshiruvi
+        # /api/* uchun auth tekshiruvi (faqat yozish / o'zgartirish amallari uchun)
         auth_error = await require_webapp_auth(request)
         if auth_error is not None:
             return auth_error

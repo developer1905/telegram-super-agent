@@ -7,9 +7,9 @@ StartLimitIntervalSec=0
 [Service]
 Type=simple
 User=ubuntu
-WorkingDirectory=/home/ubuntu/telegram-super-agent
+WorkingDirectory=/home/ubuntu/superagent
 ExecStartPre=/bin/bash -c "fuser -k 8080/tcp 2>/dev/null || true"
-ExecStart=/home/ubuntu/telegram-super-agent/venv/bin/python main.py
+ExecStart=/home/ubuntu/superagent/venv/bin/python main.py
 Restart=always
 RestartSec=5s
 LimitNOFILE=65536

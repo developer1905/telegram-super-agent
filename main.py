@@ -136,36 +136,75 @@ async def root_handler(request: web.Request) -> web.Response:
 
 async def webapp_page_handler(request: web.Request) -> web.Response:
     """Telegram Mini App (Web App) HTML interfeysi."""
-    webapp_file = os.path.join(os.path.dirname(__file__), "webapp", "index.html")
-    if os.path.exists(webapp_file):
-        with open(webapp_file, "r", encoding="utf-8") as f:
-            html = f.read()
+    try:
+        candidate_paths = [
+            os.path.join(os.path.dirname(__file__), "webapp", "index.html"),
+            os.path.join(os.getcwd(), "webapp", "index.html"),
+            os.path.join(os.path.expanduser("~"), "superagent", "webapp", "index.html"),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "webapp", "index.html"),
+        ]
+        webapp_file = None
+        for p in candidate_paths:
+            if os.path.exists(p):
+                webapp_file = p
+                break
+
+        if webapp_file:
+            with open(webapp_file, "r", encoding="utf-8", errors="replace") as f:
+                html = f.read()
+            return web.Response(
+                text=html,
+                content_type="text/html; charset=utf-8",
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                },
+            )
+        logger.warning("webapp_page_handler: index.html quyidagi joylardan topilmadi: %s", candidate_paths)
+        return web.Response(text="Web App index.html topilmadi", status=404, content_type="text/plain; charset=utf-8")
+    except Exception as exc:
+        logger.error("webapp_page_handler xatosi: %s", exc, exc_info=True)
         return web.Response(
-            text=html,
-            content_type="text/html",
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Cache-Control": "no-cache, no-store, must-revalidate",
-            },
+            text="Web App sahifasini yuklashda xatolik yuz berdi. Iltimos, keyinroq qayta urinib ko'ring.",
+            status=500,
+            content_type="text/plain; charset=utf-8"
         )
-    return web.Response(text="Web App index.html topilmadi", status=404)
 
 
 async def landing_page_handler(request: web.Request) -> web.Response:
     """B2B Sotuv Landing Page HTML interfeysi."""
-    landing_file = os.path.join(os.path.dirname(__file__), "landing", "index.html")
-    if os.path.exists(landing_file):
-        with open(landing_file, "r", encoding="utf-8") as f:
-            html = f.read()
+    try:
+        candidate_paths = [
+            os.path.join(os.path.dirname(__file__), "landing", "index.html"),
+            os.path.join(os.getcwd(), "landing", "index.html"),
+            os.path.join(os.path.expanduser("~"), "superagent", "landing", "index.html"),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "landing", "index.html"),
+        ]
+        landing_file = None
+        for p in candidate_paths:
+            if os.path.exists(p):
+                landing_file = p
+                break
+
+        if landing_file:
+            with open(landing_file, "r", encoding="utf-8", errors="replace") as f:
+                html = f.read()
+            return web.Response(
+                text=html,
+                content_type="text/html; charset=utf-8",
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                },
+            )
+        return web.Response(text="Landing page index.html topilmadi", status=404, content_type="text/plain; charset=utf-8")
+    except Exception as exc:
+        logger.error("landing_page_handler xatosi: %s", exc, exc_info=True)
         return web.Response(
-            text=html,
-            content_type="text/html",
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Cache-Control": "no-cache, no-store, must-revalidate",
-            },
+            text="Landing sahifasini yuklashda xatolik yuz berdi.",
+            status=500,
+            content_type="text/plain; charset=utf-8"
         )
-    return web.Response(text="Landing page index.html topilmadi", status=404)
 
 
 
