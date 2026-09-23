@@ -154,20 +154,22 @@ async def webapp_page_handler(request: web.Request) -> web.Response:
                 html = f.read()
             return web.Response(
                 text=html,
-                content_type="text/html; charset=utf-8",
+                content_type="text/html",
+                charset="utf-8",
                 headers={
                     "Access-Control-Allow-Origin": "*",
                     "Cache-Control": "no-cache, no-store, must-revalidate",
                 },
             )
         logger.warning("webapp_page_handler: index.html quyidagi joylardan topilmadi: %s", candidate_paths)
-        return web.Response(text="Web App index.html topilmadi", status=404, content_type="text/plain; charset=utf-8")
+        return web.Response(text="Web App index.html topilmadi", status=404, content_type="text/plain", charset="utf-8")
     except Exception as exc:
         logger.error("webapp_page_handler xatosi: %s", exc, exc_info=True)
         return web.Response(
             text="Web App sahifasini yuklashda xatolik yuz berdi. Iltimos, keyinroq qayta urinib ko'ring.",
             status=500,
-            content_type="text/plain; charset=utf-8"
+            content_type="text/plain",
+            charset="utf-8",
         )
 
 
@@ -191,19 +193,21 @@ async def landing_page_handler(request: web.Request) -> web.Response:
                 html = f.read()
             return web.Response(
                 text=html,
-                content_type="text/html; charset=utf-8",
+                content_type="text/html",
+                charset="utf-8",
                 headers={
                     "Access-Control-Allow-Origin": "*",
                     "Cache-Control": "no-cache, no-store, must-revalidate",
                 },
             )
-        return web.Response(text="Landing page index.html topilmadi", status=404, content_type="text/plain; charset=utf-8")
+        return web.Response(text="Landing page index.html topilmadi", status=404, content_type="text/plain", charset="utf-8")
     except Exception as exc:
         logger.error("landing_page_handler xatosi: %s", exc, exc_info=True)
         return web.Response(
             text="Landing sahifasini yuklashda xatolik yuz berdi.",
             status=500,
-            content_type="text/plain; charset=utf-8"
+            content_type="text/plain",
+            charset="utf-8",
         )
 
 

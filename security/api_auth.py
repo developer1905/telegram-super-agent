@@ -226,49 +226,57 @@ class WebAppAuthMiddleware:
         "/api/managed_chats",
     }
     
-    @classmethod
-    async def middleware(cls, request: web.Request, handler) -> web.Response:
-        """aiohttp middleware funksiyasi."""
-        path = request.path
-        
-        # Public yo'llar auth talab qilmaydi
-        if path in cls.PUBLIC_PATHS or not path.startswith("/api/"):
-            try:
-                response = await handler(request)
-            except Exception as exc:
-                logger.error("Public handler xatosi [%s %s]: %s", request.method, path, exc, exc_info=True)
-                response = web.Response(
-                    text="Serverda xatolik yuz berdi. Iltimos, keyinroq qayta urinib ko'ring.",
-                    status=500,
-                    content_type="text/plain; charset=utf-8",
-                )
-            for k, v in SECURITY_HEADERS.items():
-                response.headers.setdefault(k, v)
-            if path in ("/webapp", "/webapp/", "/"):
-                response.headers.pop("X-Frame-Options", None)
-            return response
-        
-        # /api/* uchun auth tekshiruvi (faqat yozish / o'zgartirish amallari uchun)
-        auth_error = await require_webapp_auth(request)
-        if auth_error is not None:
-            return auth_error
-        
-        # Auth o'tdi — handler ga uzatamiz
+    # Middleware placeholder (assigned below)
+    middleware = None
+
+
+@web.middleware
+async def webapp_auth_middleware(request: web.Request, handler) -> web.Response:
+    """aiohttp middleware — public sahifalarni o'tkazadi, /api/* ni himoyalaydi."""
+    path = request.path
+    
+    # Public yo'llar auth talab qilmaydi
+    if path in WebAppAuthMiddleware.PUBLIC_PATHS or not path.startswith("/api/"):
         try:
             response = await handler(request)
         except Exception as exc:
-            logger.error("API handler xatosi [%s %s]: %s", request.method, path, exc, exc_info=True)
-            # Internal xatolarni leak qilmaymiz
-            response = web.json_response(
-                {"error": "Internal server error", "code": "INTERNAL_ERROR"},
+            logger.error("Public handler xatosi [%s %s]: %s", request.method, path, exc, exc_info=True)
+            response = web.Response(
+                text="Serverda xatolik yuz berdi. Iltimos, keyinroq qayta urinib ko'ring.",
                 status=500,
+                content_type="text/plain",
+                charset="utf-8",
             )
-        
-        # Xavfsizlik headerlarini qo'shamiz
         for k, v in SECURITY_HEADERS.items():
             response.headers.setdefault(k, v)
-        
+        if path in ("/webapp", "/webapp/", "/"):
+            response.headers.pop("X-Frame-Options", None)
         return response
+    
+    # /api/* uchun auth tekshiruvi (faqat yozish / o'zgartirish amallari uchun)
+    auth_error = await require_webapp_auth(request)
+    if auth_error is not None:
+        return auth_error
+    
+    # Auth o'tdi — handler ga uzatamiz
+    try:
+        response = await handler(request)
+    except Exception as exc:
+        logger.error("API handler xatosi [%s %s]: %s", request.method, path, exc, exc_info=True)
+        # Internal xatolarni leak qilmaymiz
+        response = web.json_response(
+            {"error": "Internal server error", "code": "INTERNAL_ERROR"},
+            status=500,
+        )
+    
+    # Xavfsizlik headerlarini qo'shamiz
+    for k, v in SECURITY_HEADERS.items():
+        response.headers.setdefault(k, v)
+    
+    return response
+
+# Link into class for backward compatibility
+WebAppAuthMiddleware.middleware = webapp_auth_middleware
 
 
 # CORS policy (faqat Telegram WebApp domeniga ruxsat)
@@ -282,6 +290,7 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 
+@web.middleware
 async def cors_middleware(request: web.Request, handler) -> web.Response:
     """CORS middleware — faqat Telegram WebApp domenlariga ruxsat beradi."""
     origin = request.headers.get("Origin", "")
