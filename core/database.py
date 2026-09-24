@@ -271,6 +271,14 @@ class DatabaseManager:
                 except Exception:
                     pass
 
+            # Mavjud faktlarni admin ID ga avtomatik bog'lash
+            from config import ADMIN_ID
+            admin_id_str = str(ADMIN_ID).strip() if ADMIN_ID else "admin"
+            try:
+                cursor.execute("UPDATE knowledge_base SET user_id = ? WHERE user_id = 'admin';", (admin_id_str,))
+            except Exception:
+                pass
+
             conn.commit()
 
     # ─── 1. SHAXSIY MA'LUMOTLAR BAZASI (KNOWLEDGE BASE / RAG) ──────
@@ -298,7 +306,20 @@ class DatabaseManager:
                 )
                 logger.info("Supabase: Fakt saqlandi: '%s'", key_clean)
             except Exception as exc:
-                logger.warning("Supabase xatosi, SQLite ga yozilmoqda: %s", exc)
+                try:
+                    data_no_uid = {
+                        "key": key_clean,
+                        "content": content,
+                        "category": category,
+                        "updated_at": now_iso,
+                    }
+                    await loop.run_in_executor(
+                        None,
+                        lambda: self._supabase_client.table("knowledge_base").upsert(data_no_uid, on_conflict="key").execute()
+                    )
+                    logger.info("Supabase: Fakt saqlandi (user_id siz): '%s'", key_clean)
+                except Exception as exc2:
+                    logger.warning("Supabase xatosi, SQLite ga yozilmoqda: %s", exc2)
 
         # Har doim lokal SQLite ga ham yozib qo'yamiz (tezkor kesh va oflayn ishlash uchun)
         try:
@@ -320,13 +341,18 @@ class DatabaseManager:
 
     async def get_all_facts(self, user_id: Optional[str] = None) -> list[dict]:
         """Saqlangan faktlarni olish (user_id ko'rsatilsa, faqat shu foydalanuvchining ma'lumotlari)."""
+        from config import ADMIN_ID
+        admin_id_str = str(ADMIN_ID).strip() if ADMIN_ID else "admin"
+
         user_id_str = str(user_id).strip() if user_id is not None else None
+        is_admin_user = (user_id_str is None) or (user_id_str in (admin_id_str, "admin"))
+
         if self.use_supabase and self._supabase_client:
             try:
                 loop = asyncio.get_running_loop()
                 def _sb_fetch():
                     q = self._supabase_client.table("knowledge_base").select("*")
-                    if user_id_str is not None:
+                    if user_id_str is not None and not is_admin_user:
                         q = q.eq("user_id", user_id_str)
                     return q.execute()
                 res = await loop.run_in_executor(None, _sb_fetch)
@@ -340,10 +366,16 @@ class DatabaseManager:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
                 if user_id_str is not None:
-                    cursor.execute(
-                        "SELECT key, content, category, user_id, updated_at FROM knowledge_base WHERE user_id = ? ORDER BY updated_at DESC",
-                        (user_id_str,)
-                    )
+                    if is_admin_user:
+                        cursor.execute(
+                            "SELECT key, content, category, user_id, updated_at FROM knowledge_base WHERE user_id = ? OR user_id = 'admin' OR user_id = ? ORDER BY updated_at DESC",
+                            (user_id_str, admin_id_str)
+                        )
+                    else:
+                        cursor.execute(
+                            "SELECT key, content, category, user_id, updated_at FROM knowledge_base WHERE user_id = ? ORDER BY updated_at DESC",
+                            (user_id_str,)
+                        )
                 else:
                     cursor.execute("SELECT key, content, category, user_id, updated_at FROM knowledge_base ORDER BY updated_at DESC")
                 rows = cursor.fetchall()
