@@ -215,8 +215,23 @@ async def api_stats_handler(request: web.Request) -> web.Response:
     return web.json_response(stats)
 
 
+def check_admin(request: web.Request) -> Optional[web.Response]:
+    """Admin rolini tekshirish. Agar admin bo'lmasa 403 Forbidden qaytaradi."""
+    if not request.get("is_admin", False):
+        return web.json_response(
+            {"error": "Ushbu amalni bajarish uchun Administrator huquqi talab qilinadi.", "code": "FORBIDDEN"},
+            status=403,
+            headers={"Content-Type": "application/json"}
+        )
+    return None
+
+
 async def api_switch_model_handler(request: web.Request) -> web.Response:
-    """Mini App orqali AI modelni almashtirish."""
+    """Mini App orqali AI modelni almashtirish (Faqat Administrator uchun)."""
+    admin_err = check_admin(request)
+    if admin_err:
+        return admin_err
+
     ai_manager: AIManager = request.app["ai_manager"]
     data = await request.json()
     model = data.get("model", "gemini")
@@ -236,7 +251,11 @@ async def api_switch_model_handler(request: web.Request) -> web.Response:
 
 
 async def api_switch_role_handler(request: web.Request) -> web.Response:
-    """Mini App orqali tizim rolini almashtirish."""
+    """Mini App orqali tizim rolini almashtirish (Faqat Administrator uchun)."""
+    admin_err = check_admin(request)
+    if admin_err:
+        return admin_err
+
     ai_manager: AIManager = request.app["ai_manager"]
     data = await request.json()
     role = data.get("role", "universal")
@@ -250,16 +269,19 @@ async def api_add_fact_handler(request: web.Request) -> web.Response:
     key = data.get("key", "").strip()
     content = data.get("content", "").strip()
     category = data.get("category", "webapp").strip()
+    user_id = str(request.get("authenticated_user_id") or "admin")
     if not key or not content:
         return web.json_response({"status": "error", "message": "Kalit yoki matn bo'sh"}, status=400)
 
-    success = await db.save_fact(key, content, category=category)
+    success = await db.save_fact(key, content, category=category, user_id=user_id)
     return web.json_response({"status": "ok" if success else "error"})
 
 
 async def api_facts_handler(request: web.Request) -> web.Response:
-    """Mini App: doimiy xotiradagi barcha faktlar ro'yxati."""
-    facts = await db.get_all_facts()
+    """Mini App: doimiy xotiradagi faktlar ro'yxati (Foydalanuvchi faqat o'zinikini ko'radi)."""
+    user_id = request.get("authenticated_user_id")
+    is_admin = request.get("is_admin", False)
+    facts = await db.get_all_facts(user_id=None if is_admin else user_id)
     return web.json_response({"facts": facts})
 
 
@@ -267,15 +289,19 @@ async def api_delete_fact_handler(request: web.Request) -> web.Response:
     """Mini App: faktni o'chirish."""
     data = await request.json()
     key = data.get("key", "").strip()
+    user_id = request.get("authenticated_user_id")
+    is_admin = request.get("is_admin", False)
     if not key:
         return web.json_response({"status": "error", "message": "Kalit ko'rsatilmadi"}, status=400)
-    success = await db.delete_fact(key)
+    success = await db.delete_fact(key, user_id=None if is_admin else user_id)
     return web.json_response({"status": "ok" if success else "error"})
 
 
 async def api_reminders_handler(request: web.Request) -> web.Response:
-    """Mini App: barcha faol eslatmalar ro'yxati."""
-    reminders = await db.get_active_reminders()
+    """Mini App: faol eslatmalar ro'yxati."""
+    user_id = request.get("authenticated_user_id")
+    is_admin = request.get("is_admin", False)
+    reminders = await db.get_active_reminders(user_id=None if is_admin else user_id)
     return web.json_response({"reminders": reminders})
 
 
@@ -284,10 +310,11 @@ async def api_add_reminder_handler(request: web.Request) -> web.Response:
     data = await request.json()
     text = data.get("text", "").strip()
     remind_at = data.get("remind_at", "").strip()
+    user_id = str(request.get("authenticated_user_id") or ADMIN_ID or "admin")
     if not text or not remind_at:
         return web.json_response({"status": "error", "message": "Matn yoki vaqt to'ldirilmadi"}, status=400)
 
-    rem_id = await db.add_reminder(ADMIN_ID, text, remind_at)
+    rem_id = await db.add_reminder(user_id, text, remind_at, user_id=user_id)
     return web.json_response({"status": "ok", "id": rem_id})
 
 
@@ -295,14 +322,19 @@ async def api_delete_reminder_handler(request: web.Request) -> web.Response:
     """Mini App: eslatmani bekor qilish."""
     data = await request.json()
     rem_id = data.get("id")
+    user_id = request.get("authenticated_user_id")
+    is_admin = request.get("is_admin", False)
     if not rem_id:
         return web.json_response({"status": "error", "message": "ID ko'rsatilmadi"}, status=400)
-    success = await db.delete_reminder(int(rem_id))
+    success = await db.delete_reminder(int(rem_id), user_id=None if is_admin else user_id)
     return web.json_response({"status": "ok" if success else "error"})
 
 
 async def api_scheduled_posts_handler(request: web.Request) -> web.Response:
-    """Mini App: kutilayotgan kanal postlari."""
+    """Mini App: kutilayotgan kanal postlari (Faqat Administrator uchun)."""
+    admin_err = check_admin(request)
+    if admin_err:
+        return admin_err
     posts = await db.get_all_pending_posts()
     return web.json_response({"posts": posts})
 
@@ -329,7 +361,11 @@ async def api_ai_playground_handler(request: web.Request) -> web.Response:
 
 
 async def api_system_info_handler(request: web.Request) -> web.Response:
-    """Mini App: tizim holati, uptime, userbot, ma'lumotlar bazasi."""
+    """Mini App: tizim holati, uptime, userbot, ma'lumotlar bazasi (Faqat Administrator uchun)."""
+    admin_err = check_admin(request)
+    if admin_err:
+        return admin_err
+
     ai_manager: AIManager = request.app["ai_manager"]
     uptime_seconds = (datetime.now() - START_TIME).total_seconds()
     userbot_client = userbot_module.get_client() if hasattr(userbot_module, "get_client") else userbot_module.userbot
@@ -365,7 +401,10 @@ async def api_system_info_handler(request: web.Request) -> web.Response:
 
 
 async def api_managed_chats_handler(request: web.Request) -> web.Response:
-    """Mini App: boshqarilayotgan barcha guruhlar va kanallar."""
+    """Mini App: boshqarilayotgan barcha guruhlar va kanallar (Faqat Administrator uchun)."""
+    admin_err = check_admin(request)
+    if admin_err:
+        return admin_err
     chats = await db.get_managed_chats()
     return web.json_response({"chats": chats})
 
@@ -500,9 +539,11 @@ async def api_chat_agent_handler(request: web.Request) -> web.Response:
 
 
 async def api_tasks_get_handler(request: web.Request) -> web.Response:
-    """Mini App: Notion / Todo vazifalar ro'yxati."""
+    """Mini App: Notion / Todo vazifalar ro'yxati (Foydalanuvchi faqat o'z vazifalarini ko'radi)."""
     try:
-        tasks = await db.get_tasks(ADMIN_ID)
+        user_id = request.get("authenticated_user_id")
+        is_admin = request.get("is_admin", False)
+        tasks = await db.get_tasks(user_id=None if is_admin else user_id)
         return web.json_response({"status": "ok", "tasks": tasks})
     except Exception as exc:
         logger.error("api_tasks_get xatosi: %s", exc, exc_info=True)
@@ -515,9 +556,10 @@ async def api_tasks_add_handler(request: web.Request) -> web.Response:
         data = await request.json()
         title = data.get("title", "").strip()
         due_date = data.get("due_date", "")
+        user_id = str(request.get("authenticated_user_id") or "admin")
         if not title:
             return web.json_response({"status": "error", "message": "Vazifa nomi bo'sh"}, status=400)
-        task_id = await db.add_task(ADMIN_ID, title, due_date=due_date)
+        task_id = await db.add_task(user_id, title, due_date=due_date)
         return web.json_response({"status": "ok", "task_id": task_id})
     except Exception as exc:
         logger.error("api_tasks_add xatosi: %s", exc, exc_info=True)
@@ -530,10 +572,12 @@ async def api_tasks_toggle_handler(request: web.Request) -> web.Response:
         data = await request.json()
         task_id = int(data.get("task_id", 0))
         action = data.get("action", "complete")
+        user_id = request.get("authenticated_user_id")
+        is_admin = request.get("is_admin", False)
         if action == "complete":
-            await db.complete_task(task_id)
+            await db.complete_task(task_id, user_id=None if is_admin else user_id)
         elif action == "delete":
-            await db.delete_task(task_id)
+            await db.delete_task(task_id, user_id=None if is_admin else user_id)
         return web.json_response({"status": "ok"})
     except Exception as exc:
         logger.error("api_tasks_toggle xatosi: %s", exc, exc_info=True)
@@ -541,9 +585,12 @@ async def api_tasks_toggle_handler(request: web.Request) -> web.Response:
 
 
 async def api_uptime_get_handler(request: web.Request) -> web.Response:
-    """Mini App: Uptime monitor saytlar ro'yxati."""
+    """Mini App: Uptime monitor saytlar ro'yxati (Faqat Administrator uchun)."""
+    admin_err = check_admin(request)
+    if admin_err:
+        return admin_err
     try:
-        monitors = await db.get_uptime_monitors(ADMIN_ID)
+        monitors = await db.get_uptime_monitors()
         return web.json_response({"status": "ok", "monitors": monitors})
     except Exception as exc:
         logger.error("api_uptime_get xatosi: %s", exc, exc_info=True)
@@ -551,7 +598,10 @@ async def api_uptime_get_handler(request: web.Request) -> web.Response:
 
 
 async def api_uptime_add_handler(request: web.Request) -> web.Response:
-    """Mini App: Uptime monitorga yangi sayt qo'shish."""
+    """Mini App: Uptime monitorga yangi sayt qo'shish (Faqat Administrator uchun)."""
+    admin_err = check_admin(request)
+    if admin_err:
+        return admin_err
     try:
         data = await request.json()
         url = data.get("url", "").strip()
@@ -576,7 +626,10 @@ async def api_uptime_add_handler(request: web.Request) -> web.Response:
 
 
 async def api_uptime_delete_handler(request: web.Request) -> web.Response:
-    """Mini App: Uptime monitorni o'chirish."""
+    """Mini App: Uptime monitorni o'chirish (Faqat Administrator uchun)."""
+    admin_err = check_admin(request)
+    if admin_err:
+        return admin_err
     try:
         data = await request.json()
         mon_id = int(data.get("id", 0))
@@ -588,7 +641,10 @@ async def api_uptime_delete_handler(request: web.Request) -> web.Response:
 
 
 async def api_clean_server_handler(request: web.Request) -> web.Response:
-    """Mini App: Serverni xavfsiz tozalash va disk holati."""
+    """Mini App: Serverni xavfsiz tozalash va disk holati (Faqat Administrator uchun)."""
+    admin_err = check_admin(request)
+    if admin_err:
+        return admin_err
     try:
         from core.cleaner_agent import safe_clean_server_storage, get_system_storage_info
         res = await safe_clean_server_storage()
@@ -600,9 +656,11 @@ async def api_clean_server_handler(request: web.Request) -> web.Response:
 
 
 async def api_profile_handler(request: web.Request) -> web.Response:
-    """Mini App: Mem0 shaxsiy profil faktlari."""
+    """Mini App: Mem0 shaxsiy profil faktlari (Foydalanuvchi faqat o'z profilini ko'radi)."""
     try:
-        facts = await db.get_all_facts()
+        user_id = request.get("authenticated_user_id")
+        is_admin = request.get("is_admin", False)
+        facts = await db.get_all_facts(user_id=None if is_admin else user_id)
         profile_facts = [
             f for f in facts
             if f.get("category") == "mem0_profile" or f.get("key", "").startswith("profile_")
@@ -816,7 +874,7 @@ async def api_astrology_calculate_handler(request: web.Request) -> web.Response:
         birth_date = data.get("birth_date", "").strip()
         birth_time = data.get("birth_time", "12:00").strip()
         city = data.get("city", "Toshkent").strip()
-        user_id = str(data.get("user_id", "default_user"))
+        user_id = str(request.get("authenticated_user_id") or data.get("user_id", "default_user"))
 
         if not birth_date:
             return web.json_response({"status": "error", "message": "Tug'ilgan sana kiritilmadi"}, status=400)
@@ -848,8 +906,18 @@ async def api_astrology_calculate_handler(request: web.Request) -> web.Response:
 async def api_astrology_profile_handler(request: web.Request) -> web.Response:
     """Mini App: Mavjud Astrologiya profilini olish."""
     try:
-        user_id = request.query.get("user_id", "default_user")
-        profile = await db.get_astrology_profile(user_id)
+        auth_user_id = str(request.get("authenticated_user_id") or "")
+        requested_user_id = request.query.get("user_id")
+        is_admin = request.get("is_admin", False)
+
+        if requested_user_id and str(requested_user_id) != auth_user_id and not is_admin:
+            return web.json_response(
+                {"status": "forbidden", "message": "Boshqa foydalanuvchining astrologiya profiliga kirish taqiqlangan.", "code": "FORBIDDEN"},
+                status=403
+            )
+
+        target_user_id = str(requested_user_id if (requested_user_id and is_admin) else auth_user_id)
+        profile = await db.get_astrology_profile(target_user_id)
         if profile and profile.get("chart"):
             from core.astrology_agent import calculate_transits, calculate_solar_return_summary
             chart = profile["chart"]
@@ -866,7 +934,7 @@ async def api_astrology_profile_handler(request: web.Request) -> web.Response:
                     "solar": solar,
                 }
             })
-        return web.json_response({"status": "not_found", "message": "Profil mavjud emas"})
+        return web.json_response({"status": "not_found", "message": "Astrologiya profili mavjud emas", "code": "NOT_FOUND"}, status=404)
     except Exception as exc:
         logger.error("api_astrology_profile xatosi: %s", exc, exc_info=True)
         return web.json_response({"status": "error", "message": "Astrologiya profilini yuklashda xatolik yuz berdi"}, status=500)
@@ -878,10 +946,20 @@ async def api_astrology_interpret_handler(request: web.Request) -> web.Response:
         ai_manager: AIManager = request.app["ai_manager"]
         data = await request.json()
         question = data.get("question", "").strip()
-        user_id = str(data.get("user_id", "default_user"))
+        auth_user_id = str(request.get("authenticated_user_id") or "")
+        requested_user_id = data.get("user_id")
+        is_admin = request.get("is_admin", False)
+
+        if requested_user_id and str(requested_user_id) != auth_user_id and not is_admin:
+            return web.json_response(
+                {"status": "forbidden", "message": "Boshqa foydalanuvchi nomidan tahlil olish taqiqlangan.", "code": "FORBIDDEN"},
+                status=403
+            )
+
+        target_user_id = str(requested_user_id if (requested_user_id and is_admin) else auth_user_id)
         selected_model = data.get("model", "")
 
-        profile = await db.get_astrology_profile(user_id)
+        profile = await db.get_astrology_profile(target_user_id)
         if not profile or not profile.get("chart"):
             return web.json_response({"status": "error", "message": "Avval natal kartangizni hisoblang"}, status=400)
 
@@ -900,7 +978,7 @@ async def api_astrology_interpret_handler(request: web.Request) -> web.Response:
             ai_manager.switch_provider("gemini")
 
         try:
-            report = await ai_manager.generate(prompt, save_history=False, chat_id=f"astro_{user_id}")
+            report = await ai_manager.generate(prompt, save_history=False, chat_id=f"astro_{target_user_id}")
             from core.astrology_agent import ensure_uzbek_astrology_report
             report = await ensure_uzbek_astrology_report(report, ai_manager)
         finally:
@@ -922,7 +1000,17 @@ async def api_astrology_lots_handler(request: web.Request) -> web.Response:
     """Mini App: 513 tagacha bo'lgan Arab Lotlarini qabul qilish va profilga saqlash."""
     try:
         data = await request.json()
-        user_id = str(data.get("user_id", "default_user"))
+        auth_user_id = str(request.get("authenticated_user_id") or "")
+        requested_user_id = data.get("user_id")
+        is_admin = request.get("is_admin", False)
+
+        if requested_user_id and str(requested_user_id) != auth_user_id and not is_admin:
+            return web.json_response(
+                {"status": "forbidden", "message": "Boshqa foydalanuvchiga lot saqlash taqiqlangan.", "code": "FORBIDDEN"},
+                status=403
+            )
+
+        target_user_id = str(requested_user_id if (requested_user_id and is_admin) else auth_user_id)
         raw_lots = data.get("lots_data", "")
 
         from core.astrology_agent import parse_custom_arabic_lots
@@ -930,7 +1018,7 @@ async def api_astrology_lots_handler(request: web.Request) -> web.Response:
         if not parsed:
             return web.json_response({"status": "error", "message": "Lotlar ma'lumotlarini o'qib bo'lmadi"}, status=400)
 
-        await db.save_custom_lots(user_id, parsed)
+        await db.save_custom_lots(target_user_id, parsed)
         return web.json_response({
             "status": "ok",
             "count": len(parsed),

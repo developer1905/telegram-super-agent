@@ -320,6 +320,17 @@ def stop_chit_chat(chat_id: str | int) -> bool:
             stopped = True
     except Exception:
         pass
+
+    try:
+        from core.autonomy_manager import autonomy_manager
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(autonomy_manager.cancel_tasks_for_chat(int(chat_id), reason="stop_chit_chat"))
+        except RuntimeError:
+            pass
+    except Exception:
+        pass
+
     return stopped
 
 
@@ -333,6 +344,17 @@ def stop_collab(chat_id: str) -> bool:
     if ACTIVE_PROJECT_BUILDS.get(chat_key, False):
         ACTIVE_PROJECT_BUILDS[chat_key] = False
         stopped = True
+
+    try:
+        from core.autonomy_manager import autonomy_manager
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(autonomy_manager.cancel_tasks_for_chat(int(chat_id), reason="stop_collab"))
+        except RuntimeError:
+            pass
+    except Exception:
+        pass
+
     return stopped
 
 

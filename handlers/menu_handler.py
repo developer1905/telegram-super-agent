@@ -715,23 +715,114 @@ async def cmd_main_avto_suhbat(message: Message, bot: Bot) -> None:
 @router.message(F.text.lower().startswith(("/stop_suhbat", "/stop_chat", "/toxtat_suhbat", "/avto_suhbat off", "/avtosuhbat off", "toxtat", "to'xtat suhbat")))
 async def cmd_main_stop_suhbat(message: Message) -> None:
     """Erkin suhbat, bahs yoki avtonom jonli muloqotni to'xtatish."""
-    from core.bot_collab import stop_chit_chat
+    from core.bot_collab import stop_chit_chat, stop_collab
     from core.bot_skills import autonomous_dialogue_engine
+    from core.autonomy_manager import autonomy_manager
+
     stopped_auto = autonomous_dialogue_engine.stop_chat(message.chat.id)
     stopped_chit = stop_chit_chat(str(message.chat.id))
+    stopped_collab = stop_collab(str(message.chat.id))
+    cancelled_tasks = await autonomy_manager.cancel_tasks_for_chat(message.chat.id, reason="User /stop_suhbat command")
+
     try:
-        from core.database import db
         await db.save_fact(f"auto_chat_{message.chat.id}", "0", category="auto_chat")
     except Exception:
         pass
-    if stopped_auto or stopped_chit:
+
+    if stopped_auto or stopped_chit or stopped_collab or cancelled_tasks > 0:
         await message.answer(
-            "🛑 <b>Suhbat / Avtonom muloqot to'xtatildi.</b>\n"
-            "Qayta yoqish uchun: <code>/avtosuhbat</code> yoki <code>/suhbat</code> deb yozing.",
+            f"🛑 <b>Suhbat / Avtonom muloqot to'xtatildi.</b>\n"
+            f"Bekor qilingan vazifalar: {cancelled_tasks} ta.\n\n"
+            f"Qayta yoqish uchun: <code>/avtosuhbat</code> yoki <code>/suhbat</code> deb yozing.",
             parse_mode="HTML"
         )
     else:
-        await message.answer("⚠️ Hozirda faol suhbat yoki avtonom muloqot mavjud emas.", parse_mode="HTML")
+        await message.answer("⚠️ Hozirda ushbu chatda faol suhbat yoki avtonom jarayon mavjud emas.", parse_mode="HTML")
+
+
+@router.message(Command("autonomy_status"))
+async def cmd_autonomy_status(message: Message) -> None:
+    """Avtonomiya boshqaruv markazi holati (Global Control Plane)."""
+    from core.autonomy_manager import autonomy_manager
+    summary = autonomy_manager.get_status_summary()
+    is_on = summary.get("global_enabled", True)
+    total = summary.get("total_tasks", 0)
+    active = summary.get("active_tasks", 0)
+    active_list = summary.get("active_task_list", [])
+
+    status_icon = "🟢 YOQILGAN (ON)" if is_on else "🔴 O'CHIRILGAN (OFF)"
+    lines = [
+        "🤖 <b>Avtonomiya Boshqaruv Markazi (Autonomy Control Plane)</b>\n",
+        f"• <b>Global Holat:</b> {status_icon}",
+        f"• <b>Faol Vazifalar:</b> {active} ta",
+        f"• <b>Jami Ro'yxatdagi:</b> {total} ta\n",
+    ]
+
+    if active_list:
+        lines.append("📋 <b>Hozirda Ishlayotgan Vazifalar:</b>")
+        for t in active_list[:10]:
+            lines.append(f"▫️ <code>{t['task_id']}</code> | Rejim: <i>{t['mode']}</i> | Chat: <code>{t['chat_id']}</code> | Qadam: {t['current_turns']}/{t['max_turns']}")
+    else:
+        lines.append("<i>Hozirda fonda bajarilayotgan faol avtonom jarayon yo'q.</i>")
+
+    lines.append("\n⚙️ <i>Boshqaruv:</i> <code>/autonomy_on</code>, <code>/autonomy_off</code>, <code>/stop_all_autonomy</code>, <code>/stop_suhbat</code>")
+    await message.answer("\n".join(lines), parse_mode="HTML")
+
+
+@router.message(Command("autonomy_off"))
+async def cmd_autonomy_off(message: Message) -> None:
+    """Global avtonomiyani o'chirish (Faqat Administrator uchun)."""
+    if ADMIN_ID and message.from_user.id != ADMIN_ID:
+        await message.answer("⛔ Ushbu buyruq faqat bot Administratori uchun ochiq.")
+        return
+
+    from core.autonomy_manager import autonomy_manager
+    await autonomy_manager.set_global_enabled(False)
+    await message.answer(
+        "🛑 <b>Global Avtonomiya O'CHIRILDI!</b>\n\n"
+        "Yangi avtonom suhbatlar, munozaralar va fon vazifalari yaratilishi to'xtatildi.\n"
+        "Barcha faol vazifalar to'xtatildi.",
+        parse_mode="HTML"
+    )
+
+
+@router.message(Command("autonomy_on"))
+async def cmd_autonomy_on(message: Message) -> None:
+    """Global avtonomiyani yoqish (Faqat Administrator uchun)."""
+    if ADMIN_ID and message.from_user.id != ADMIN_ID:
+        await message.answer("⛔ Ushbu buyruq faqat bot Administratori uchun ochiq.")
+        return
+
+    from core.autonomy_manager import autonomy_manager
+    await autonomy_manager.set_global_enabled(True)
+    await message.answer(
+        "✅ <b>Global Avtonomiya YOQILDI!</b>\n\n"
+        "Endi avtonom vazifalar, tirik hamkasblar va suhbatlar rejalashtirilgan tartibda ishlashi mumkin.",
+        parse_mode="HTML"
+    )
+
+
+@router.message(Command("stop_all_autonomy"))
+async def cmd_stop_all_autonomy(message: Message) -> None:
+    """Barcha faol avtonom jarayonlarni favqulodda to'xtatish (Faqat Administrator uchun)."""
+    if ADMIN_ID and message.from_user.id != ADMIN_ID:
+        await message.answer("⛔ Ushbu buyruq faqat bot Administratori uchun ochiq.")
+        return
+
+    from core.autonomy_manager import autonomy_manager
+    from core.bot_collab import ACTIVE_COLLABS, ACTIVE_CHIT_CHATS, ACTIVE_DEBATES, ACTIVE_PROJECT_BUILDS
+
+    cancelled = await autonomy_manager.cancel_all_tasks(reason="Admin /stop_all_autonomy")
+    ACTIVE_COLLABS.clear()
+    ACTIVE_CHIT_CHATS.clear()
+    ACTIVE_DEBATES.clear()
+    ACTIVE_PROJECT_BUILDS.clear()
+
+    await message.answer(
+        f"🚨 <b>Barcha faol avtonom jarayonlar to'xtatildi!</b>\n\n"
+        f"To'xtatilgan vazifalar soni: <b>{cancelled}</b> ta.",
+        parse_mode="HTML"
+    )
 
 
 @router.message(Command("persona", "character", "xarakter", "uslub"))

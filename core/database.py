@@ -29,8 +29,9 @@ SQLITE_PATH = os.path.join(DB_DIR, "superagent.db")
 class DatabaseManager:
     """Supabase va SQLite gibrid ma'lumotlar bazasi menejeri."""
 
-    def __init__(self) -> None:
-        self.use_supabase = bool(SUPABASE_URL and SUPABASE_KEY)
+    def __init__(self, sqlite_path: Optional[str] = None) -> None:
+        self.sqlite_path = sqlite_path or SQLITE_PATH
+        self.use_supabase = bool(SUPABASE_URL and SUPABASE_KEY) and (sqlite_path is None)
         self._supabase_client: Any = None
         self._supabase_reminders_available: bool = True
         self._supabase_chats_available: bool = True
@@ -49,7 +50,7 @@ class DatabaseManager:
     @contextlib.contextmanager
     def _get_sqlite_conn(self):
         """Optimallashtirilgan SQLite ulanishi (30s timeout, busy_timeout va avtomatik close)."""
-        conn = sqlite3.connect(SQLITE_PATH, timeout=30.0)
+        conn = sqlite3.connect(self.sqlite_path, timeout=30.0)
         conn.execute("PRAGMA busy_timeout = 15000;")
         try:
             yield conn
@@ -61,22 +62,26 @@ class DatabaseManager:
 
     def _init_sqlite(self) -> None:
         """Lokal SQLite bazasi va kerakli jadvallarni initsializatsiya qilish."""
-        os.makedirs(DB_DIR, exist_ok=True)
-        with sqlite3.connect(SQLITE_PATH, timeout=30.0) as conn:
+        target_dir = os.path.dirname(self.sqlite_path)
+        if target_dir:
+            os.makedirs(target_dir, exist_ok=True)
+        with sqlite3.connect(self.sqlite_path, timeout=30.0) as conn:
             cursor = conn.cursor()
             cursor.execute("PRAGMA journal_mode = WAL;")
             cursor.execute("PRAGMA busy_timeout = 15000;")
             cursor.execute("PRAGMA synchronous = NORMAL;")
 
-            # 1. Knowledge Base (Doimiy xotira)
+            # 1. Knowledge Base (Doimiy xotira — Multi-tenancy qo'llab-quvvatlanadi)
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS knowledge_base (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    key TEXT UNIQUE NOT NULL,
+                    key TEXT NOT NULL,
                     content TEXT NOT NULL,
                     category TEXT DEFAULT 'general',
+                    user_id TEXT DEFAULT 'admin',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(user_id, key)
                 )
             """)
 
@@ -216,14 +221,65 @@ class DatabaseManager:
                 cursor.execute("ALTER TABLE astrology_profiles ADD COLUMN custom_lots_json TEXT DEFAULT '[]'")
             except Exception:
                 pass
+
+            # Multi-tenancy va Data Ownership: user_id ustunlari va indekslari
+            for alter_sql in [
+                "ALTER TABLE knowledge_base ADD COLUMN user_id TEXT DEFAULT 'admin';",
+                "ALTER TABLE tasks ADD COLUMN user_id TEXT DEFAULT 'admin';",
+                "ALTER TABLE uptime_monitors ADD COLUMN user_id TEXT DEFAULT 'admin';",
+                "ALTER TABLE reminders ADD COLUMN user_id TEXT DEFAULT '';",
+            ]:
+                try:
+                    cursor.execute(alter_sql)
+                except Exception:
+                    pass
+
+            # Agar eski bazada key ustida qat'iy global UNIQUE constraint bo'lsa, uni user_id + key ga yangilash
+            try:
+                cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='knowledge_base';")
+                row = cursor.fetchone()
+                if row and row[0] and "key TEXT UNIQUE" in row[0]:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS knowledge_base_v2 (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            key TEXT NOT NULL,
+                            content TEXT NOT NULL,
+                            category TEXT DEFAULT 'general',
+                            user_id TEXT DEFAULT 'admin',
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            UNIQUE(user_id, key)
+                        );
+                    """)
+                    cursor.execute("""
+                        INSERT OR IGNORE INTO knowledge_base_v2 (id, key, content, category, user_id, created_at, updated_at)
+                        SELECT id, key, content, category, COALESCE(user_id, 'admin'), created_at, updated_at FROM knowledge_base;
+                    """)
+                    cursor.execute("DROP TABLE knowledge_base;")
+                    cursor.execute("ALTER TABLE knowledge_base_v2 RENAME TO knowledge_base;")
+            except Exception as e:
+                logger.warning("knowledge_base schema v2 migration: %s", e)
+
+            for idx_sql in [
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_kb_user_key ON knowledge_base (user_id, key);",
+                "CREATE INDEX IF NOT EXISTS idx_tasks_user ON tasks (user_id, status);",
+                "CREATE INDEX IF NOT EXISTS idx_uptime_user ON uptime_monitors (user_id);",
+                "CREATE INDEX IF NOT EXISTS idx_reminders_user ON reminders (user_id, status);",
+            ]:
+                try:
+                    cursor.execute(idx_sql)
+                except Exception:
+                    pass
+
             conn.commit()
 
     # ─── 1. SHAXSIY MA'LUMOTLAR BAZASI (KNOWLEDGE BASE / RAG) ──────
 
-    async def save_fact(self, key: str, content: str, category: str = "general") -> bool:
+    async def save_fact(self, key: str, content: str, category: str = "general", user_id: str = "admin") -> bool:
         """Doimiy faktni saqlash (masalan: 'card_number', 'company_services', 'resume')."""
         key_clean = key.strip().lower()
-        now_iso = datetime.datetime.utcnow().isoformat()
+        user_id_clean = str(user_id or "admin").strip()
+        now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
         # Supabase ga yozishga urinish
         if self.use_supabase and self._supabase_client:
@@ -233,6 +289,7 @@ class DatabaseManager:
                     "key": key_clean,
                     "content": content,
                     "category": category,
+                    "user_id": user_id_clean,
                     "updated_at": now_iso,
                 }
                 await loop.run_in_executor(
@@ -248,28 +305,31 @@ class DatabaseManager:
             with self._get_sqlite_conn() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    INSERT INTO knowledge_base (key, content, category, updated_at)
-                    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-                    ON CONFLICT(key) DO UPDATE SET
+                    INSERT INTO knowledge_base (key, content, category, user_id, updated_at)
+                    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT(user_id, key) DO UPDATE SET
                         content = excluded.content,
                         category = excluded.category,
                         updated_at = CURRENT_TIMESTAMP
-                """, (key_clean, content, category))
+                """, (key_clean, content, category, user_id_clean))
                 conn.commit()
             return True
         except Exception as exc:
             logger.error("SQLite save_fact xatosi: %s", exc)
             return False
 
-    async def get_all_facts(self) -> list[dict]:
-        """Barcha saqlangan faktlarni olish."""
+    async def get_all_facts(self, user_id: Optional[str] = None) -> list[dict]:
+        """Saqlangan faktlarni olish (user_id ko'rsatilsa, faqat shu foydalanuvchining ma'lumotlari)."""
+        user_id_str = str(user_id).strip() if user_id is not None else None
         if self.use_supabase and self._supabase_client:
             try:
                 loop = asyncio.get_running_loop()
-                res = await loop.run_in_executor(
-                    None,
-                    lambda: self._supabase_client.table("knowledge_base").select("*").execute()
-                )
+                def _sb_fetch():
+                    q = self._supabase_client.table("knowledge_base").select("*")
+                    if user_id_str is not None:
+                        q = q.eq("user_id", user_id_str)
+                    return q.execute()
+                res = await loop.run_in_executor(None, _sb_fetch)
                 if res.data:
                     return res.data
             except Exception as exc:
@@ -279,39 +339,59 @@ class DatabaseManager:
             with self._get_sqlite_conn() as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
-                cursor.execute("SELECT key, content, category, updated_at FROM knowledge_base ORDER BY updated_at DESC")
+                if user_id_str is not None:
+                    cursor.execute(
+                        "SELECT key, content, category, user_id, updated_at FROM knowledge_base WHERE user_id = ? ORDER BY updated_at DESC",
+                        (user_id_str,)
+                    )
+                else:
+                    cursor.execute("SELECT key, content, category, user_id, updated_at FROM knowledge_base ORDER BY updated_at DESC")
                 rows = cursor.fetchall()
                 return [dict(r) for r in rows]
         except Exception as exc:
             logger.error("SQLite get_all_facts xatosi: %s", exc)
             return []
 
-    async def delete_fact(self, key: str) -> bool:
-        """Faktni o'chirish."""
+    async def delete_fact(self, key: str, user_id: Optional[str] = None) -> bool:
+        """Faktni o'chirish (user_id ko'rsatilsa faqat o'sha foydalanuvchining fakti o'chiriladi)."""
         key_clean = key.strip().lower()
+        user_id_str = str(user_id).strip() if user_id is not None else None
         if self.use_supabase and self._supabase_client:
             try:
                 loop = asyncio.get_running_loop()
-                await loop.run_in_executor(
-                    None,
-                    lambda: self._supabase_client.table("knowledge_base").delete().eq("key", key_clean).execute()
-                )
+                def _sb_del():
+                    q = self._supabase_client.table("knowledge_base").delete().eq("key", key_clean)
+                    if user_id_str is not None and user_id_str != "admin":
+                        q = q.eq("user_id", user_id_str)
+                    return q.execute()
+                await loop.run_in_executor(None, _sb_del)
             except Exception as exc:
                 logger.warning("Supabase delete_fact xatosi: %s", exc)
 
         try:
             with self._get_sqlite_conn() as conn:
                 cursor = conn.cursor()
-                cursor.execute("DELETE FROM knowledge_base WHERE key = ?", (key_clean,))
+                if user_id_str is not None and user_id_str != "admin":
+                    cursor.execute("DELETE FROM knowledge_base WHERE key = ? AND user_id = ?", (key_clean, user_id_str))
+                else:
+                    cursor.execute("DELETE FROM knowledge_base WHERE key = ?", (key_clean,))
                 conn.commit()
             return True
         except Exception as exc:
             logger.error("SQLite delete_fact xatosi: %s", exc)
             return False
 
-    async def build_rag_context(self) -> str:
-        """AI promptiga qo'shish uchun doimiy xotiradagi barcha faktlarni formatlash."""
-        facts = await self.get_all_facts()
+    async def build_rag_context(self, user_id: Optional[str] = None, context_type: str = "private") -> str:
+        """AI promptiga qo'shish uchun doimiy xotiradagi faktlarni formatlash.
+        
+        Qat'iy xavfsizlik qoidasi:
+        - Agar context_type 'group', 'supergroup' yoki 'channel' bo'lsa, shaxsiy faktlar HECH QACHON kiritilmaydi (bo'sh satr qaytaradi).
+        - Agar user_id ko'rsatilsa, faqat shu foydalanuvchining shaxsiy faktlari qaytariladi.
+        """
+        if context_type in ("group", "supergroup", "channel"):
+            return ""
+
+        facts = await self.get_all_facts(user_id=user_id)
         if not facts:
             return ""
 
@@ -499,8 +579,9 @@ class DatabaseManager:
 
     # ─── 5. ESLATMALAR (REMINDERS) ───────────────────────────────
 
-    async def add_reminder(self, chat_id: int | str, text: str, remind_at: str) -> int:
+    async def add_reminder(self, chat_id: int | str, text: str, remind_at: str, user_id: Optional[int | str] = None) -> int:
         """Yangi eslatma qo'shish. remind_at formati: 'YYYY-MM-DD HH:MM:SS'."""
+        user_id_str = str(user_id or chat_id).strip()
         if self.use_supabase and self._supabase_client and self._supabase_reminders_available:
             try:
                 loop = asyncio.get_running_loop()
@@ -529,8 +610,8 @@ class DatabaseManager:
             with self._get_sqlite_conn() as conn:
                 cur = conn.cursor()
                 cur.execute(
-                    "INSERT INTO reminders (chat_id, text, remind_at, status) VALUES (?, ?, ?, 'pending')",
-                    (str(chat_id), text, remind_at),
+                    "INSERT INTO reminders (chat_id, text, remind_at, status, user_id) VALUES (?, ?, ?, 'pending', ?)",
+                    (str(chat_id), text, remind_at, user_id_str),
                 )
                 conn.commit()
                 return cur.lastrowid
@@ -598,17 +679,18 @@ class DatabaseManager:
                 return cur.rowcount > 0
         return await loop.run_in_executor(None, _update)
 
-    async def get_active_reminders(self, chat_id: Optional[int | str] = None) -> list[dict]:
-        """Foydalanuvchining hali kelmagan faol eslatmalari ro'yxati (chat_id berilmasa barchasi)."""
+    async def get_active_reminders(self, chat_id: Optional[int | str] = None, user_id: Optional[int | str] = None) -> list[dict]:
+        """Foydalanuvchining hali kelmagan faol eslatmalari ro'yxati (chat_id yoki user_id bo'yicha)."""
+        target_id = str(user_id or chat_id).strip() if (user_id is not None or chat_id is not None) else None
         loop = asyncio.get_running_loop()
         def _query():
             with self._get_sqlite_conn() as conn:
                 conn.row_factory = sqlite3.Row
                 cur = conn.cursor()
-                if chat_id is not None:
+                if target_id is not None:
                     cur.execute(
-                        "SELECT * FROM reminders WHERE chat_id = ? AND status = 'pending' ORDER BY remind_at ASC",
-                        (str(chat_id),),
+                        "SELECT * FROM reminders WHERE (chat_id = ? OR user_id = ?) AND status = 'pending' ORDER BY remind_at ASC",
+                        (target_id, target_id),
                     )
                 else:
                     cur.execute(
@@ -617,8 +699,9 @@ class DatabaseManager:
                 return [dict(r) for r in cur.fetchall()]
         return await loop.run_in_executor(None, _query)
 
-    async def delete_reminder(self, reminder_id: int) -> bool:
-        """Eslatmani bekor qilish yoki o'chirish."""
+    async def delete_reminder(self, reminder_id: int, user_id: Optional[int | str] = None) -> bool:
+        """Eslatmani bekor qilish yoki o'chirish (agar user_id berilsa, mulkdorlik tekshiriladi)."""
+        user_id_str = str(user_id).strip() if user_id is not None else None
         if self.use_supabase and self._supabase_client:
             try:
                 loop = asyncio.get_running_loop()
@@ -633,7 +716,10 @@ class DatabaseManager:
         def _delete():
             with self._get_sqlite_conn() as conn:
                 cur = conn.cursor()
-                cur.execute("UPDATE reminders SET status = 'cancelled' WHERE id = ?", (reminder_id,))
+                if user_id_str and user_id_str != "admin":
+                    cur.execute("UPDATE reminders SET status = 'cancelled' WHERE id = ? AND (user_id = ? OR chat_id = ?)", (reminder_id, user_id_str, user_id_str))
+                else:
+                    cur.execute("UPDATE reminders SET status = 'cancelled' WHERE id = ?", (reminder_id,))
                 conn.commit()
                 return cur.rowcount > 0
         return await loop.run_in_executor(None, _delete)
@@ -855,73 +941,73 @@ class DatabaseManager:
     # ─── 8. TODOLIST VA VAZIFALAR (TASKS) ──────────────────────────
 
     async def add_task(self, user_id: "int | str | None" = None, title: str = "", description: str = "", due_date: str = "", notion_page_id: str = "") -> int:
-        """Yangi vazifa qo'shish.
-        
-        Args:
-            user_id: Foydalanuvchi ID (ixtiyoriy, backward-compat uchun qabul qilinadi, DB da saqlanmaydi hozircha)
-            title: Vazifa nomi (majburiy)
-            description: Tavsif (ixtiyoriy)
-            due_date: Muddat (ixtiyoriy)
-            notion_page_id: Notion page ID (ixtiyoriy)
-        """
-        # user_id birinchi positional arg sifatida kelishi mumkin (legacy callers)
+        """Yangi vazifa qo'shish."""
         if title == "" and user_id is not None and not isinstance(user_id, int):
-            # Agar user_id string bo'lsa va title bo'sh bo'lsa — bu aslida title
             title = str(user_id)
-            user_id = None
+            user_id = "admin"
         actual_title = title.strip() if title else ""
         if not actual_title:
             return 0
+        actual_user_id = str(user_id or "admin").strip()
         loop = asyncio.get_running_loop()
         def _insert():
             with self._get_sqlite_conn() as conn:
                 cur = conn.cursor()
                 cur.execute("""
-                    INSERT INTO tasks (title, description, due_date, status, notion_page_id)
-                    VALUES (?, ?, ?, 'pending', ?)
-                """, (actual_title, description.strip(), due_date.strip(), notion_page_id.strip()))
+                    INSERT INTO tasks (title, description, due_date, status, notion_page_id, user_id)
+                    VALUES (?, ?, ?, 'pending', ?, ?)
+                """, (actual_title, description.strip(), due_date.strip(), notion_page_id.strip(), actual_user_id))
                 conn.commit()
                 return cur.lastrowid or 0
         return await loop.run_in_executor(None, _insert)
 
     async def get_tasks(self, user_id: "int | str | None" = None, status: str = "pending", limit: int = 50) -> list[dict]:
-        """Vazifalar ro'yxatini olish.
-        
-        Args:
-            user_id: Foydalanuvchi ID (ixtiyoriy, backward-compat uchun qabul qilinadi)
-            status: 'pending', 'completed', 'all'
-            limit: Maksimal natijalar soni
-        """
+        """Vazifalar ro'yxatini olish (user_id ko'rsatilsa faqat shu userning vazifalari)."""
+        actual_user_id = str(user_id).strip() if user_id is not None else None
         loop = asyncio.get_running_loop()
         def _get():
             with self._get_sqlite_conn() as conn:
                 conn.row_factory = sqlite3.Row
                 cur = conn.cursor()
-                if status == "all":
-                    cur.execute("SELECT * FROM tasks ORDER BY id DESC LIMIT ?", (limit,))
+                if actual_user_id:
+                    if status == "all":
+                        cur.execute("SELECT * FROM tasks WHERE user_id = ? ORDER BY id DESC LIMIT ?", (actual_user_id, limit))
+                    else:
+                        cur.execute("SELECT * FROM tasks WHERE user_id = ? AND status = ? ORDER BY id DESC LIMIT ?", (actual_user_id, status, limit))
                 else:
-                    cur.execute("SELECT * FROM tasks WHERE status = ? ORDER BY id DESC LIMIT ?", (status, limit))
+                    if status == "all":
+                        cur.execute("SELECT * FROM tasks ORDER BY id DESC LIMIT ?", (limit,))
+                    else:
+                        cur.execute("SELECT * FROM tasks WHERE status = ? ORDER BY id DESC LIMIT ?", (status, limit))
                 return [dict(r) for r in cur.fetchall()]
         return await loop.run_in_executor(None, _get)
 
-    async def complete_task(self, task_id: int) -> bool:
+    async def complete_task(self, task_id: int, user_id: "int | str | None" = None) -> bool:
         """Vazifani bajarilgan (completed) deb belgilash."""
+        actual_user_id = str(user_id).strip() if user_id is not None else None
         loop = asyncio.get_running_loop()
         def _update():
             with self._get_sqlite_conn() as conn:
                 cur = conn.cursor()
-                cur.execute("UPDATE tasks SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = ?", (task_id,))
+                if actual_user_id and actual_user_id != "admin":
+                    cur.execute("UPDATE tasks SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?", (task_id, actual_user_id))
+                else:
+                    cur.execute("UPDATE tasks SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = ?", (task_id,))
                 conn.commit()
                 return cur.rowcount > 0
         return await loop.run_in_executor(None, _update)
 
-    async def delete_task(self, task_id: int) -> bool:
+    async def delete_task(self, task_id: int, user_id: "int | str | None" = None) -> bool:
         """Vazifani butunlay o'chirish."""
+        actual_user_id = str(user_id).strip() if user_id is not None else None
         loop = asyncio.get_running_loop()
         def _del():
             with self._get_sqlite_conn() as conn:
                 cur = conn.cursor()
-                cur.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+                if actual_user_id and actual_user_id != "admin":
+                    cur.execute("DELETE FROM tasks WHERE id = ? AND user_id = ?", (task_id, actual_user_id))
+                else:
+                    cur.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
                 conn.commit()
                 return cur.rowcount > 0
         return await loop.run_in_executor(None, _del)
@@ -929,49 +1015,47 @@ class DatabaseManager:
     # ─── 9. UPTIME MONITORINGI ─────────────────────────────────────
 
     async def add_uptime_monitor(self, user_id: "int | str | None" = None, url: str = "", name: str = "") -> int:
-        """Kuzatuvga yangi veb-sayt yoki API URL qo'shish.
-        
-        Args:
-            user_id: Foydalanuvchi ID (ixtiyoriy, backward-compat uchun qabul qilinadi)
-            url: Kuzatiluvchi URL
-            name: Inson o'qiy oladigan nom
-        """
+        """Kuzatuvga yangi veb-sayt yoki API URL qo'shish."""
         loop = asyncio.get_running_loop()
         clean_url = url.strip()
         if not clean_url.startswith(("http://", "https://")):
             clean_url = f"https://{clean_url}"
         clean_name = name.strip() or clean_url.replace("https://", "").replace("http://", "").split("/")[0]
+        actual_user_id = str(user_id or "admin").strip()
 
         def _add():
             with self._get_sqlite_conn() as conn:
                 cur = conn.cursor()
                 cur.execute("""
-                    INSERT INTO uptime_monitors (url, name, is_active, last_status, last_checked)
-                    VALUES (?, ?, 1, 0, '')
+                    INSERT INTO uptime_monitors (url, name, is_active, last_status, last_checked, user_id)
+                    VALUES (?, ?, 1, 0, '', ?)
                     ON CONFLICT(url) DO UPDATE SET
                         name = excluded.name,
-                        is_active = 1
-                """, (clean_url, clean_name))
+                        is_active = 1,
+                        user_id = excluded.user_id
+                """, (clean_url, clean_name, actual_user_id))
                 conn.commit()
                 return cur.lastrowid or 0
         return await loop.run_in_executor(None, _add)
 
     async def get_uptime_monitors(self, user_id: "int | str | None" = None, active_only: bool = True) -> list[dict]:
-        """Kuzatilayotgan barcha saytlarni olish.
-        
-        Args:
-            user_id: Foydalanuvchi ID (ixtiyoriy, backward-compat uchun qabul qilinadi)
-            active_only: Faqat faol monitorlarni qaytarish
-        """
+        """Kuzatilayotgan barcha saytlarni olish (user_id ko'rsatilsa faqat o'sha foydalanuvchining saytlari)."""
+        actual_user_id = str(user_id).strip() if user_id is not None else None
         loop = asyncio.get_running_loop()
         def _get():
             with self._get_sqlite_conn() as conn:
                 conn.row_factory = sqlite3.Row
                 cur = conn.cursor()
-                if active_only:
-                    cur.execute("SELECT * FROM uptime_monitors WHERE is_active = 1 ORDER BY id ASC")
+                if actual_user_id and actual_user_id != "admin":
+                    if active_only:
+                        cur.execute("SELECT * FROM uptime_monitors WHERE is_active = 1 AND user_id = ? ORDER BY id ASC", (actual_user_id,))
+                    else:
+                        cur.execute("SELECT * FROM uptime_monitors WHERE user_id = ? ORDER BY id ASC", (actual_user_id,))
                 else:
-                    cur.execute("SELECT * FROM uptime_monitors ORDER BY id ASC")
+                    if active_only:
+                        cur.execute("SELECT * FROM uptime_monitors WHERE is_active = 1 ORDER BY id ASC")
+                    else:
+                        cur.execute("SELECT * FROM uptime_monitors ORDER BY id ASC")
                 return [dict(r) for r in cur.fetchall()]
         return await loop.run_in_executor(None, _get)
 
@@ -991,13 +1075,17 @@ class DatabaseManager:
                 return cur.rowcount > 0
         return await loop.run_in_executor(None, _upd)
 
-    async def delete_uptime_monitor(self, monitor_id: int) -> bool:
+    async def delete_uptime_monitor(self, monitor_id: int, user_id: "int | str | None" = None) -> bool:
         """Saytni kuzatuvdan o'chirish."""
+        actual_user_id = str(user_id).strip() if user_id is not None else None
         loop = asyncio.get_running_loop()
         def _del():
             with self._get_sqlite_conn() as conn:
                 cur = conn.cursor()
-                cur.execute("DELETE FROM uptime_monitors WHERE id = ?", (monitor_id,))
+                if actual_user_id and actual_user_id != "admin":
+                    cur.execute("DELETE FROM uptime_monitors WHERE id = ? AND user_id = ?", (monitor_id, actual_user_id))
+                else:
+                    cur.execute("DELETE FROM uptime_monitors WHERE id = ?", (monitor_id,))
                 conn.commit()
                 return cur.rowcount > 0
         return await loop.run_in_executor(None, _del)
@@ -1037,9 +1125,7 @@ class DatabaseManager:
                 cur.execute("SELECT * FROM astrology_profiles WHERE user_id = ? LIMIT 1", (u_id,))
                 row = cur.fetchone()
                 if not row:
-                    # Agar aniq topilmasa, standart 'default' yoki admin ID profili bormi tekshiramiz
-                    cur.execute("SELECT * FROM astrology_profiles ORDER BY updated_at DESC LIMIT 1")
-                    row = cur.fetchone()
+                    return None
                 if row:
                     res = dict(row)
                     try:

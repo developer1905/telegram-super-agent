@@ -364,7 +364,7 @@ class AIManager:
                 "2. Agar bu aniq topshiriq yoki savol bo'lsa, savolga to'liq, aqlli va foydali javob qaytaring."
             )
 
-            rag_context = await db.build_rag_context()
+            rag_context = await db.build_rag_context(context_type="private")
             if rag_context:
                 instruction = f"{rag_context}\n\n{instruction}"
 
@@ -416,22 +416,24 @@ class AIManager:
             elif chat_type == "channel":
                 system_prompt += "\n\nSiz Telegram kanalidasiz. Postlar uchun jozibali, mazmunli va professional formatda javob bering."
 
-            rag_context = await db.build_rag_context()
-            if rag_context:
-                system_prompt = f"{rag_context}\n\n{system_prompt}"
+            rag_context = ""
+            if chat_type not in ("group", "supergroup", "channel"):
+                rag_context = await db.build_rag_context(user_id=user_id or chat_id, context_type="private")
+                if rag_context:
+                    system_prompt = f"{rag_context}\n\n{system_prompt}"
 
-            # Foydalanuvchining shaxsiy astrologik kartasini AI kontekstiga ulash
-            try:
-                astro_profile = await db.get_astrology_profile(user_id=user_id or chat_id)
-                if astro_profile and astro_profile.get("chart"):
-                    from core.astrology_agent import format_astrology_rag_context, calculate_transits
-                    chart = astro_profile["chart"]
-                    transits = calculate_transits(chart.get("planets", {}))
-                    astro_ctx = format_astrology_rag_context(chart, transits)
-                    if astro_ctx:
-                        system_prompt = f"{astro_ctx}\n\n{system_prompt}"
-            except Exception as e:
-                logger.debug("Astrology context yuklashda xato: %s", e)
+                # Foydalanuvchining shaxsiy astrologik kartasini AI kontekstiga ulash (faqat shaxsiy chatda)
+                try:
+                    astro_profile = await db.get_astrology_profile(user_id=user_id or chat_id)
+                    if astro_profile and astro_profile.get("chart"):
+                        from core.astrology_agent import format_astrology_rag_context, calculate_transits
+                        chart = astro_profile["chart"]
+                        transits = calculate_transits(chart.get("planets", {}))
+                        astro_ctx = format_astrology_rag_context(chart, transits)
+                        if astro_ctx:
+                            system_prompt = f"{astro_ctx}\n\n{system_prompt}"
+                except Exception as e:
+                    logger.debug("Astrology context yuklashda xato: %s", e)
 
             history_list = await self.get_chat_history(chat_id=chat_id, limit=30)
 
@@ -541,22 +543,24 @@ class AIManager:
         elif chat_type == "channel":
             system_prompt += "\n\nSiz Telegram kanalidasiz. Mazmunli va professional formatda javob bering."
 
-        rag_context = await db.build_rag_context()
-        if rag_context:
-            system_prompt = f"{rag_context}\n\n{system_prompt}"
+        rag_context = ""
+        if chat_type not in ("group", "supergroup", "channel"):
+            rag_context = await db.build_rag_context(user_id=user_id or chat_id, context_type="private")
+            if rag_context:
+                system_prompt = f"{rag_context}\n\n{system_prompt}"
 
-        # Foydalanuvchining shaxsiy astrologik kartasini AI kontekstiga ulash
-        try:
-            astro_profile = await db.get_astrology_profile(user_id=user_id or chat_id)
-            if astro_profile and astro_profile.get("chart"):
-                from core.astrology_agent import format_astrology_rag_context, calculate_transits
-                chart = astro_profile["chart"]
-                transits = calculate_transits(chart.get("planets", {}))
-                astro_ctx = format_astrology_rag_context(chart, transits)
-                if astro_ctx:
-                    system_prompt = f"{astro_ctx}\n\n{system_prompt}"
-        except Exception as e:
-            logger.debug("OpenRouter astrology context yuklashda xato: %s", e)
+            # Foydalanuvchining shaxsiy astrologik kartasini AI kontekstiga ulash (faqat shaxsiy chatda)
+            try:
+                astro_profile = await db.get_astrology_profile(user_id=user_id or chat_id)
+                if astro_profile and astro_profile.get("chart"):
+                    from core.astrology_agent import format_astrology_rag_context, calculate_transits
+                    chart = astro_profile["chart"]
+                    transits = calculate_transits(chart.get("planets", {}))
+                    astro_ctx = format_astrology_rag_context(chart, transits)
+                    if astro_ctx:
+                        system_prompt = f"{astro_ctx}\n\n{system_prompt}"
+            except Exception as e:
+                logger.debug("OpenRouter astrology context yuklashda xato: %s", e)
 
         history_list = await self.get_chat_history(chat_id=chat_id, limit=30)
         messages: list[dict] = [{"role": "system", "content": system_prompt}]
@@ -640,9 +644,11 @@ class AIManager:
             elif chat_type == "channel":
                 system_prompt += "\n\nSiz Telegram kanalidasiz. Mazmunli va professional formatda javob bering."
 
-            rag_context = await db.build_rag_context()
-            if rag_context:
-                system_prompt = f"{rag_context}\n\n{system_prompt}"
+            rag_context = ""
+            if chat_type not in ("group", "supergroup", "channel"):
+                rag_context = await db.build_rag_context(user_id=user_id or chat_id, context_type="private")
+                if rag_context:
+                    system_prompt = f"{rag_context}\n\n{system_prompt}"
 
             history_list = await self.get_chat_history(chat_id=chat_id, limit=30)
             messages = [{"role": "system", "content": system_prompt}]
@@ -705,9 +711,11 @@ class AIManager:
         elif chat_type == "channel":
             system_prompt += "\n\nSiz Telegram kanalidasiz. Mazmunli va professional formatda javob bering."
 
-        rag_context = await db.build_rag_context()
-        if rag_context:
-            system_prompt = f"{rag_context}\n\n{system_prompt}"
+        rag_context = ""
+        if chat_type not in ("group", "supergroup", "channel"):
+            rag_context = await db.build_rag_context(user_id=user_id or chat_id, context_type="private")
+            if rag_context:
+                system_prompt = f"{rag_context}\n\n{system_prompt}"
 
         history_list = await self.get_chat_history(chat_id=chat_id, limit=30)
         messages = [{"role": "system", "content": system_prompt}]
@@ -818,9 +826,11 @@ class AIManager:
         elif chat_type == "channel":
             system_prompt += "\n\nSiz Telegram kanalidasiz. Mazmunli va professional formatda javob bering."
 
-        rag_context = await db.build_rag_context()
-        if rag_context:
-            system_prompt = f"{rag_context}\n\n{system_prompt}"
+        rag_context = ""
+        if chat_type not in ("group", "supergroup", "channel"):
+            rag_context = await db.build_rag_context(user_id=user_id or chat_id, context_type="private")
+            if rag_context:
+                system_prompt = f"{rag_context}\n\n{system_prompt}"
 
         history_list = await self.get_chat_history(chat_id=chat_id, limit=30)
         messages = [{"role": "system", "content": system_prompt}]

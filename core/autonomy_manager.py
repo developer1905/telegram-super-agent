@@ -90,7 +90,7 @@ class AutonomyTask:
 
     @property
     def is_active(self) -> bool:
-        return self.status in (AutonomyStatus.RUNNING, AutonomyStatus.STOPPING)
+        return self.status in (AutonomyStatus.IDLE, AutonomyStatus.RUNNING, AutonomyStatus.STOPPING)
 
     @property
     def age_seconds(self) -> float:

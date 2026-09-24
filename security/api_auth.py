@@ -131,18 +131,19 @@ def validate_telegram_init_data(
     return True, user_id, None
 
 
-async def require_webapp_auth(request: web.Request) -> Optional[tuple[web.Response, None]]:
+async def require_webapp_auth(request: web.Request) -> Optional[web.Response]:
     """
     aiohttp handler uchun auth middleware helper.
-    
-    Ishlatish:
-        auth_error = await require_webapp_auth(request)
-        if auth_error:
-            return auth_error
+    Telegram WebApp initData HMAC-SHA256 validatsiyasini amalga oshiradi.
     
     Returns:
-        (error_response, None) — authentication yoki authorization xato bo'lsa
-        None — muvaffaqiyatli (request.["authenticated_user_id"] da user_id bo'ladi)
+        web.Response (401 yoki 403) — agar auth xato bo'lsa
+        None — agar muvaffaqiyatli bo'lsa.
+        Muvaffaqiyatli bo'lganda request obyektiga:
+        - request["authenticated_user_id"] (str)
+        - request["is_admin"] (bool)
+        - request["role"] ("admin" | "user")
+        biriktiriladi.
     """
     from config import BOT_TOKEN, ADMIN_ID
     
@@ -152,43 +153,44 @@ async def require_webapp_auth(request: web.Request) -> Optional[tuple[web.Respon
         or request.headers.get("Authorization", "").replace("Bearer ", "")
     )
     
-    # Agar header bo'lmasa, JSON body dan ham tekshiramiz (frontend POST requestlar uchun)
+    # Agar header bo'lmasa, JSON body dan ham tekshiramiz
     if not init_data and request.method in ("POST", "PUT", "PATCH"):
         try:
-            body = await request.json()
+            body = await request.clone(read_body=True).json()
             init_data = body.get("init_data", "") or body.get("initData", "")
         except Exception:
             pass
     
     if not init_data:
         return web.json_response(
-            {"error": "Authentication required", "code": "MISSING_AUTH"},
+            {"error": "Authentication required. Telegram WebApp initData missing.", "code": "MISSING_AUTH"},
             status=401,
             headers=SECURITY_HEADERS,
         )
     
-    # Faqat admin ruxsat etilgan
-    allowed_ids = [ADMIN_ID] if ADMIN_ID else None
-    
     is_valid, user_id, error_msg = validate_telegram_init_data(
-        init_data, BOT_TOKEN, allowed_user_ids=allowed_ids
+        init_data, BOT_TOKEN, allowed_user_ids=None
     )
     
-    if not is_valid:
-        status = 401
-        code = "INVALID_AUTH"
-        if error_msg and ("Ruxsatsiz" in error_msg or "Unauthorized" in error_msg):
-            status = 403
-            code = "FORBIDDEN"
-        
+    if not is_valid or not user_id:
         return web.json_response(
-            {"error": error_msg or "Authentication failed", "code": code},
-            status=status,
+            {"error": error_msg or "Invalid authentication", "code": "INVALID_AUTH"},
+            status=401,
             headers=SECURITY_HEADERS,
         )
     
-    # Muvaffaqiyatli — user_id ni request ga qo'shamiz
-    request["authenticated_user_id"] = user_id
+    # Muvaffaqiyatli — authenticated identity va RBAC rolini biriktiramiz
+    str_user_id = str(user_id)
+    is_admin = False
+    if ADMIN_ID:
+        try:
+            is_admin = int(user_id) == int(ADMIN_ID)
+        except (ValueError, TypeError):
+            is_admin = str_user_id == str(ADMIN_ID)
+
+    request["authenticated_user_id"] = str_user_id
+    request["is_admin"] = is_admin
+    request["role"] = "admin" if is_admin else "user"
     return None
 
 
@@ -202,10 +204,10 @@ def add_security_headers(response: web.Response) -> web.Response:
 class WebAppAuthMiddleware:
     """
     aiohttp middleware — barcha /api/* endpointlarini autentifikatsiya qiladi.
-    /health, /webapp, /landing, / endpointlari himoyalanmaydi.
+    Faqatgina ochiq statik sahifalar (/health, /webapp, /landing, /) autentifikatsiyasiz o'tadi.
     """
     
-    # Auth talab qilinmaydigan yo'llar (Mini App dashboardi o'qiy olishi uchun)
+    # Faqat haqiqiy ochiq resurslar (hech qanday nozik ma'lumot bermaydi)
     PUBLIC_PATHS = {
         "/",
         "/health",
@@ -214,15 +216,7 @@ class WebAppAuthMiddleware:
         "/landing",
         "/landing/",
         "/readiness",
-        "/api/stats",
-        "/api/system_info",
-        "/api/uptime",
-        "/api/profile",
-        "/api/tasks",
-        "/api/facts",
-        "/api/reminders",
-        "/api/scheduled_posts",
-        "/api/managed_chats",
+        "/favicon.ico",
     }
     
     # Middleware placeholder (assigned below)

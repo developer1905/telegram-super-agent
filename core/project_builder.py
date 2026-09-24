@@ -82,6 +82,65 @@ def parse_project_files_from_text(raw_text: str) -> Dict[str, str]:
     return files
 
 
+def sanitize_archive_path(filepath: str) -> Optional[str]:
+    """
+    ZIP arxiv fayl yo'lini xavfsiz holatga keltiradi (Zip Slip va Directory Traversal himoyasi).
+    
+    Qoidalar:
+    - NUL byte (\0) bo'lsa darhol rad etiladi (None qaytaradi)
+    - Windows drive letterlari (C:, D: va hk) olib tashlanadi
+    - Barcha teskari chiziqlar (\\) to'g'ri chiziqqa (/) aylantiriladi
+    - Boshidagi va oxiridagi / yoki bo'shliqlar tozalanadi
+    - Har qanday '..' yoki '.' segmentlari rad etiladi
+    - Faqat xavfsiz nisbiy yo'l qaytariladi, aks holda None
+    """
+    if not filepath or "\0" in filepath:
+        return None
+
+    # Windows drive letter olib tashlash (masalan, C:\path -> \path)
+    clean = re.sub(r"^[a-zA-Z]:", "", filepath)
+    clean = clean.replace("\\", "/").strip().strip("/")
+
+    parts = []
+    for segment in clean.split("/"):
+        segment = segment.strip()
+        if not segment or segment == ".":
+            continue
+        if segment == "..":
+            # Traversal urinishini xavfsiz bloklaymiz
+            return None
+        # Faqat ruxsat etilgan xavfsiz belgilar
+        if re.search(r"[/\\:*?\"<>|\0]", segment):
+            return None
+        parts.append(segment)
+
+    if not parts:
+        return None
+
+    return "/".join(parts)
+
+
+def safe_extract_zip(zip_file: zipfile.ZipFile, target_dir: str) -> list[str]:
+    """
+    ZIP arxivini xavfsiz (Zip Slip dan himoyalangan holda) diskka ochish.
+    Har bir a'zoning to'liq yo'li target_dir ichida ekanligini qat'iy kafolatlaydi.
+    """
+    abs_target_dir = os.path.abspath(target_dir)
+    extracted_files = []
+
+    for member in zip_file.infolist():
+        # Zip slip tekshiruvi
+        dest_path = os.path.abspath(os.path.join(abs_target_dir, member.filename))
+        if not dest_path.startswith(abs_target_dir + os.sep) and dest_path != abs_target_dir:
+            logger.warning("Zip Slip xavfi aniqlandi va bloklandi: %s -> %s", member.filename, dest_path)
+            continue
+
+        zip_file.extract(member, abs_target_dir)
+        extracted_files.append(dest_path)
+
+    return extracted_files
+
+
 def build_zip_archive_in_memory(
     project_name: str,
     files: Dict[str, str],
@@ -90,6 +149,7 @@ def build_zip_archive_in_memory(
     """
     Fayllar lug'atini RAM da .ZIP arxiviga aylantiradi.
     Qaytaradi: (zip_bytes, fayllar_soni)
+    Barcha fayl yo'llari Zip Slip xavfsizlik filtri (sanitize_archive_path) orqali tekshiriladi.
     """
     zip_buffer = io.BytesIO()
 
@@ -113,14 +173,20 @@ def build_zip_archive_in_memory(
     if has_py and not has_req:
         files["requirements.txt"] = "# Loyiha kutubxonalari\nrequests\naiohttp\npydantic\n"
 
+    valid_file_count = 0
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
         clean_proj_name = re.sub(r"[^\w\-]", "_", project_name).strip("_") or "project"
         for filepath, code in files.items():
-            archive_path = f"{clean_proj_name}/{filepath.lstrip('/')}"
+            safe_rel_path = sanitize_archive_path(filepath)
+            if not safe_rel_path:
+                logger.warning("Xavfli yoki noto'g'ri fayl yo'li ZIP ga kiritilmadi: %r", filepath)
+                continue
+            archive_path = f"{clean_proj_name}/{safe_rel_path}"
             zf.writestr(archive_path, code)
+            valid_file_count += 1
 
     zip_buffer.seek(0)
-    return zip_buffer.getvalue(), len(files)
+    return zip_buffer.getvalue(), valid_file_count
 
 
 async def send_project_zip_archive(
