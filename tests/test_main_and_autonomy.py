@@ -48,7 +48,7 @@ def test_background_task_tracker_defined():
 def test_track_background_task_lifecycle():
     """track_background_task fon vazifalarini to'g'ri ro'yxatga olib, tugaganda tozalashi kerak."""
     async def _test():
-        from main import track_background_task, _BACKGROUND_TASKS
+        from core.task_tracker import track_background_task, _BACKGROUND_TASKS
 
         initial_count = len(_BACKGROUND_TASKS)
 

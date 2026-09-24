@@ -148,7 +148,6 @@ class TestSecurityHeaders:
 
     REQUIRED_HEADERS = [
         "X-Content-Type-Options",
-        "X-Frame-Options",
         "X-XSS-Protection",
         "Referrer-Policy",
         "Content-Security-Policy",
@@ -165,10 +164,11 @@ class TestSecurityHeaders:
         """X-Content-Type-Options: nosniff bo'lishi kerak."""
         assert SECURITY_HEADERS.get("X-Content-Type-Options") == "nosniff"
 
-    def test_x_frame_options_set(self):
-        """X-Frame-Options qiymatga ega."""
-        val = SECURITY_HEADERS.get("X-Frame-Options", "")
-        assert val in ("DENY", "SAMEORIGIN"), f"X-Frame-Options noto'g'ri: {val}"
+    def test_csp_frame_ancestors_configured(self):
+        """Telegram Mini App uchun CSP da frame-ancestors xavfsiz sozlangan bo'lishi kerak."""
+        csp = SECURITY_HEADERS.get("Content-Security-Policy", "")
+        assert "frame-ancestors" in csp, "CSP da frame-ancestors direktivasi topilmadi"
+        assert "telegram.org" in csp, "CSP frame-ancestors da telegram.org domenlari ruxsat etilmagan"
 
 
 @pytest.mark.skipif(not SECURITY_MODULE_AVAILABLE, reason="security.api_auth import qilinmadi")

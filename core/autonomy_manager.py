@@ -103,6 +103,38 @@ class AutonomyTask:
         end = self.finished_at or time.time()
         return end - self.started_at
 
+    def check_limits(self) -> tuple[bool, Optional[str]]:
+        """
+        Task cheklovlarini (turn va duration) tekshiradi.
+        Qaytaradi: (davom_eta_oladimi: bool, sabab: Optional[str])
+        """
+        if self.current_turns >= self.max_turns:
+            return False, f"Maksimal qadamlar (turn) soniga yetildi: {self.current_turns}/{self.max_turns}"
+        if self.runtime_seconds >= self.max_duration_sec:
+            return False, f"Maksimal bajarilish vaqti tugadi: {self.runtime_seconds:.1f}s/{self.max_duration_sec:.1f}s"
+        return True, None
+
+    def record_turn(self) -> tuple[bool, Optional[str]]:
+        """
+        Bitta qadamni (turn) hisobga oladi va limitlarni tekshiradi.
+        """
+        self.current_turns += 1
+        self.updated_at = time.time()
+        return self.check_limits()
+
+    @staticmethod
+    def is_loop_detected(action_history: list[str], threshold: int = 3) -> bool:
+        """
+        Ketma-ket bir xil harakat yoki javoblar takrorlanishi (infinite loop) ni aniqlaydi.
+        """
+        if not action_history or len(action_history) < threshold:
+            return False
+        last_item = action_history[-1].strip().lower()
+        if not last_item:
+            return False
+        recent = [a.strip().lower() for a in action_history[-threshold:]]
+        return all(a == last_item for a in recent)
+
 
 class AutonomyManager:
     """

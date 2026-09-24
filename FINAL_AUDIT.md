@@ -47,33 +47,37 @@
 ---
 
 ## 6. O'tkazilgan Testlar va Natijalar (Tests Executed)
-- **Test Suite:** `super_agent/tests` papkasida 57 ta test.
+- **Test Suite:** `super_agent/tests` papkasida 82 ta test to'plami (9 ta to'liq test moduli):
+  1. `test_code_sandbox.py` — Docker sandbox xavfsizlik cheklovlari va timeoutlari
+  2. `test_config.py` — Maxfiy ma'lumotlar sanitizatsiyasi va validatsiyasi
+  3. `test_database.py` — Gibrid baza signaturalari va mosligi
+  4. `test_main_and_autonomy.py` — Anti-bot loop va lifecycle kuzatuvi
+  5. `test_memory_isolation.py` — Shaxsiy xotiraning guruh/kanalga oqib ketmasligi kafolati (Phase 5)
+  6. `test_security.py` — Telegram Mini App HMAC-SHA256 imzosi va CSP xavfsizlik sarlavhalari (Phase 3)
+  7. `test_tool_permission.py` — Xavf darajalari (LOW/HIGH/CRITICAL) bo'yicha asboblarni avtorizatsiyalash (Phase 16)
+  8. `test_safe_send.py` — 4096 belgilik chunking va markdown parsing fallback mexanizmlari (Phase 25)
+  9. `test_autonomy_limits.py` — Max turns, max duration, infinite loop detection va kill switch (Phase 25)
 - **Natija:**
-  - `52 passed, 5 skipped` (skip qilinganlar faqat real Docker daemoni yo'qligi sababli).
-  - Testlar soniyalar ichida muvaffaqiyatli yakunlanadi.
-- **Kompilyatsiya:** `python -m compileall super_agent` 100% muvaffaqiyat bilan o'tdi.
+  - `77 passed, 5 skipped, 0 failed` (100% muvaffaqiyat).
+- **Kompilyatsiya:** `python -m compileall super_agent` 0 ta xato bilan to'liq o'tdi.
 
 ---
 
 ## 7. O'rnatish va Ishga Tushirish (Deployment Instructions)
 AWS EC2 yoki boshqa Linux serverda:
 ```bash
-# 1. Loyihani tortish
-git clone https://github.com/developer1905/telegram-super-agent.git ~/telegram-super-agent
+# 1. Loyihani tortish yoki yangilash
 cd ~/telegram-super-agent
+git pull origin main
 
 # 2. Virtual environment va paketlar
-python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
-# 3. .env ni to'ldirish
-cp .env.example .env
+# 3. .env faylini tekshirish
 nano .env
 
-# 4. Systemd xizmatini yoqish
-sudo cp superagent.service /etc/systemd/system/superagent.service
-sudo systemctl daemon-reload
-sudo systemctl enable superagent
-sudo systemctl start superagent
+# 4. Systemd xizmatini qayta ishga tushirish
+sudo systemctl restart superagent
+sudo systemctl status superagent --no-pager
 ```

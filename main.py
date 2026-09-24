@@ -52,17 +52,10 @@ logger = logging.getLogger(__name__)
 START_TIME = datetime.now()
 
 # Fon vazifalarini xavfsiz boshqarish va tozalash (Background Task Tracker)
-_BACKGROUND_TASKS: set[asyncio.Task] = set()
-
-def track_background_task(coro_or_task, name: Optional[str] = None) -> asyncio.Task:
-    """Fonda ishlaydigan asyncio tasklarni ro'yxatga oladi va xavfsiz to'xtatish imkonini beradi."""
-    if isinstance(coro_or_task, asyncio.Task):
-        task = coro_or_task
-    else:
-        task = asyncio.create_task(coro_or_task, name=name)
-    _BACKGROUND_TASKS.add(task)
-    task.add_done_callback(_BACKGROUND_TASKS.discard)
-    return task
+from core import task_tracker
+_BACKGROUND_TASKS = task_tracker._BACKGROUND_TASKS
+track_background_task = task_tracker.track_background_task
+cancel_all_background_tasks = task_tracker.cancel_all_background_tasks
 
 
 # ─── Web Server & Telegram Mini App ───────────────────────────
