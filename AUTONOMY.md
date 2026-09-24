@@ -64,7 +64,21 @@ Foydalanuvchi va admin quyidagi buyruqlar orqali avtonomiyani to'liq nazorat qil
 ## 5. Fon Vazifalari Hayot Tsikli (Background Task Lifecycle)
 
 `main.py` da barcha `asyncio.create_task` chaqiriqlari `track_background_task()` orqali ro'yxatga olinadi. 
-Tizim to'xtatilganda (Graceful Shutdown):
+Tizim to'xtatilganda (11-bosqichli Graceful Shutdown):
 1. Yangi vazifalar qabul qilinishi to'xtatiladi.
 2. Barcha faol avtonom vazifalar xavfsiz bekor qilinadi.
 3. Baza ulanishlari va Telegram mijozlari xatosiz yopiladi.
+
+---
+
+## 6. Scheduler Integratsiyasi va Idempotency
+- `services/scheduler.py` dagi `night_autopilot_job` va `coworkers_pulse_job` mustaqil fon sikllari emas, balki `AutonomyManager.register_task()` va `start_task()` orqali boshqariladi.
+- `core/idempotency.py` dagi `IdempotencyManager` orqali bir vaqtning o'zida bir xil vazifaning ikki marta bajarilishi (duplicate trigger) TTL asosida to'liq bartaraf etiladi.
+
+---
+
+## 7. Crash Recovery (Qayta Tiklanish Kafolati)
+Server kutilmaganda qayta yuklanganda (masalan, OS restart yoki OOM killer):
+- `main.py` ishga tushish paytida `autonomy_manager.recover_stale_tasks_on_startup()` chaqiriladi.
+- Oldingi sessiyada `RUNNING` holatida qotib qolgan vazifalar aniqlanib, xavfsiz tarzda `FAILED` holatiga o'tkaziladi va sababi (`Server restart / Crash recovery`) qayd etiladi. Tizimda osilib qolgan (orphan/stale) vazifalar 0 tani tashkil etadi.
+
