@@ -145,6 +145,18 @@ class DatabaseManager:
                 )
             """)
 
+            # LOG_CHANNEL_ID ni avtomatik managed_chats ga kiritish
+            try:
+                from config import LOG_CHANNEL_ID
+                if LOG_CHANNEL_ID:
+                    cursor.execute("""
+                        INSERT INTO managed_chats (chat_id, title, chat_type, username, is_active)
+                        VALUES (?, 'Asosiy Hisobot Kanali', 'channel', '', 1)
+                        ON CONFLICT(chat_id) DO UPDATE SET is_active = 1
+                    """, (str(LOG_CHANNEL_ID),))
+            except Exception:
+                pass
+
             # 7. Chat History (Ko'p chatli doimiy suhbat tarixi — guruh, kanal va shaxsiy chatlar uchun)
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS chat_history (
@@ -357,6 +369,29 @@ class DatabaseManager:
                     return q.execute()
                 res = await loop.run_in_executor(None, _sb_fetch)
                 if res.data:
+                    # Supabase dagi faktlarni lokal SQLite ga zudlik bilan sinxronlaymiz
+                    def _sync_to_sqlite(facts_list):
+                        try:
+                            with self._get_sqlite_conn() as conn:
+                                cur = conn.cursor()
+                                for f in facts_list:
+                                    k = str(f.get("key", "")).strip().lower()
+                                    c = str(f.get("content", ""))
+                                    cat = str(f.get("category", "general"))
+                                    u = str(f.get("user_id", "admin"))
+                                    if k and c:
+                                        cur.execute("""
+                                            INSERT INTO knowledge_base (key, content, category, user_id, updated_at)
+                                            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                                            ON CONFLICT(user_id, key) DO UPDATE SET
+                                                content = excluded.content,
+                                                category = excluded.category,
+                                                updated_at = CURRENT_TIMESTAMP
+                                        """, (k, c, cat, u))
+                                conn.commit()
+                        except Exception as sync_e:
+                            logger.debug("Lokal SQLite knowledge_base kesh xatosi: %s", sync_e)
+                    await loop.run_in_executor(None, lambda: _sync_to_sqlite(res.data))
                     return res.data
             except Exception as exc:
                 logger.warning("Supabase get_all_facts xatosi: %s. SQLite dan olinmoqda.", exc)
@@ -568,6 +603,7 @@ class DatabaseManager:
             "knowledge_count": 0,
             "pending_posts": 0,
             "competitors_count": 0,
+            "managed_chats_count": 0,
         }
         try:
             with self._get_sqlite_conn() as conn:
@@ -592,7 +628,7 @@ class DatabaseManager:
                 cursor.execute("SELECT COUNT(*) FROM bot_stats WHERE event_type = 'ai_query' AND created_at LIKE ?", (f"{today_prefix}%",))
                 res["today_ai_queries"] = cursor.fetchone()[0]
 
-                # Bilimlar soni
+                # Bilimlar soni (Lokal SQLite)
                 cursor.execute("SELECT COUNT(*) FROM knowledge_base")
                 res["knowledge_count"] = cursor.fetchone()[0]
 
@@ -604,8 +640,25 @@ class DatabaseManager:
                 cursor.execute("SELECT COUNT(*) FROM competitor_channels WHERE active = 1")
                 res["competitors_count"] = cursor.fetchone()[0]
 
+                # Boshqarilayotgan kanallar va guruhlar soni
+                cursor.execute("SELECT COUNT(*) FROM managed_chats WHERE is_active = 1")
+                res["managed_chats_count"] = cursor.fetchone()[0]
+
         except Exception as exc:
             logger.error("get_stats_summary xatosi: %s", exc)
+
+        # Supabase ga ulangan bo'lsa, xotira sonini tekshirib maksimal qiymatni olamiz
+        if self.use_supabase and self._supabase_client:
+            try:
+                loop = asyncio.get_running_loop()
+                def _sb_count():
+                    c_res = self._supabase_client.table("knowledge_base").select("key", count="exact").execute()
+                    return c_res.count if c_res and c_res.count is not None else 0
+                sb_cnt = await loop.run_in_executor(None, _sb_count)
+                if sb_cnt > 0:
+                    res["knowledge_count"] = max(res["knowledge_count"], sb_cnt)
+            except Exception as sb_err:
+                logger.debug("get_stats_summary Supabase knowledge count xatosi: %s", sb_err)
 
         return res
 
@@ -842,6 +895,26 @@ class DatabaseManager:
     async def get_managed_chats(self, chat_type: Optional[str] = None) -> list[dict]:
         """Faol boshqarilayotgan guruhlar va kanallar ro'yxati."""
         loop = asyncio.get_running_loop()
+
+        # LOG_CHANNEL_ID mavjud bo'lsa va bazada hali kiritilmagan bo'lsa, avtomatik kiritish
+        from config import LOG_CHANNEL_ID
+        if LOG_CHANNEL_ID:
+            str_log_id = str(LOG_CHANNEL_ID)
+            def _ensure_log_channel():
+                try:
+                    with self._get_sqlite_conn() as conn:
+                        cur = conn.cursor()
+                        cur.execute("SELECT 1 FROM managed_chats WHERE chat_id = ?", (str_log_id,))
+                        if not cur.fetchone():
+                            cur.execute("""
+                                INSERT INTO managed_chats (chat_id, title, chat_type, username, is_active)
+                                VALUES (?, 'Asosiy Hisobot Kanali', 'channel', '', 1)
+                            """, (str_log_id,))
+                            conn.commit()
+                except Exception:
+                    pass
+            await loop.run_in_executor(None, _ensure_log_channel)
+
         def _query():
             with self._get_sqlite_conn() as conn:
                 conn.row_factory = sqlite3.Row

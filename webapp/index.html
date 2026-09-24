@@ -675,30 +675,37 @@
     <div class="tab-pane-content" id="tab-overview">
       <!-- Realtime Stats Grid -->
       <div class="row g-2 mb-3">
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md-4">
           <div class="stat-card">
             <div class="stat-title">Bugungi Xabarlar</div>
             <div class="stat-val text-primary" id="stat-msgs">0</div>
             <div class="stat-sub">AI Muloqot</div>
           </div>
         </div>
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md-4">
           <div class="stat-card">
             <div class="stat-title">Userbot Yuboruvlar</div>
             <div class="stat-val text-info" id="stat-userbot">0</div>
             <div class="stat-sub">Shaxsiy & Guruh</div>
           </div>
         </div>
-        <div class="col-6 col-md-3">
-          <div class="stat-card">
-            <div class="stat-title">Doimiy Xotira</div>
+        <div class="col-6 col-md-4">
+          <div class="stat-card" style="cursor: pointer;" onclick="switchTab('memory')" title="RAG Doimiy Xotiraga o'tish">
+            <div class="stat-title">Doimiy Xotira <i class="bi bi-box-arrow-up-right ms-1 text-muted" style="font-size: 10px;"></i></div>
             <div class="stat-val text-success" id="stat-kb">0</div>
             <div class="stat-sub">RAG Faktlar</div>
           </div>
         </div>
-        <div class="col-6 col-md-3">
-          <div class="stat-card">
-            <div class="stat-title">Kutilayotgan Postlar</div>
+        <div class="col-6 col-md-6">
+          <div class="stat-card" style="cursor: pointer;" onclick="switchTab('chats')" title="Ulangan Kanallarga o'tish">
+            <div class="stat-title">Ulangan Kanallar <i class="bi bi-box-arrow-up-right ms-1 text-muted" style="font-size: 10px;"></i></div>
+            <div class="stat-val text-primary" id="stat-chats">0</div>
+            <div class="stat-sub">Boshqarilayotgan</div>
+          </div>
+        </div>
+        <div class="col-12 col-md-6">
+          <div class="stat-card" style="cursor: pointer;" onclick="switchTab('reminders')" title="Kutilayotgan Postlarga o'tish">
+            <div class="stat-title">Kutilayotgan Postlar <i class="bi bi-box-arrow-up-right ms-1 text-muted" style="font-size: 10px;"></i></div>
             <div class="stat-val text-warning" id="stat-posts">0</div>
             <div class="stat-sub">Rejalashtirilgan</div>
           </div>
@@ -1817,7 +1824,22 @@
           const data = await res.json();
           document.getElementById('stat-msgs').innerText = data.today_user_messages || 0;
           document.getElementById('stat-userbot').innerText = data.today_userbot_sends || 0;
-          document.getElementById('stat-kb').innerText = data.knowledge_count || 0;
+
+          const kbCount = Math.max(data.knowledge_count || 0, allFactsData.length || 0);
+          document.getElementById('stat-kb').innerText = kbCount;
+          const factBadge = document.getElementById('fact-count-badge');
+          if (factBadge && (allFactsData.length === 0 || kbCount > allFactsData.length)) {
+            factBadge.innerText = `${kbCount} ta`;
+          }
+
+          const managedChatsCount = data.managed_chats_count !== undefined ? data.managed_chats_count : 0;
+          const statChatsEl = document.getElementById('stat-chats');
+          if (statChatsEl) statChatsEl.innerText = managedChatsCount;
+          const chatsBadge = document.getElementById('chats-count-badge');
+          if (chatsBadge && chatsBadge.innerText === '0 ta' && managedChatsCount > 0) {
+            chatsBadge.innerText = `${managedChatsCount} ta`;
+          }
+
           document.getElementById('stat-posts').innerText = data.pending_posts || 0;
 
           let provName = 'Gemini 3.1 Flash';
@@ -2176,6 +2198,10 @@
           const data = await res.json();
           allFactsData = data.facts || [];
           document.getElementById('fact-count-badge').innerText = `${allFactsData.length} ta`;
+          const statKbEl = document.getElementById('stat-kb');
+          if (statKbEl && allFactsData.length > 0) {
+            statKbEl.innerText = allFactsData.length;
+          }
           renderFacts(allFactsData);
         } else {
           container.innerHTML = '<div class="text-center text-muted py-3">🧠 Faktlarni yuklash uchun autentifikatsiya talab qilinadi.</div>';
@@ -2273,6 +2299,10 @@
           const data = await res.json();
           const chats = data.chats || [];
           document.getElementById('chats-count-badge').innerText = `${chats.length} ta`;
+          const statChatsEl = document.getElementById('stat-chats');
+          if (statChatsEl) {
+            statChatsEl.innerText = chats.length;
+          }
 
           if (chats.length === 0) {
             container.innerHTML = `
@@ -3517,6 +3547,8 @@
     loadStats();
     loadTasks();
     loadSystemInfo();
+    loadFacts();
+    loadManagedChats();
     setInterval(loadStats, 15000);
   </script>
 </body>

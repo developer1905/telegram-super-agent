@@ -1298,6 +1298,7 @@ async def rk_status(message: Message, ai_manager: AIManager) -> None:
         f"• Userbot yuboruvlari: `{stats['today_userbot_sends']}` ta\n"
         f"• Doimiy xotira (RAG): `{stats['knowledge_count']}` ta fakt\n"
         f"• Rejalashtirilgan postlar: `{stats['pending_posts']}` ta\n"
+        f"• Ulangan kanallar va guruhlar: `{stats.get('managed_chats_count', 0)}` ta\n"
         f"• Raqobatchi kanallar: `{stats['competitors_count']}` ta\n\n"
         f"🖥 **Server Xotirasi (Disk):**\n"
         f"• Jami: `{storage['total_gb']} GB` | Bo'sh: `{storage['free_gb']} GB` (`{storage['percent']}% band`)\n"

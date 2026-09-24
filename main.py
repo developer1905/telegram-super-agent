@@ -27,7 +27,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
-from config import BOT_TOKEN, ADMIN_ID, validate_config, WEBAPP_URL, get_clean_webapp_url
+from config import BOT_TOKEN, ADMIN_ID, validate_config, WEBAPP_URL, get_clean_webapp_url, LOG_CHANNEL_ID
 from core.ai_manager import AIManager
 from core.database import db
 from core.inbox_triage import init_inbox_triage
@@ -1206,6 +1206,31 @@ async def main() -> None:
             logger.info("✅ Telegram Menu Button (Mini App) sozlandi: %s", target_webapp_url)
         except Exception as exc:
             logger.warning("Menu Button sozlashda xato: %s", exc)
+
+    # 5.5. Doimiy RAG xotirani (Supabase -> SQLite) va kanalni (LOG_CHANNEL_ID) yangilash
+    async def _init_rag_and_channel_sync():
+        try:
+            facts = await db.get_all_facts()
+            logger.info("✅ RAG doimiy xotira yuklandi va keshlandi: %d ta fakt", len(facts))
+        except Exception as r_err:
+            logger.warning("RAG xotira sinxronlash ogohlantirish: %s", r_err)
+
+        if LOG_CHANNEL_ID:
+            try:
+                ch = await bot.get_chat(LOG_CHANNEL_ID)
+                ch_title = ch.title or f"Asosiy Kanal ({LOG_CHANNEL_ID})"
+                ch_username = ch.username or ""
+                await db.add_or_update_managed_chat(
+                    chat_id=LOG_CHANNEL_ID,
+                    title=ch_title,
+                    chat_type="channel",
+                    username=ch_username,
+                )
+                logger.info("✅ Boshqariladigan kanal (LOG_CHANNEL_ID) yangilandi: '%s' (@%s)", ch_title, ch_username)
+            except Exception as ch_err:
+                logger.debug("LOG_CHANNEL_ID bot orqali tekshirish ogohlantirish: %s", ch_err)
+
+    track_background_task(_init_rag_and_channel_sync(), name="init_rag_and_channel_sync")
 
     # AIManager ni data sifatida uzatish
     dp["ai_manager"] = ai_manager
