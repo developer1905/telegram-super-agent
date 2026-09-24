@@ -652,6 +652,9 @@ class DatabaseManager:
                 # Boshqarilayotgan kanallar va guruhlar soni
                 cursor.execute("SELECT COUNT(*) FROM managed_chats WHERE is_active = 1")
                 res["managed_chats_count"] = cursor.fetchone()[0]
+                from config import LOG_CHANNEL_ID
+                if res["managed_chats_count"] == 0 and LOG_CHANNEL_ID:
+                    res["managed_chats_count"] = 1
 
         except Exception as exc:
             logger.error("get_stats_summary xatosi: %s", exc)

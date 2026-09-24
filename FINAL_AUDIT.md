@@ -148,9 +148,10 @@ Loyiha bo'ylab 13 ta maxsus test moduli yaratildi va tekshirildi:
 | `tests/test_main_and_autonomy.py` | Anti-bot loop, background tracker, exception leakage yo'qligi | 6 PASSED |
 | `tests/test_rate_limit_and_idempotency.py` | Sliding window rate limiter, aiohttp middleware, TTL idempotency | 5 PASSED |
 | `tests/test_shutdown_and_autonomy_flow.py` | Tool permission, prompt injection, autonomy lifecycle, crash recovery, DB close | 6 PASSED |
+| `tests/test_real_agent_bot.py` | Database lifecycle, natural language parsing, autonomy limits, injection shield, tool gate | 7 PASSED |
 
 **Jami Test Natijasi:**  
-`102 passed, 5 skipped, 0 failed` (100% muvaffaqiyat)
+`109 passed, 5 skipped, 0 failed` (100% muvaffaqiyat — 14 ta test moduli)
 
 **Statik Kod Tekshiruvi:**  
 `python -m compileall .` — 0 ta sintaktik xato.

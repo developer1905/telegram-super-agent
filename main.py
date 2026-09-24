@@ -407,6 +407,21 @@ async def api_managed_chats_handler(request: web.Request) -> web.Response:
     if admin_err:
         return admin_err
     chats = await db.get_managed_chats()
+    if not chats and LOG_CHANNEL_ID:
+        try:
+            bot: Optional[Bot] = request.app.get("bot")
+            if bot:
+                ch = await bot.get_chat(LOG_CHANNEL_ID)
+                await db.register_managed_chat(
+                    chat_id=LOG_CHANNEL_ID,
+                    title=ch.title or "Asosiy Kanal",
+                    username=ch.username or "",
+                    chat_type="channel",
+                    is_admin=True,
+                )
+                chats = await db.get_managed_chats()
+        except Exception as exc:
+            logger.debug("api_managed_chats auto-sync ogohlantirish: %s", exc)
     return web.json_response({"chats": chats})
 
 
