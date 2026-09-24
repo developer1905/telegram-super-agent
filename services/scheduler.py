@@ -395,12 +395,18 @@ async def check_reminders_job(bot: "Bot") -> None:
     from aiogram.utils.keyboard import InlineKeyboardBuilder
     from aiogram.types import InlineKeyboardButton
 
+    from core.idempotency import idempotency_manager
+
     due_reminders = await db.get_due_reminders()
     if not due_reminders:
         return
 
     for rem in due_reminders:
         rem_id = rem["id"]
+        # Idempotency deduplication (60s lock per reminder)
+        if not await idempotency_manager.check_and_set(f"reminder:{rem_id}", ttl=60):
+            continue
+
         chat_id = rem["chat_id"]
         text = rem["text"]
         remind_at = rem["remind_at"]
@@ -580,8 +586,20 @@ def setup_scheduler(bot: "Bot", ai_manager: "AIManager") -> AsyncIOScheduler:
         try:
             from core.bot_collab import run_night_autopilot_cycle
             from core.mistral_agent_bot import get_second_bot
+            from core.autonomy_manager import autonomy_manager, AutonomyMode
+            if not autonomy_manager.is_globally_enabled():
+                logger.info("Night autopilot skipped: autonomy globally disabled")
+                return
+            task = await autonomy_manager.register_task(
+                name="Night Autopilot Cycle",
+                mode=AutonomyMode.NIGHT_AUTOPILOT,
+                max_iterations=1,
+            )
             sec_bot = get_second_bot()
-            await run_night_autopilot_cycle(bot_white=bot, bot_black=sec_bot)
+            await autonomy_manager.start_task(
+                task.task_id,
+                run_night_autopilot_cycle(bot_white=bot, bot_black=sec_bot)
+            )
         except Exception as na_err:
             logger.error("Tungi avtopilot job xatosi: %s", na_err)
 
@@ -599,10 +617,22 @@ def setup_scheduler(bot: "Bot", ai_manager: "AIManager") -> AsyncIOScheduler:
         try:
             from core.bot_skills import run_autonomous_coworker_pulse
             from core.mistral_agent_bot import get_second_bot
+            from core.autonomy_manager import autonomy_manager, AutonomyMode
+            if not autonomy_manager.is_globally_enabled():
+                logger.debug("Coworkers pulse skipped: autonomy globally disabled")
+                return
+            task = await autonomy_manager.register_task(
+                name="Coworkers Pulse",
+                mode=AutonomyMode.COWORKER_PULSE,
+                max_iterations=1,
+            )
             sec_bot = get_second_bot()
             target_chat = LOG_CHANNEL_ID if LOG_CHANNEL_ID != 0 else ADMIN_ID
             if target_chat:
-                await run_autonomous_coworker_pulse(bot_white=bot, bot_black=sec_bot, chat_id=target_chat)
+                await autonomy_manager.start_task(
+                    task.task_id,
+                    run_autonomous_coworker_pulse(bot_white=bot, bot_black=sec_bot, chat_id=target_chat)
+                )
         except Exception as cw_err:
             logger.debug("Coworkers pulse job xatosi: %s", cw_err)
 

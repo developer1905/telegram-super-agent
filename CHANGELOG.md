@@ -4,6 +4,20 @@ Barcha yirik arxitekturaviy o'zgarishlar, xavfsizlik kuchaytirishlari va yangila
 
 ---
 
+## [2.1.0] — 2026-09-24
+
+### 🚀 To'liq Master Prompt Vazifalarining Yakunlanishi (Production Finalization)
+- **Tool Permission Enforcement (Phase 16):** `execute_python_code` va `send_email` amaliyotlariga `ToolPermissionManager` orqali ruxsatlar tekshiruvi to'liq integratsiya qilindi.
+- **Prompt Injection Defense (Phase 17):** Email tahlili (`analyze_inbox`) va javob tayyorlash (`draft_reply`) oqimlarida tashqi ma'lumotlar `<untrusted_content>` teglari ichiga o'raldi.
+- **Autonomy Control Plane Integration:** APScheduler'dagi `night_autopilot_job`, `coworkers_pulse_job` va `core/bot_collab.py` dagi loyiha quruvchi hamda CAMEL/ChatDev hamkorlik jarayonlari `AutonomyManager` nazorati ostiga olindi.
+- **Rate Limiting (Phase 37):** `security/rate_limiter.py` da siljuvchi oyna (Sliding Window) algoritmi va aiohttp uchun `rate_limit_middleware` joriy etildi.
+- **Idempotency & Deduplication (Phase 38):** `core/idempotency.py` da TTL keshli `IdempotencyManager` yaratildi va eslatmalar, joblar hamda email jo'natishlarga bog'landi.
+- **Crash Recovery (Phase 39):** Server qayta yuklanganda `recover_stale_tasks_on_startup()` orqali chala qolgan avtonom jarayonlar xavfsiz tozalanadi.
+- **11-Bosqichli Graceful Shutdown (Phase 19):** `main.py` va `core/database.py` dagi `close()` orqali barcha resurslar (polling, scheduler, autonomy, background tasks, web runner, bot sessions, userbot, SQLite WAL checkpoint, logging) tartibli yopiladi.
+- **102 ta Muvaffaqiyatli Test:** Jami 13 ta modul bo'yicha 102 ta test 0 ta xatolik bilan yakunlandi.
+
+---
+
 ## [2.0.0] — 2026-09-24
 
 ### 🔒 Xavfsizlik (Security Hardening)

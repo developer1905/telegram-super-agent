@@ -208,11 +208,16 @@ async def execute_python_code_docker(
 async def execute_python_code(
     code_or_text: str,
     timeout_sec: float = 12.0,
+    user_id: int = 0,
+    context_type: str = "private",
+    is_admin: bool = False,
+    user_permissions: Optional[list[str]] = None,
 ) -> dict:
     """
     Python kodini xavfsiz sandbox da ishga tushiradi.
 
     XAVFSIZLIK QARORLARI:
+    - ToolPermissionManager orqali ruxsatlar tekshiruvi (HIGH risk).
     - Docker mavjud bo'lsa: Docker-based izolyatsiya (ishlab chiqarishda tavsiya qilinadi).
     - Docker mavjud bo'lmasa: EXECUTION RAD ETILADI (unsafe host execution qilinmaydi).
 
@@ -224,9 +229,30 @@ async def execute_python_code(
         "returncode": int,
         "duration": float,
         "error_message": Optional[str],
-        "sandbox_type": str,  # "docker" | "unavailable"
+        "sandbox_type": str,  # "docker" | "unavailable" | "permission_denied"
     }
     """
+    # 0. Tool Permission tekshiruvi
+    if user_id > 0:
+        from security.tool_permission import tool_permission_manager
+        allowed, reason = tool_permission_manager.can_execute(
+            tool_name="execute_code",
+            user_id=user_id,
+            context_type=context_type,
+            user_permissions=user_permissions,
+            is_admin=is_admin,
+        )
+        if not allowed:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"Xavfsizlik: {reason}",
+                "returncode": -1,
+                "duration": 0.0,
+                "error_message": reason,
+                "sandbox_type": "permission_denied",
+            }
+
     code = extract_python_code(code_or_text)
 
     # Dastlabki tekshirish

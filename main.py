@@ -36,6 +36,7 @@ from core.userbot import create_userbot_client
 import core.userbot as userbot_module
 from services.scheduler import setup_scheduler
 from security.api_auth import WebAppAuthMiddleware, cors_middleware
+from security.rate_limiter import rate_limit_middleware
 
 # Handlerlar
 from handlers import menu_handler, message_handler, file_handler, photo_handler, email_handler, voice_handler, group_handler
@@ -1032,9 +1033,10 @@ async def api_astrology_lots_handler(request: web.Request) -> web.Response:
 
 async def start_web_server(ai_manager: AIManager, bot: Optional[Bot] = None) -> web.AppRunner:
     """aiohttp web server va Mini App endpointlarini ishga tushiradi."""
-    # Middleware zanjiri: cors -> auth -> handler
+    # Middleware zanjiri: cors -> rate_limit -> auth -> handler
     app = web.Application(middlewares=[
         cors_middleware,
+        rate_limit_middleware,
         WebAppAuthMiddleware.middleware,
     ])
     app["ai_manager"] = ai_manager
@@ -1141,6 +1143,15 @@ async def main() -> None:
     # 2. AIManager yaratish
     ai_manager = AIManager()
     logger.info("✅ AI Manager tayyor")
+
+    # 2.5. Crash Recovery: steyl avtonom vazifalarni qayta tiklash
+    from core.autonomy_manager import autonomy_manager
+    try:
+        recovered = await autonomy_manager.recover_stale_tasks_on_startup()
+        if recovered:
+            logger.info("✅ Qayta tiklangan steyl avtonom vazifalar: %d ta", recovered)
+    except Exception as rec_err:
+        logger.warning("recover_stale_tasks_on_startup xatosi: %s", rec_err)
 
     # 3. aiogram Bot va Dispatcher sozlash
     bot = Bot(
@@ -1384,45 +1395,84 @@ async def main() -> None:
                     await asyncio.sleep(retry_delay)
                     retry_delay = min(retry_delay * 1.4, 20.0)
     finally:
-        # To'xtatishda barcha resurslarni xavfsiz tozalash
+        # [Shutdown 1/11] Scheduler to'xtatish
         if scheduler:
             try:
                 scheduler.shutdown(wait=False)
+                logger.info("[Shutdown 1/11] Scheduler to'xtatildi")
             except Exception as sch_err:
                 logger.debug("Scheduler to'xtatishda xatolik: %s", sch_err)
-        if userbot_module.userbot and userbot_module.userbot.is_connected():
-            try:
-                await userbot_module.userbot.disconnect()
-            except Exception as ub_err:
-                logger.debug("Userbot uzishda xatolik: %s", ub_err)
+
+        # [Shutdown 2/11] Yangi avtonom vazifalarni qabul qilishni to'xtatish
+        try:
+            from core.autonomy_manager import autonomy_manager
+            await autonomy_manager.set_global_enabled(False)
+            logger.info("[Shutdown 2/11] AutonomyManager global to'xtatildi")
+        except Exception as aut_err:
+            logger.debug("Autonomy global disable xatosi: %s", aut_err)
+
+        # [Shutdown 3/11] Faol avtonom vazifalarni bekor qilish
+        try:
+            cancelled_tasks = await autonomy_manager.cancel_all_tasks(reason="System shutdown")
+            logger.info("[Shutdown 3/11] Faol avtonom vazifalar bekor qilindi (%d ta)", len(cancelled_tasks))
+        except Exception as aut_can_err:
+            logger.debug("Autonomy cancel all xatosi: %s", aut_can_err)
+
+        # [Shutdown 4/11] Qolgan barcha fon vazifalarini to'xtatish (Tracked Background Tasks)
+        try:
+            await cancel_all_background_tasks(timeout=5.0)
+            logger.info("[Shutdown 4/11] Fon vazifalari to'xtatildi")
+        except Exception as wait_err:
+            logger.debug("Fon vazifalarini to'xtatishda kutish xatosi: %s", wait_err)
+
+        # [Shutdown 5/11] Web Runner cleanup
         if web_runner:
             try:
                 await web_runner.cleanup()
+                logger.info("[Shutdown 5/11] Web Runner tozalandi")
             except Exception as wr_err:
                 logger.debug("Web runner tozalashda xatolik: %s", wr_err)
 
-        # Qolgan barcha fon vazifalarini to'xtatish (Tracked Background Tasks)
-        running_bg_tasks = [t for t in _BACKGROUND_TASKS if not t.done()]
-        for t in running_bg_tasks:
-            t.cancel()
-        if running_bg_tasks:
-            try:
-                await asyncio.wait(running_bg_tasks, timeout=5.0)
-            except Exception as wait_err:
-                logger.debug("Fon vazifalarini to'xtatishda kutish xatosi: %s", wait_err)
-
+        # [Shutdown 6/11] Telegram asosiy bot sessiyasini yopish
         try:
             await bot.session.close()
+            logger.info("[Shutdown 6/11] Telegram asosiy bot sessiyasi yopildi")
         except Exception as bot_err:
             logger.debug("Bot sessiyasini yopishda xatolik: %s", bot_err)
+
+        # [Shutdown 7/11] 2-Bot sessiyasi va taskini yopish
         if second_bot_task and not second_bot_task.done():
             second_bot_task.cancel()
         if second_bot:
             try:
                 await second_bot.session.close()
+                logger.info("[Shutdown 7/11] 2-Bot sessiyasi yopildi")
             except Exception as s_err:
                 logger.debug("2-Bot sessiyasini yopishda xatolik: %s", s_err)
-        logger.info("👋 Bot to'xtatildi. Resurslar tozalandi.")
+
+        # [Shutdown 8/11] Userbot ulanishini uzish
+        if userbot_module.userbot and userbot_module.userbot.is_connected():
+            try:
+                await userbot_module.userbot.disconnect()
+                logger.info("[Shutdown 8/11] Userbot uzildi")
+            except Exception as ub_err:
+                logger.debug("Userbot uzishda xatolik: %s", ub_err)
+
+        # [Shutdown 9/11] Ma'lumotlar bazasi resurslarini yopish
+        try:
+            db.close()
+            logger.info("[Shutdown 9/11] Ma'lumotlar bazasi ulanishi yopildi")
+        except Exception as db_err:
+            logger.debug("DB close xatosi: %s", db_err)
+
+        # [Shutdown 10/11] Logging resurslarini flush qilish
+        try:
+            logging.shutdown()
+        except Exception:
+            pass
+
+        # [Shutdown 11/11] Yakuniy xavfsiz to'xtatish xabari
+        print("👋 [Shutdown 11/11] Bot to'liq va xavfsiz to'xtatildi. Barcha resurslar tozalandi.")
 
 
 # ─── Kirish Nuqtasi ───────────────────────────────────────────

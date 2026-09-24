@@ -81,14 +81,15 @@ Hech bir modul o'chirib tashlanmadi; har bir xavfli nuqta xavfsiz arxitekturaga 
 ---
 
 ## 11. Tool Security & Permissions
-- **Xavf Darajalari:** Har bir asbob `LOW`, `HIGH`, `CRITICAL` risk toifasiga ajratilgan.
-- **CRITICAL Operations:** Kod bajarish, fayl o'chirish yoki tizim sozlamalarini o'zgartirish faqat admin huquqi bilan amalga oshiriladi.
+- **Xavf Darajalari:** Har bir asbob `LOW`, `MEDIUM`, `HIGH`, `CRITICAL` risk toifasiga ajratilgan.
+- **CRITICAL & HIGH Operations:** Kod bajarish (`execute_code`), email jo'natish (`send_email`), fayl o'chirish yoki tizim sozlamalarini o'zgartirish `ToolPermissionManager` orqali qat'iy nazorat qilinadi. Ruxsat berilmagan foydalanuvchilar urinishlari avtomatik bloklanadi.
 
 ---
 
-## 12. Code Sandbox (Docker Fail-Closed)
+## 12. Code Sandbox (Docker Fail-Closed & Permission Enforced)
 - **Izolyatsiya Qoidalari:** `network_mode="none"`, `read_only=True`, `user="nobody"`, CPU kvotasi va xotira limiti (128 MB).
 - **Qat'iy Qoida:** Docker mavjud bo'lmasa, kod HECH QACHON xostda (`subprocess`/`eval`) bajarilmaydi (Fail-Closed).
+- **Tool Permission Nazorati:** `execute_python_code` chaqiruvlari avval `tool_permission_manager.can_execute` orqali tekshiriladi.
 
 ---
 
@@ -98,26 +99,39 @@ Hech bir modul o'chirib tashlanmadi; har bir xavfli nuqta xavfsiz arxitekturaga 
 
 ---
 
-## 14. Email & External Input Safety
-- **Prompt Injection Isolation:** Tashqi email matnlari faqat xom ma'lumot sifatida qabul qilinadi, tizim direktivasi deb hisoblanmaydi.
+## 14. Email & External Input Safety (Prompt Injection Defense)
+- **Prompt Injection Isolation:** Tashqi email matnlari tahlil qilinganda yoki javob yozilganda, ular qat'iyan `<untrusted_content>` teglari ichiga o'rab beriladi va AI modelga hech qanday tizim ko'rsatmasi deb qabul qilmaslik buyrug'i beriladi.
 - **Approval Gate:** AI o'zicha tashqariga xat jo'nata olmaydi; faqat admin tasdiqlaganidan keyin jo'natiladi.
+- **Idempotent Email Sending:** Bir xil xatning takroran yuborilishini oldini olish uchun `IdempotencyManager` orqali 300 soniyalik deduplication o'rnatilgan.
 
 ---
 
-## 15. AI Provider Gateway & Fallback
-- **Ko'p Provayderli Arxitektura:** Gemini, OpenRouter, Mistral, NVIDIA provayderlari adapter sifatida boshqariladi.
-- **Safe Error Masking:** Tashqi AI uzilib qolsa, foydalanuvchiga tizimning ichki xatoligi (`str(exc)`) emas, foydalanuvchiga mos tushunarli xabar beriladi.
+## 15. Rate Limiting & Idempotency (Phases 37 & 38)
+- **SlidingWindowRateLimiter:** In-memory siljuvchi oyna algoritmi yordamida har bir IP va Telegram user bo'yicha limitlar (`api_general`: 60 req/min, `ai_expensive`: 8 req/min, `telegram_msg`: 25 msg / 30s).
+- **aiohttp Rate Limit Middleware:** Barcha `/api/*` so'rovlariga integratsiya qilindi. Limit oshganda `429 Too Many Requests` va `Retry-After` sarlavhasi beriladi.
+- **IdempotencyManager:** Rejalashtirilgan eslatmalar (`reminder`), xabarlar va avtonom topshiriqlar uchun TTL asosidagi deduplication keshlanadi.
 
 ---
 
-## 16. Observability & Health
-- **Strukturaviy Loglar:** Correlation ID va Request ID asosida xavfsiz loglash.
-- **Health Check:** `/health` va `/readiness` marshrutlari haqiqiy DB va servis holatini qaytaradi.
+## 16. Crash Recovery & 11-Step Graceful Shutdown (Phases 19 & 39)
+- **Crash Recovery:** Server qayta ishga tushganda `recover_stale_tasks_on_startup()` orqali oldingi sessiyadan chala qolgan avtonom vazifalar xavfsiz tozalanadi va `FAILED` holatiga o'tkaziladi.
+- **11-Bosqichli Graceful Shutdown:**
+  1. Polling to'xtatiladi (yangi xabarlar qabuli yopiladi)
+  2. APScheduler to'xtatiladi
+  3. AutonomyManager yangi vazifalar qabuli o'chiriladi
+  4. Barcha faol avtonom vazifalar bekor qilinadi
+  5. Barcha tracked background vazifalar to'xtatiladi
+  6. Web Runner HTTP serveri tozalanadi
+  7. Asosiy Telegram bot sessiyasi yopiladi
+  8. 2-Bot (@architect7_bot) sessiyasi yopiladi
+  9. Telethon Userbot sessiyasi uziladi
+  10. Ma'lumotlar bazasi (SQLite WAL checkpoint truncate) resurslari yopiladi
+  11. Logging resurslari flush qilinadi
 
 ---
 
 ## 17. Testing & Verification Results
-Loyiha bo'ylab 11 ta maxsus test moduli yaratildi va tekshirildi:
+Loyiha bo'ylab 13 ta maxsus test moduli yaratildi va tekshirildi:
 
 | Test Moduli | Tekshiruv Yo'nalishi | Natija |
 |---|---|---|
@@ -132,9 +146,11 @@ Loyiha bo'ylab 11 ta maxsus test moduli yaratildi va tekshirildi:
 | `tests/test_tool_permission.py` | Asboblarning xavf darajalari va avtorizatsiya nazorati | 6 PASSED |
 | `tests/test_safe_send.py` | Telegram 4096 belgilik chunking va markdown parsing fallback | 7 PASSED |
 | `tests/test_main_and_autonomy.py` | Anti-bot loop, background tracker, exception leakage yo'qligi | 6 PASSED |
+| `tests/test_rate_limit_and_idempotency.py` | Sliding window rate limiter, aiohttp middleware, TTL idempotency | 5 PASSED |
+| `tests/test_shutdown_and_autonomy_flow.py` | Tool permission, prompt injection, autonomy lifecycle, crash recovery, DB close | 6 PASSED |
 
 **Jami Test Natijasi:**  
-`91 passed, 5 skipped, 0 failed` (100% muvaffaqiyat)
+`102 passed, 5 skipped, 0 failed` (100% muvaffaqiyat)
 
 **Statik Kod Tekshiruvi:**  
 `python -m compileall .` — 0 ta sintaktik xato.
@@ -146,4 +162,4 @@ Tizim to'liq ishlab chiqarish (production) talablariga javob beradi:
 - Barcha zaifliklar yopildi.
 - Barcha funksiyalar saqlandi.
 - Testlar orqali real isbotlandi.
-- AWS EC2 da `sudo systemctl restart superagent` orqali yangilashga tayyor.
+- AWS EC2 da `git pull` va `sudo systemctl restart superagent` orqali yangilashga tayyor.

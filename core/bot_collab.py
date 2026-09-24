@@ -567,10 +567,24 @@ async def handle_agent_collaboration(
     if ACTIVE_COLLABS.get(chat_key, False):
         logger.warning("Chat %s da allaqachon faol hamkorlik ketmoqda, yangisi boshlanmaydi", chat_id)
         return
+
+    from core.autonomy_manager import autonomy_manager, AutonomyMode
+    if not autonomy_manager.is_globally_enabled():
+        cur_origin = origin_bot or bot_white
+        await cur_origin.send_message(chat_id, "⚠️ Avtonom rejim global tarzda o'chirilgan.")
+        return
+
     ACTIVE_COLLABS[chat_key] = True
 
     cur_origin = origin_bot or bot_white
     is_group = chat_id < 0
+
+    autonomy_task = await autonomy_manager.register_task(
+        name=f"Collab: {task_description[:30]}",
+        mode=AutonomyMode.COLLABORATION,
+        chat_id=chat_id,
+        max_iterations=max_rounds,
+    )
 
     logger.info("🚀 handle_agent_collaboration boshlandi: chat_id=%s, task='%s'", chat_id, task_description[:50])
 
@@ -769,9 +783,13 @@ async def handle_agent_collaboration(
             logger.warning("Collab zip yaratish xatosi: %s", p_zip_err)
 
         logger.info("✅ handle_agent_collaboration muvaffaqiyatli yakunlandi")
+        if 'autonomy_task' in locals() and autonomy_task:
+            await autonomy_manager.complete_task(autonomy_task.task_id, result="Collab completed successfully")
 
     except Exception as exc:
         logger.error("❌ handle_agent_collaboration da kutilmagan xato: %s", exc, exc_info=True)
+        if 'autonomy_task' in locals() and autonomy_task:
+            await autonomy_manager.fail_task(autonomy_task.task_id, error=str(exc))
         try:
             await cur_origin.send_message(chat_id, f"⚠️ Hamkorlik jarayonida xatolik yuz berdi: {exc}")
         except Exception:
@@ -797,10 +815,23 @@ async def handle_project_generation(
     if ACTIVE_PROJECT_BUILDS.get(chat_key, False):
         logger.warning("Chat %s da allaqachon loyiha qurilmoqda, yangisi boshlanmaydi", chat_id)
         return
+
+    from core.autonomy_manager import autonomy_manager, AutonomyMode
+    if not autonomy_manager.is_globally_enabled():
+        cur_origin = origin_bot or bot_white
+        await cur_origin.send_message(chat_id, "⚠️ Avtonom rejim global tarzda o'chirilgan.")
+        return
+
     ACTIVE_PROJECT_BUILDS[chat_key] = True
 
     cur_origin = origin_bot or bot_white
     is_group = chat_id < 0
+
+    proj_task = await autonomy_manager.register_task(
+        name=f"Project: {task_description[:30]}",
+        mode=AutonomyMode.CUSTOM,
+        chat_id=chat_id,
+    )
 
     try:
         intro = (
@@ -872,9 +903,13 @@ async def handle_project_generation(
             await send_project_zip_archive(chat_id, bot_white, project_name, files, caption=None)
 
         logger.info("✅ handle_project_generation muvaffaqiyatli yakunlandi")
+        if 'proj_task' in locals() and proj_task:
+            await autonomy_manager.complete_task(proj_task.task_id, result="Project generated successfully")
 
     except Exception as exc:
         logger.error("handle_project_generation xatosi: %s", exc, exc_info=True)
+        if 'proj_task' in locals() and proj_task:
+            await autonomy_manager.fail_task(proj_task.task_id, error=str(exc))
         try:
             await cur_origin.send_message(chat_id, f"⚠️ Loyihani generatsiya qilishda xatolik yuz berdi: {exc}")
         except Exception:

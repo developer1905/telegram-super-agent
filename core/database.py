@@ -419,6 +419,15 @@ class DatabaseManager:
             logger.error("SQLite get_all_facts xatosi: %s", exc)
             return []
 
+    async def get_fact(self, key: str, user_id: Optional[str] = None) -> Optional[str]:
+        """Bitta aniq faktni kalit bo'yicha olish."""
+        facts = await self.get_all_facts(user_id=user_id)
+        key_clean = key.strip().lower()
+        for f in facts:
+            if f.get("key", "").strip().lower() == key_clean:
+                return f.get("content")
+        return None
+
     async def delete_fact(self, key: str, user_id: Optional[str] = None) -> bool:
         """Faktni o'chirish (user_id ko'rsatilsa faqat o'sha foydalanuvchining fakti o'chiriladi)."""
         key_clean = key.strip().lower()
@@ -1266,6 +1275,17 @@ class DatabaseManager:
                 conn.commit()
                 return True
         return await loop.run_in_executor(None, _save_lots)
+
+    def close(self) -> None:
+        """Ma'lumotlar bazasi resurslarini tozalash va yopish."""
+        logger.info("DatabaseManager resurslari tozalanmoqda...")
+        try:
+            with sqlite3.connect(self.sqlite_path, timeout=5.0) as conn:
+                conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+        except Exception as exc:
+            logger.debug("WAL checkpoint truncate xatosi: %s", exc)
+        self._supabase_client = None
+        logger.info("DatabaseManager muvaffaqiyatli yopildi.")
 
 
 # Global database singleton
