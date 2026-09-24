@@ -27,8 +27,8 @@ from aiohttp import web
 
 logger = logging.getLogger(__name__)
 
-# initData 5 daqiqadan eski bo'lsa rad etiladi
-INIT_DATA_MAX_AGE_SECONDS: int = 300  # 5 daqiqa
+# initData 24 soatgacha amal qiladi (Telegram Mini App standart seansi)
+INIT_DATA_MAX_AGE_SECONDS: int = 86400  # 24 soat
 
 # Xavfsizlik headerlari (Telegram Mini App iframe yuklana olishi uchun X-Frame-Options olib tashlangan)
 SECURITY_HEADERS = {
@@ -147,17 +147,20 @@ async def require_webapp_auth(request: web.Request) -> Optional[web.Response]:
     """
     from config import BOT_TOKEN, ADMIN_ID
     
-    # initData header yoki JSON body dan olamiz
+    # initData header, query param yoki JSON body dan olamiz
     init_data = (
-        request.headers.get("X-Telegram-Init-Data", "")
-        or request.headers.get("Authorization", "").replace("Bearer ", "")
+        request.headers.get("X-Telegram-Init-Data", "").strip()
+        or request.headers.get("Authorization", "").replace("Bearer ", "").strip()
+        or request.query.get("init_data", "").strip()
+        or request.query.get("initData", "").strip()
+        or request.query.get("token", "").strip()
     )
     
     # Agar header bo'lmasa, JSON body dan ham tekshiramiz
     if not init_data and request.method in ("POST", "PUT", "PATCH"):
         try:
             body = await request.clone(read_body=True).json()
-            init_data = body.get("init_data", "") or body.get("initData", "")
+            init_data = str(body.get("init_data", "") or body.get("initData", "") or body.get("token", "")).strip()
         except Exception:
             pass
     
@@ -167,6 +170,14 @@ async def require_webapp_auth(request: web.Request) -> Optional[web.Response]:
             status=401,
             headers=SECURITY_HEADERS,
         )
+
+    # Maxsus holat: Bot egasi brauzerdan BOT_TOKEN bilan to'g'ridan-to'g'ri admin sifatida kirishi
+    if BOT_TOKEN and (init_data == BOT_TOKEN.strip()):
+        str_admin_id = str(ADMIN_ID or "admin")
+        request["authenticated_user_id"] = str_admin_id
+        request["is_admin"] = True
+        request["role"] = "admin"
+        return None
     
     is_valid, user_id, error_msg = validate_telegram_init_data(
         init_data, BOT_TOKEN, allowed_user_ids=None

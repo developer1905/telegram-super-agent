@@ -1629,6 +1629,98 @@
       } catch(e) {}
     }
 
+    // ══════════════════════════════════════════════════════════════
+    // Telegram WebApp Authentication & Global Fetch Interceptor
+    // ══════════════════════════════════════════════════════════════
+    function getAuthToken() {
+      // 1. Telegram WebApp SDK initData
+      let token = window.Telegram?.WebApp?.initData || '';
+      
+      // 2. URL Hash (#tgWebAppData=...)
+      if (!token && window.location.hash) {
+        const hashMatch = window.location.hash.match(/tgWebAppData=([^&]+)/);
+        if (hashMatch) token = decodeURIComponent(hashMatch[1]);
+      }
+      
+      // 3. URL Query Param (?initData=... or ?token=...)
+      if (!token && window.location.search) {
+        const params = new URLSearchParams(window.location.search);
+        token = params.get('tgWebAppData') || params.get('initData') || params.get('init_data') || params.get('token') || '';
+      }
+      
+      // 4. Session / Local Storage
+      if (!token) {
+        token = sessionStorage.getItem('superagent_auth_token') || localStorage.getItem('superagent_auth_token') || '';
+      }
+      
+      if (token) {
+        sessionStorage.setItem('superagent_auth_token', token);
+      }
+      return token;
+    }
+
+    const _originalFetch = window.fetch;
+    window.fetch = async function(url, options = {}) {
+      options = options || {};
+      options.headers = options.headers || {};
+      
+      const urlStr = typeof url === 'string' ? url : (url?.url || '');
+      if (urlStr.includes('/api/')) {
+        const token = getAuthToken();
+        if (token) {
+          if (options.headers instanceof Headers) {
+            if (!options.headers.has('X-Telegram-Init-Data')) options.headers.set('X-Telegram-Init-Data', token);
+            if (!options.headers.has('Authorization')) options.headers.set('Authorization', 'Bearer ' + token);
+          } else {
+            if (!options.headers['X-Telegram-Init-Data']) options.headers['X-Telegram-Init-Data'] = token;
+            if (!options.headers['Authorization']) options.headers['Authorization'] = 'Bearer ' + token;
+          }
+        }
+      }
+
+      const res = await _originalFetch.call(this, url, options);
+
+      // Brauzer orqali kirilganda 401 bo'lsa kirish oynasini ko'rsatish
+      if (res.status === 401 && urlStr.includes('/api/') && !window.Telegram?.WebApp?.initData) {
+        promptAdminLogin();
+      }
+
+      return res;
+    };
+
+    function promptAdminLogin() {
+      if (document.getElementById('admin-auth-banner')) return;
+      const banner = document.createElement('div');
+      banner.id = 'admin-auth-banner';
+      banner.className = 'alert alert-primary border border-primary shadow-sm mx-3 mt-3 rounded-3 d-flex align-items-center justify-content-between';
+      banner.innerHTML = `
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-shield-lock-fill text-primary fs-4"></i>
+          <div>
+            <div class="fw-bold small">Brauzer Rejimi: Autentifikatsiya</div>
+            <div class="text-muted" style="font-size: 11px;">Telegram Mini App tashqarisida barcha ma'lumotlarni ko'rish uchun Bot Tokeningizni kiriting:</div>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm fw-bold px-3" onclick="openTokenModal()">🔑 Kirish</button>
+      `;
+      document.body.prepend(banner);
+    }
+
+    function openTokenModal() {
+      const current = sessionStorage.getItem('superagent_auth_token') || '';
+      const token = prompt('Iltimos, Bot Tokeningizni kiriting (Administrator sifatida kirish):', current);
+      if (token && token.trim()) {
+        sessionStorage.setItem('superagent_auth_token', token.trim());
+        localStorage.setItem('superagent_auth_token', token.trim());
+        const b = document.getElementById('admin-auth-banner');
+        if (b) b.remove();
+        showToast('Muvaffaqiyatli saqlandi! Ma\'lumotlar yangilanmoqda...');
+        loadStats();
+        loadSystemInfo();
+        loadTasks();
+      }
+    }
+
     let allFactsData = [];
 
     // Haptics helper
@@ -1958,6 +2050,8 @@
             `;
           });
           container.innerHTML = html;
+        } else {
+          container.innerHTML = '<div class="text-center text-muted py-3">⏰ Eslatmalarni yuklash uchun autentifikatsiya talab qilinadi.</div>';
         }
       } catch (e) {
         container.innerHTML = '<div class="text-center text-danger py-3">Yuklashda xato yuz berdi.</div>';
@@ -2065,8 +2159,12 @@
             `;
           });
           container.innerHTML = html;
+        } else {
+          container.innerHTML = '<div class="text-center text-muted py-3">Postlarni yuklash uchun admin huquqi talab qilinadi.</div>';
         }
-      } catch(e) {}
+      } catch(e) {
+        container.innerHTML = '<div class="text-center text-danger py-3">Yuklashda xato yuz berdi.</div>';
+      }
     }
 
     // ─── KNOWLEDGE BASE (FACTS) ──────────────────────────────
@@ -2079,6 +2177,8 @@
           allFactsData = data.facts || [];
           document.getElementById('fact-count-badge').innerText = `${allFactsData.length} ta`;
           renderFacts(allFactsData);
+        } else {
+          container.innerHTML = '<div class="text-center text-muted py-3">🧠 Faktlarni yuklash uchun autentifikatsiya talab qilinadi.</div>';
         }
       } catch(e) {
         container.innerHTML = '<div class="text-center text-danger py-3">Faktlarni yuklab bo\'lmadi.</div>';
@@ -2208,6 +2308,8 @@
             `;
           });
           container.innerHTML = html;
+        } else {
+          container.innerHTML = '<div class="text-center text-muted py-3">Kanallarni yuklash uchun admin huquqi talab qilinadi.</div>';
         }
       } catch(e) {
         container.innerHTML = '<div class="text-center text-danger py-3">Yuklashda xato yuz berdi.</div>';
@@ -2216,12 +2318,12 @@
 
     // ─── SYSTEM DIAGNOSTICS ──────────────────────────────────
     async function loadSystemInfo() {
+      const upEl = document.getElementById('sys-uptime');
       try {
         const res = await fetch('/api/system_info');
         if (res.ok) {
           const data = await res.json();
-          const upEl = document.getElementById('sys-uptime');
-          if (upEl) upEl.innerText = data.uptime_human || '—';
+          if (upEl) upEl.innerText = data.uptime_human || 'Faol (0h)';
 
           const dbEl = document.getElementById('sys-db');
           if (dbEl) dbEl.innerText = data.database_type || 'SQLite';
@@ -2250,9 +2352,12 @@
             const collabCount = data.active_collabs || 0;
             dualAgentEl.innerText = collabCount > 0 ? `Architect 7 + Jarvis (${collabCount} ta faol suhbat)` : 'Architect 7 + Jarvis (Tayyor)';
           }
+        } else {
+          if (upEl) upEl.innerText = res.status === 401 ? 'Autentifikatsiya kutilmoqda' : 'Yuklab bo\'lmadi';
         }
       } catch(e) {
         console.warn('loadSystemInfo xatosi:', e);
+        if (upEl) upEl.innerText = 'Tarmoq uzilishi';
       }
     }
 
@@ -2274,6 +2379,8 @@
     document.getElementById('btn-refresh').addEventListener('click', () => {
       haptic('light');
       loadStats();
+      loadSystemInfo();
+      loadTasks();
       showToast('Ma\'lumotlar yangilandi');
     });
 
@@ -2302,6 +2409,13 @@
           const cntBadge = document.getElementById('tasks-count-badge');
           if (cntBadge) cntBadge.innerText = `${allTasksData.length} ta`;
           renderTasks();
+        } else {
+          listBox.innerHTML = `
+            <div class="text-center text-muted py-4">
+              <i class="bi bi-shield-lock text-primary fs-3 d-block mb-1"></i>
+              Vazifalarni ko'rish uchun autentifikatsiya talab qilinadi.
+            </div>
+          `;
         }
       } catch (e) {
         listBox.innerHTML = '<div class="text-center text-danger py-3">Vazifalarni yuklab bo\'lmadi</div>';
@@ -3399,8 +3513,10 @@
       document.body.removeChild(ta);
     }
 
-    // Initial load
+    // Initial load: Asosiy ma'lumotlarni darhol yuklaymiz
     loadStats();
+    loadTasks();
+    loadSystemInfo();
     setInterval(loadStats, 15000);
   </script>
 </body>
