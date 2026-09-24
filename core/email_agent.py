@@ -122,6 +122,12 @@ class EmailAgent:
         self.smtp_port = EMAIL_SMTP_PORT
         self.last_error: str = ""
 
+    @staticmethod
+    def wrap_untrusted_content(content: str) -> str:
+        """Tashqi email kontentini prompt injectiondan himoya qilish uchun o'raydi."""
+        clean = (content or "").strip()
+        return f"<untrusted_content>\n{clean}\n</untrusted_content>"
+
     def is_configured(self) -> bool:
         """Email sozlamalari mavjudligini tekshiradi."""
         return bool(self.user and self.password)

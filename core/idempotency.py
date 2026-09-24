@@ -20,12 +20,13 @@ logger = logging.getLogger(__name__)
 class IdempotencyManager:
     """Dublikat amallarni aniqlovchi va to'xtatuvchi in-memory kesh."""
 
-    def __init__(self) -> None:
+    def __init__(self, default_ttl: float = 300.0) -> None:
+        self.default_ttl = float(default_ttl)
         # key -> expiration_timestamp (float)
         self._keys: dict[str, float] = {}
         self._lock = asyncio.Lock()
 
-    async def check_and_set(self, key: str, ttl_seconds: float = 300.0, ttl: Optional[float] = None) -> bool:
+    async def check_and_set(self, key: str, ttl_seconds: Optional[float] = None, ttl: Optional[float] = None) -> bool:
         """
         Amalni ro'yxatga oladi.
 
@@ -35,6 +36,8 @@ class IdempotencyManager:
         """
         if ttl is not None:
             ttl_seconds = float(ttl)
+        elif ttl_seconds is None:
+            ttl_seconds = self.default_ttl
         now = time.time()
         async with self._lock:
             self._cleanup(now)

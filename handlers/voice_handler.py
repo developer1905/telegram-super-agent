@@ -44,14 +44,15 @@ def get_voice_actions_keyboard(action_type: str = "send") -> InlineKeyboardMarku
 
 
 @router.message(F.voice | F.audio)
-async def handle_voice_message(message: Message, bot: Bot, ai: AIManager) -> None:
+async def handle_voice_message(message: Message, bot: Bot, ai_manager: Optional[AIManager] = None, ai: Optional[AIManager] = None) -> None:
     """Ovozli xabar kelganda uni Speech-to-Text va Ovozli Agent orqali to'liq bajarish."""
     if message.from_user and message.from_user.id != ADMIN_ID:
         await message.reply("⛔ Kechirasiz, faqat tizim administratori ovozli buyruqlardan foydalana oladi.")
         return
 
+    ai_inst = ai_manager or ai
     from core.speech_agent import process_voice_agent_message
-    await process_voice_agent_message(message=message, bot=bot, ai_manager=ai)
+    await process_voice_agent_message(message=message, bot=bot, ai_manager=ai_inst)
 
 
 @router.callback_query(F.data == "voice_confirm_action")

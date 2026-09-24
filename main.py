@@ -1245,6 +1245,7 @@ async def main() -> None:
 
     # AIManager ni data sifatida uzatish
     dp["ai_manager"] = ai_manager
+    dp["ai"] = ai_manager
 
     # Routerlarni ulash (tartib: menu, email, file, photo, voice, group, message)
     dp.include_router(menu_handler.router)

@@ -56,6 +56,22 @@ class ToolPermissionManager:
     def get_tool(self, name: str) -> Optional[ToolDefinition]:
         return self._tools.get(name)
 
+    def get_risk_level(self, name: str) -> Optional[RiskLevel]:
+        """Vositaning risk darajasini qaytaradi."""
+        tool = self._tools.get(name)
+        return tool.risk_level if tool else None
+
+    def is_tool_allowed(
+        self,
+        name: str,
+        user_id: int = 0,
+        context_type: str = "private",
+        is_admin: bool = False,
+    ) -> bool:
+        """Vositaga ruxsat berilganligini sodda boolean shaklda qaytaradi."""
+        allowed, _ = self.can_execute(name, user_id=user_id, context_type=context_type, is_admin=is_admin)
+        return allowed
+
     def can_execute(
         self,
         tool_name: str,
