@@ -1597,6 +1597,76 @@
       </div>
     </div>
 
+    <!-- ══════════════ TAB 6: ADMIN PANEL (SECURITY & USERS) ══════════════ -->
+    <div class="tab-pane-content" id="tab-admin">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <h5 class="fw-bold mb-0 text-white"><i class="bi bi-shield-lock-fill text-warning me-2"></i>Admin & Xavfsizlik Paneli</h5>
+          <span class="text-muted small">Foydalanuvchilar nazorati, jonli faollik va xavfsizlik cheklovlari</span>
+        </div>
+        <button class="btn btn-sm btn-outline-primary rounded-pill px-3" onclick="loadAdminPanel()">
+          <i class="bi bi-arrow-clockwise me-1"></i> Yangilash
+        </button>
+      </div>
+
+      <!-- Live User Stats -->
+      <div class="row g-2 mb-3">
+        <div class="col-6 col-md-3">
+          <div class="stat-card">
+            <div class="stat-title">Foydalanuvchilar</div>
+            <div class="stat-val text-primary" id="admin-stat-total">0</div>
+            <div class="stat-sub">Jami ro'yxatdan o'tgan</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="stat-card">
+            <div class="stat-title">Faol Foydalanuvchilar</div>
+            <div class="stat-val text-success" id="admin-stat-active">0</div>
+            <div class="stat-sub">Ruxsat berilgan</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="stat-card">
+            <div class="stat-title">Bloklanganlar</div>
+            <div class="stat-val text-danger" id="admin-stat-blocked">0</div>
+            <div class="stat-sub">Xavfsizlik cheklovi</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="stat-card">
+            <div class="stat-title">Jami Muloqot</div>
+            <div class="stat-val text-info" id="admin-stat-msgs">0</div>
+            <div class="stat-sub">Foydalanuvchi xabarlari</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Actions & Search -->
+      <div class="neon-card p-3 mb-3">
+        <div class="d-flex flex-column flex-md-row gap-2 justify-content-between align-items-stretch align-items-md-center mb-3">
+          <div class="input-group flex-grow-1">
+            <span class="input-group-text bg-dark border-secondary text-muted"><i class="bi bi-search"></i></span>
+            <input type="text" class="form-control" id="admin-user-search" placeholder="ID, username yoki ism bo'yicha qidirish..." oninput="filterAdminUsers()">
+          </div>
+          <div class="d-flex gap-2">
+            <select class="form-select w-auto" id="admin-user-filter" onchange="filterAdminUsers()">
+              <option value="all">Barchasi</option>
+              <option value="active">🟢 Faol</option>
+              <option value="blocked">🔴 Bloklangan</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Users List Container -->
+        <div id="admin-users-list" class="d-flex flex-column gap-2">
+          <div class="text-center py-4 text-muted">
+            <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
+            <div>Foydalanuvchilar ro'yxati yuklanmoqda...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </main>
 
   <!-- Bottom Floating Dock Navigation (Direct Button Clickable) -->
@@ -1620,6 +1690,10 @@
     <button type="button" class="dock-tab" data-tab="system" onclick="switchTab('system', this)">
       <i class="bi bi-gear-fill"></i>
       <span>Tizim</span>
+    </button>
+    <button type="button" class="dock-tab" id="dock-tab-admin" data-tab="admin" onclick="switchTab('admin', this)" style="display: none;">
+      <i class="bi bi-shield-lock-fill text-warning"></i>
+      <span>Admin</span>
     </button>
   </nav>
 
@@ -1790,6 +1864,7 @@
         if (tabId === 'chats') loadManagedChats();
         if (tabId === 'system') loadSystemInfo();
         if (tabId === 'overview') loadStats();
+        if (tabId === 'admin') loadAdminPanel();
       } catch (err) {
         console.warn('Tab load error:', err);
       }
@@ -1874,6 +1949,27 @@
 
           if (data.current_role) {
             setActivePill('role-group', data.current_role);
+          }
+
+          // Xavfsizlik va Rollar bo'yicha ko'rinish nazorati
+          window.isAdmin = !!data.is_admin;
+          const astroPill = document.querySelector('.subtab-pill[data-tool="astrology"]');
+          const astroPane = document.getElementById('tool-pane-astrology');
+          const adminDock = document.getElementById('dock-tab-admin');
+
+          if (!window.isAdmin) {
+            // Oddiy foydalanuvchidan Astrologiya va Admin Panelni yashirish
+            if (astroPill) astroPill.style.display = 'none';
+            if (astroPane) astroPane.style.display = 'none';
+            if (adminDock) adminDock.style.display = 'none';
+            const adminPane = document.getElementById('tab-admin');
+            if (adminPane && adminPane.classList.contains('active')) {
+              switchTab('agent');
+            }
+          } else {
+            // Administrator uchun ikkalasi ham to'liq ochiq
+            if (astroPill) astroPill.style.display = 'inline-flex';
+            if (adminDock) adminDock.style.display = 'inline-flex';
           }
         }
       } catch (e) {
@@ -2575,6 +2671,10 @@
     }
 
     function switchToolSubTab(subId, el) {
+      if (subId === 'astrology' && !window.isAdmin) {
+        showToast("Astrologiya bo'limi shaxsiy rejimda bo'lib, faqat bot egasi uchun ochiq!", true);
+        return;
+      }
       haptic('light');
       currentActiveTool = subId;
       document.querySelectorAll('#tab-tools .subtab-pill').forEach(p => p.classList.remove('active'));
@@ -3541,6 +3641,171 @@
         showToast('Nusxalab bo\'lmadi, qo\'lda belgilab oling', true);
       }
       document.body.removeChild(ta);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // Administrator & Foydalanuvchilar Boshqaruvi (Admin Panel)
+    // ══════════════════════════════════════════════════════════════
+    let allAdminUsersData = [];
+
+    async function loadAdminPanel() {
+      if (!window.isAdmin) return;
+      const listEl = document.getElementById('admin-users-list');
+      if (listEl) {
+        listEl.innerHTML = `
+          <div class="text-center py-4 text-muted">
+            <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
+            <div>Foydalanuvchilar ro'yxati yangilanmoqda...</div>
+          </div>`;
+      }
+
+      try {
+        const [ovRes, usersRes] = await Promise.all([
+          fetch('/api/admin/overview'),
+          fetch('/api/admin/users'),
+        ]);
+
+        if (ovRes.ok) {
+          const ov = await ovRes.json();
+          const elTot = document.getElementById('admin-stat-total');
+          const elAct = document.getElementById('admin-stat-active');
+          const elBlk = document.getElementById('admin-stat-blocked');
+          const elMsg = document.getElementById('admin-stat-msgs');
+          if (elTot) elTot.innerText = ov.total_users || 0;
+          if (elAct) elAct.innerText = ov.active_count || 0;
+          if (elBlk) elBlk.innerText = ov.blocked_count || 0;
+          if (elMsg) elMsg.innerText = ov.total_messages || 0;
+        }
+
+        if (usersRes.ok) {
+          const uData = await usersRes.json();
+          allAdminUsersData = uData.users || [];
+          renderAdminUsers(allAdminUsersData);
+        } else {
+          if (listEl) listEl.innerHTML = `<div class="alert alert-danger mb-0">Foydalanuvchilarni yuklashda xatolik: ${usersRes.statusText}</div>`;
+        }
+      } catch (err) {
+        console.error('loadAdminPanel xatosi:', err);
+        if (listEl) listEl.innerHTML = `<div class="alert alert-danger mb-0">Tarmoq xatosi: ${err.message}</div>`;
+      }
+    }
+
+    function filterAdminUsers() {
+      const query = (document.getElementById('admin-user-search')?.value || '').toLowerCase().trim();
+      const filterType = document.getElementById('admin-user-filter')?.value || 'all';
+
+      const filtered = allAdminUsersData.filter(u => {
+        const matchesQuery = !query
+          || String(u.user_id || '').toLowerCase().includes(query)
+          || String(u.username || '').toLowerCase().includes(query)
+          || String(u.first_name || '').toLowerCase().includes(query)
+          || String(u.last_name || '').toLowerCase().includes(query);
+
+        const matchesFilter = filterType === 'all'
+          || (filterType === 'active' && !u.is_blocked)
+          || (filterType === 'blocked' && !!u.is_blocked);
+
+        return matchesQuery && matchesFilter;
+      });
+
+      renderAdminUsers(filtered);
+    }
+
+    function renderAdminUsers(users) {
+      const listEl = document.getElementById('admin-users-list');
+      if (!listEl) return;
+
+      if (!users || users.length === 0) {
+        listEl.innerHTML = `
+          <div class="text-center py-4 text-muted">
+            <i class="bi bi-people mb-2" style="font-size: 2rem;"></i>
+            <div>Foydalanuvchilar topilmadi</div>
+          </div>`;
+        return;
+      }
+
+      let html = '';
+      users.forEach(u => {
+        const isBlocked = !!u.is_blocked;
+        const isAdmin = u.role === 'admin';
+        const displayName = `${u.first_name || ''} ${u.last_name || ''}`.trim() || 'Telegram Foydalanuvchisi';
+        const usernameDisplay = u.username ? `@${u.username}` : '<span class="text-muted">usernamesiz</span>';
+        const lastActive = u.last_active || u.created_at || 'Yaqinda';
+
+        html += `
+          <div class="p-3 rounded-3 border ${isBlocked ? 'border-danger bg-danger bg-opacity-10' : 'border-secondary bg-dark bg-opacity-50'} d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2">
+            <div class="d-flex align-items-center gap-3">
+              <div class="rounded-circle p-2 ${isAdmin ? 'bg-warning text-dark' : (isBlocked ? 'bg-danger text-white' : 'bg-primary text-white')} d-flex align-items-center justify-content-center" style="width: 42px; height: 42px;">
+                <i class="bi ${isAdmin ? 'bi-shield-fill-check' : (isBlocked ? 'bi-person-x-fill' : 'bi-person-fill')} fs-5"></i>
+              </div>
+              <div>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                  <span class="fw-bold text-white">${escapeHtml(displayName)}</span>
+                  ${isAdmin ? '<span class="badge bg-warning text-dark small">👑 Admin</span>' : '<span class="badge bg-secondary small">Foydalanuvchi</span>'}
+                  ${isBlocked ? '<span class="badge bg-danger small">⛔ Bloklangan</span>' : '<span class="badge bg-success small">🟢 Faol</span>'}
+                </div>
+                <div class="small text-muted mt-1">
+                  <span>ID: <code class="text-info">${u.user_id}</code></span> •
+                  <span>${usernameDisplay}</span> •
+                  <span>💬 ${u.message_count || 0} xabar</span> •
+                  <span>🕒 ${lastActive}</span>
+                </div>
+                ${isBlocked && u.blocked_reason ? `<div class="small text-danger mt-1"><i class="bi bi-info-circle me-1"></i>Sabab: ${escapeHtml(u.blocked_reason)}</div>` : ''}
+              </div>
+            </div>
+            <div class="d-flex align-items-center gap-2 w-100 w-md-auto justify-content-end">
+              ${isAdmin ? `
+                <span class="badge bg-dark border border-warning text-warning px-3 py-2">
+                  <i class="bi bi-lock-fill me-1"></i> Himoyalangan
+                </span>
+              ` : (isBlocked ? `
+                <button class="btn btn-sm btn-success rounded-pill px-3 py-1" onclick="toggleBlockUser('${u.user_id}', false, '${escapeHtml(displayName)}')">
+                  <i class="bi bi-unlock-fill me-1"></i> Blokdan chiqarish
+                </button>
+              ` : `
+                <button class="btn btn-sm btn-outline-danger rounded-pill px-3 py-1" onclick="toggleBlockUser('${u.user_id}', true, '${escapeHtml(displayName)}')">
+                  <i class="bi bi-slash-circle me-1"></i> Bloklash
+                </button>
+              `)}
+            </div>
+          </div>`;
+      });
+
+      listEl.innerHTML = html;
+    }
+
+    async function toggleBlockUser(userId, blockStatus, userName) {
+      let reason = '';
+      if (blockStatus) {
+        reason = prompt(`Foydalanuvchi (${userName}) ni bloklash sababini kiriting (ixtiyoriy):`, "Xavfsizlik qoidalarini buzganlik yoki shubhali faollik");
+        if (reason === null) return;
+      } else {
+        if (!confirm(`Haqiqatan ham foydalanuvchi (${userName}) ni blokdan chiqarmoqchimisiz?`)) {
+          return;
+        }
+      }
+
+      try {
+        const res = await fetch('/api/admin/block_user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: userId,
+            is_blocked: blockStatus,
+            reason: reason || ''
+          })
+        });
+
+        const data = await res.json();
+        if (res.ok && data.status === 'ok') {
+          showToast(blockStatus ? '⛔ Foydalanuvchi muvaffaqiyatli bloklandi!' : '✅ Foydalanuvchi blokdan chiqarildi!', false);
+          await loadAdminPanel();
+        } else {
+          showToast(data.message || 'Xatolik yuz berdi', true);
+        }
+      } catch (err) {
+        showToast('So\'rov yuborishda xatolik: ' + err.message, true);
+      }
     }
 
     // Initial load: Asosiy ma'lumotlarni darhol yuklaymiz
