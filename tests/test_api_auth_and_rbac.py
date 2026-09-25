@@ -198,10 +198,10 @@ class TestApiAuthAndRbac(AioHTTPTestCase):
 
     @unittest_run_loop
     async def test_missing_astrology_profile_returns_404_not_other_user(self):
-        """Mavjud bo'lmagan astrologiya profili 404 qaytarishi kerak (boshqa user profilini bermaslik)."""
-        from config import BOT_TOKEN
+        """Mavjud bo'lmagan astrologiya profili Admin uchun 404 qaytarishi kerak (boshqa user profilini bermaslik)."""
+        from config import BOT_TOKEN, ADMIN_ID
         token = BOT_TOKEN or "test_bot_token_12345"
-        user_a_id = 111222
+        user_a_id = ADMIN_ID
 
         init_data_a = create_valid_init_data(user_id=user_a_id, bot_token=token)
         headers = {"X-Telegram-Init-Data": init_data_a}
