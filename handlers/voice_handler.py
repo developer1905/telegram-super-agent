@@ -46,8 +46,9 @@ def get_voice_actions_keyboard(action_type: str = "send") -> InlineKeyboardMarku
 @router.message(F.voice | F.audio)
 async def handle_voice_message(message: Message, bot: Bot, ai_manager: Optional[AIManager] = None, ai: Optional[AIManager] = None) -> None:
     """Ovozli xabar kelganda uni Speech-to-Text va Ovozli Agent orqali to'liq bajarish."""
-    if message.from_user and message.from_user.id != ADMIN_ID:
-        await message.reply("⛔ Kechirasiz, faqat tizim administratori ovozli buyruqlardan foydalana oladi.")
+    user_id = message.from_user.id if message.from_user else 0
+    if await db.is_user_blocked(user_id):
+        await message.reply("❌ Sizning hisobingiz administrator tomonidan bloklangan.")
         return
 
     ai_inst = ai_manager or ai
