@@ -80,23 +80,30 @@ _mj_tasks: dict[str, dict] = {}  # task_id -> {"prompt": str, "enhanced": str, "
 _media_cache: dict[str, dict] = {}  # task_id -> video_info
 
 
-# ─── Boshqalar uchun Rad Etish ────────────────────────────────
+# ─── Foydalanuvchi Huquqlari va Bloklash Tekshiruvi ──────────────
 
-@router.message(F.chat.type == "private", NOT_ADMIN_FILTER)
-async def reject_unauthorized(message: Message) -> None:
-    logger.warning(
-        "Ruxsatsiz kirish urinishi: user_id=%s, username=%s",
-        message.from_user.id,
-        message.from_user.username,
+async def check_user_access(message: Message) -> bool:
+    """
+    Foydalanuvchini ro'yxatga oladi va bloklanganligini tekshiradi.
+    Agar bloklangan bo'lsa True qaytaradi (xabar jarayonini to'xtatish kerak).
+    """
+    user = message.from_user
+    if not user:
+        return False
+    await db.register_or_update_user(
+        user_id=user.id,
+        username=user.username,
+        first_name=user.first_name,
+        last_name=user.last_name,
     )
-    text = (
-        f"⛔ **Xavfsizlik Cheklovi:**\n"
-        f"Bu bot faqat uning egasi uchun shaxsiy rejimda ishlaydi.\n\n"
-        f"👤 Sizning Telegram ID: `{message.from_user.id}`\n\n"
-        f"💡 Agar bu siz bo'lsangiz, botga to'liq egalik qilish uchun `.env` faylingizda:\n"
-        f"`ADMIN_ID={message.from_user.id}` deb yozing va botni qayta yoqing!"
-    )
-    await message.answer(text, parse_mode="Markdown")
+    if await db.is_user_blocked(user.id):
+        await message.answer(
+            "❌ **Hisobingiz bloklangan:** Administrator sizning botdan foydalanishingizni cheklagan.",
+            parse_mode="Markdown",
+        )
+        return True
+    await db.increment_user_message_count(user.id)
+    return False
 
 
 # ─── Moslashuvchan Qidiruv va Buyruq Patternlari ──────────────
@@ -627,10 +634,47 @@ async def handle_dialogs(message: Message) -> None:
 
 # ─── Asosiy Xabarlar va AI Muloqot ───────────────────────────
 
-@router.message(ADMIN_FILTER, F.text)
+@router.message(F.text)
 async def handle_ai_chat(message: Message, ai_manager: AIManager) -> None:
-    user_text = message.text.strip()
+    # 0. Kirish va bloklanishni tekshirish
+    if await check_user_access(message):
+        return
+
+    user_id = message.from_user.id if message.from_user else 0
+    is_admin = (user_id == ADMIN_ID)
+    user_text = (message.text or "").strip()
+    user_text_lower = user_text.lower()
     await db.log_event("user_msg", user_text[:80])
+
+    # Maxfiylik va Xavfsizlik: Oddiy foydalanuvchilar uchun Astrologiya va Maxsus buyruqlarni cheklash
+    if not is_admin:
+        # 1. Astrologiya so'rovlari: Faqat bot egasi uchun
+        astro_words = ["astrologiya", "natal karta", "goroskop", "/astrology", "/natal", "/transit", "/solar", "munajjim"]
+        if any(w in user_text_lower for w in astro_words):
+            await message.answer(
+                "🔒 **Ruxsat yo'q:** Astrologiya bo'limi shaxsiy rejimda bo'lib, faqat bot egasi uchun ochiq.",
+                parse_mode="Markdown",
+            )
+            return
+
+        # 2. Administrator/Userbot nazorat buyruqlari
+        admin_blocked_prefixes = (
+            "/post", "/clean_server", "/cleandisk", "/del_site", "/add_site",
+            "/add_competitor", "/remove_competitor", "/sync", "/sync_history",
+            "/admin", "suhbatlar", "/disk"
+        )
+        if (
+            parse_post_command(user_text) is not None
+            or _match_send_command(user_text) is not None
+            or _CHAT_SUMMARY_PATTERN.match(user_text) is not None
+            or user_text_lower.startswith(admin_blocked_prefixes)
+            or user_text_lower in ("telegram tekshir", "telegram xulosasi", "kim yozdi", "server holati", "disk holati")
+        ):
+            await message.answer(
+                "🔒 **Ruxsat yo'q:** Ushbu boshqaruv buyrug'i faqat tizim administratori uchun mo'ljallangan.",
+                parse_mode="Markdown",
+            )
+            return
 
     # 1. Ijtimoiy tarmoqlardan video yuklash (Instagram, TikTok, YouTube, X, Pinterest)
     from core.media_downloader import extract_media_url, download_social_video, detect_platform, get_or_create_mp3
