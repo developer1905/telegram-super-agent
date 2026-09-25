@@ -353,6 +353,7 @@ class AIManager:
         audio_bytes: bytes,
         mime_type: str = "audio/ogg",
         custom_instruction: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> str:
         """
         Ovozli xabarni Gemini Multimodal orqali tushunib, matnga aylantirish va javob berish.
@@ -364,7 +365,7 @@ class AIManager:
                 "2. Agar bu aniq topshiriq yoki savol bo'lsa, savolga to'liq, aqlli va foydali javob qaytaring."
             )
 
-            rag_context = await db.build_rag_context(context_type="private")
+            rag_context = await db.build_rag_context(user_id=user_id, context_type="private")
             if rag_context:
                 instruction = f"{rag_context}\n\n{instruction}"
 
