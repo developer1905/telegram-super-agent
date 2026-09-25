@@ -63,7 +63,7 @@ def build_email_menu(is_configured: bool) -> InlineKeyboardMarkup:
 
 # ─── /email Buyrug'i ─────────────────────────────────────────
 
-@router.message(ADMIN_FILTER, Command("email"))
+@router.message(Command("email"))
 async def cmd_email(message: Message) -> None:
     """Email boshqaruv markazi."""
     agent = get_email_agent()
@@ -111,7 +111,7 @@ async def safe_edit_text(
 
 # ─── Callback Handlerlar ─────────────────────────────────────
 
-@router.callback_query(ADMIN_FILTER, F.data == "email:menu")
+@router.callback_query(F.data == "email:menu")
 async def cb_email_menu(cb: CallbackQuery) -> None:
     await cb.answer()
     agent = get_email_agent()
@@ -126,7 +126,7 @@ async def cb_email_menu(cb: CallbackQuery) -> None:
     )
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "email:status")
+@router.callback_query(F.data == "email:status")
 async def cb_email_status(cb: CallbackQuery) -> None:
     await cb.answer()
     agent = get_email_agent()
@@ -158,8 +158,11 @@ async def cb_email_status(cb: CallbackQuery) -> None:
     await safe_edit_text(cb, text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "email:check")
+@router.callback_query(F.data == "email:check")
 async def cb_email_check(cb: CallbackQuery, ai_manager: AIManager) -> None:
+    if cb.from_user.id != ADMIN_ID:
+        await cb.answer("🔒 Shaxsiy pochta xatlarini tekshirish faqat bot egasi uchun ochiq.", show_alert=True)
+        return
     agent = get_email_agent()
     if not agent.is_configured():
         await cb.answer("⚠️ Email sozlanmagan!", show_alert=True)
@@ -196,7 +199,7 @@ async def cb_email_check(cb: CallbackQuery, ai_manager: AIManager) -> None:
     )
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "email:compose_help")
+@router.callback_query(F.data == "email:compose_help")
 async def cb_email_compose_help(cb: CallbackQuery) -> None:
     await cb.answer()
     builder = InlineKeyboardBuilder()
@@ -218,8 +221,11 @@ async def cb_email_compose_help(cb: CallbackQuery) -> None:
 
 # ─── Xatni Tasdiqlash va Yuborish ────────────────────────────
 
-@router.callback_query(ADMIN_FILTER, F.data.startswith("send_email:"))
+@router.callback_query(F.data.startswith("send_email:"))
 async def cb_send_email_confirm(cb: CallbackQuery) -> None:
+    if cb.from_user.id != ADMIN_ID:
+        await cb.answer("🔒 Xat yuborish faqat bot egasi uchun ochiq.", show_alert=True)
+        return
     draft_id = cb.data.replace("send_email:", "")
     draft = PENDING_EMAILS.pop(draft_id, None)
 
@@ -256,7 +262,7 @@ async def cb_send_email_confirm(cb: CallbackQuery) -> None:
         )
 
 
-@router.callback_query(ADMIN_FILTER, F.data.startswith("cancel_email:"))
+@router.callback_query(F.data.startswith("cancel_email:"))
 async def cb_cancel_email(cb: CallbackQuery) -> None:
     draft_id = cb.data.replace("cancel_email:", "")
     PENDING_EMAILS.pop(draft_id, None)
