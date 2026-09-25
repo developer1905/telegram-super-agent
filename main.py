@@ -213,6 +213,9 @@ async def api_stats_handler(request: web.Request) -> web.Response:
     stats["current_provider"] = ai_manager.current_provider
     stats["current_or_model"] = ai_manager.current_or_model
     stats["current_role"] = ai_manager.current_role
+    stats["is_admin"] = bool(request.get("is_admin", False))
+    stats["user_id"] = str(request.get("authenticated_user_id", ""))
+    stats["role"] = str(request.get("role", "user"))
     return web.json_response(stats)
 
 
@@ -225,6 +228,63 @@ def check_admin(request: web.Request) -> Optional[web.Response]:
             headers={"Content-Type": "application/json"}
         )
     return None
+
+
+async def api_admin_users_handler(request: web.Request) -> web.Response:
+    """Admin Panel: barcha ro'yxatdan o'tgan foydalanuvchilar ro'yxati (Faqat Administrator uchun)."""
+    admin_err = check_admin(request)
+    if admin_err:
+        return admin_err
+    users = await db.get_all_users()
+    return web.json_response({"status": "ok", "users": users, "total": len(users)})
+
+
+async def api_admin_block_user_handler(request: web.Request) -> web.Response:
+    """Admin Panel: foydalanuvchini bloklash yoki blokdan chiqarish (Faqat Administrator uchun)."""
+    admin_err = check_admin(request)
+    if admin_err:
+        return admin_err
+
+    data = await request.json()
+    user_id = str(data.get("user_id", "")).strip()
+    is_blocked = bool(data.get("is_blocked", False))
+    reason = str(data.get("reason", "")).strip()
+
+    if not user_id:
+        return web.json_response({"status": "error", "message": "user_id kiritilmadi"}, status=400)
+
+    from config import ADMIN_ID
+    if str(ADMIN_ID) and user_id == str(ADMIN_ID):
+        return web.json_response({"status": "error", "message": "Tizim administratorini bloklash mumkin emas!"}, status=400)
+
+    success = await db.set_user_blocked_status(user_id, is_blocked=is_blocked, reason=reason)
+    return web.json_response({
+        "status": "ok" if success else "error",
+        "user_id": user_id,
+        "is_blocked": is_blocked,
+        "reason": reason,
+    })
+
+
+async def api_admin_overview_handler(request: web.Request) -> web.Response:
+    """Admin Panel: umumiy foydalanuvchilar va xavfsizlik statistikasi (Faqat Administrator uchun)."""
+    admin_err = check_admin(request)
+    if admin_err:
+        return admin_err
+
+    users = await db.get_all_users()
+    total_users = len(users)
+    blocked_count = sum(1 for u in users if u.get("is_blocked"))
+    active_count = total_users - blocked_count
+    total_messages = sum(u.get("message_count", 0) for u in users)
+
+    return web.json_response({
+        "status": "ok",
+        "total_users": total_users,
+        "blocked_count": blocked_count,
+        "active_count": active_count,
+        "total_messages": total_messages,
+    })
 
 
 async def api_switch_model_handler(request: web.Request) -> web.Response:
@@ -1105,6 +1165,11 @@ async def start_web_server(ai_manager: AIManager, bot: Optional[Bot] = None) -> 
     app.router.add_get("/api/astrology/profile", api_astrology_profile_handler)
     app.router.add_post("/api/astrology/interpret", api_astrology_interpret_handler)
     app.router.add_post("/api/astrology/lots", api_astrology_lots_handler)
+
+    # Administrator Paneli & Foydalanuvchilar Boshqaruvi
+    app.router.add_get("/api/admin/users", api_admin_users_handler)
+    app.router.add_post("/api/admin/block_user", api_admin_block_user_handler)
+    app.router.add_get("/api/admin/overview", api_admin_overview_handler)
 
     port = int(os.getenv("PORT", "8080"))
     runner = web.AppRunner(app)
