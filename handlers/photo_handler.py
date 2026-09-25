@@ -157,7 +157,7 @@ async def handle_photo(message: Message, bot: Bot, ai_manager: AIManager) -> Non
 
 # ─── Barcha Tahrirlash Buyruqlari Ro'yxati ───────────────────
 
-@router.message(ADMIN_FILTER, F.text.lower() == "rasmlar")
+@router.message(F.text.lower() == "rasmlar")
 async def show_image_commands(message: Message) -> None:
     """Rasm tahrirlash buyruqlari ro'yxatini ko'rsatadi."""
     text = (
