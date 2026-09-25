@@ -246,6 +246,38 @@ class DatabaseManager:
                 except Exception:
                     pass
 
+            # 11. Users (Bot va WebApp foydalanuvchilari)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    user_id TEXT PRIMARY KEY,
+                    username TEXT DEFAULT '',
+                    first_name TEXT DEFAULT '',
+                    last_name TEXT DEFAULT '',
+                    role TEXT DEFAULT 'user',
+                    is_blocked INTEGER DEFAULT 0,
+                    blocked_reason TEXT DEFAULT '',
+                    message_count INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            try:
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_active ON users (last_active DESC);")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_blocked ON users (is_blocked);")
+            except Exception:
+                pass
+
+            from config import ADMIN_ID
+            if ADMIN_ID:
+                try:
+                    cursor.execute("""
+                        INSERT INTO users (user_id, username, first_name, role, is_blocked)
+                        VALUES (?, 'admin', 'Administrator', 'admin', 0)
+                        ON CONFLICT(user_id) DO UPDATE SET role = 'admin', is_blocked = 0;
+                    """, (str(ADMIN_ID),))
+                except Exception:
+                    pass
+
             # Agar eski bazada key ustida qat'iy global UNIQUE constraint bo'lsa, uni user_id + key ga yangilash
             try:
                 cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='knowledge_base';")
@@ -1278,6 +1310,140 @@ class DatabaseManager:
                 conn.commit()
                 return True
         return await loop.run_in_executor(None, _save_lots)
+
+    # ─── 11. FOYDALANUVCHILAR BOSHQARUVI VA BLOKLASH ─────────────
+
+    async def register_or_update_user(
+        self,
+        user_id: str | int,
+        username: str = "",
+        first_name: str = "",
+        last_name: str = "",
+    ) -> dict:
+        """Foydalanuvchi botga kirganda yoki start bosganda ro'yxatga oladi yoki yangilaydi."""
+        u_id = str(user_id).strip()
+        from config import ADMIN_ID
+        is_admin = bool(ADMIN_ID and (str(ADMIN_ID).strip() == u_id))
+        role = "admin" if is_admin else "user"
+        loop = asyncio.get_running_loop()
+
+        def _sync_reg():
+            with self._get_sqlite_conn() as conn:
+                cur = conn.cursor()
+                cur.execute("""
+                    INSERT INTO users (user_id, username, first_name, last_name, role, is_blocked, last_active)
+                    VALUES (?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP)
+                    ON CONFLICT(user_id) DO UPDATE SET
+                        username = COALESCE(NULLIF(excluded.username, ''), users.username),
+                        first_name = COALESCE(NULLIF(excluded.first_name, ''), users.first_name),
+                        last_name = COALESCE(NULLIF(excluded.last_name, ''), users.last_name),
+                        role = CASE WHEN users.role = 'admin' OR excluded.role = 'admin' THEN 'admin' ELSE users.role END,
+                        last_active = CURRENT_TIMESTAMP;
+                """, (u_id, username or "", first_name or "", last_name or "", role))
+                conn.commit()
+
+                cur.execute("SELECT user_id, username, first_name, last_name, role, is_blocked, blocked_reason, message_count, created_at, last_active FROM users WHERE user_id = ?", (u_id,))
+                row = cur.fetchone()
+                if row:
+                    return {
+                        "user_id": row[0],
+                        "username": row[1],
+                        "first_name": row[2],
+                        "last_name": row[3],
+                        "role": row[4],
+                        "is_blocked": bool(row[5]),
+                        "blocked_reason": row[6],
+                        "message_count": row[7],
+                        "created_at": row[8],
+                        "last_active": row[9],
+                    }
+                return {"user_id": u_id, "is_blocked": False, "role": role}
+
+        return await loop.run_in_executor(None, _sync_reg)
+
+    async def is_user_blocked(self, user_id: str | int) -> bool:
+        """Foydalanuvchi bloklanganligini tekshiradi (Admin hech qachon bloklanmaydi)."""
+        u_id = str(user_id).strip()
+        from config import ADMIN_ID
+        if ADMIN_ID and str(ADMIN_ID).strip() == u_id:
+            return False
+
+        loop = asyncio.get_running_loop()
+        def _check():
+            with self._get_sqlite_conn() as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT is_blocked FROM users WHERE user_id = ?", (u_id,))
+                row = cur.fetchone()
+                return bool(row[0]) if row else False
+        return await loop.run_in_executor(None, _check)
+
+    async def set_user_blocked_status(self, user_id: str | int, is_blocked: bool, reason: str = "") -> bool:
+        """Foydalanuvchini bloklash yoki blokdan chiqarish (Adminni bloklab bo'lmaydi)."""
+        u_id = str(user_id).strip()
+        from config import ADMIN_ID
+        if ADMIN_ID and str(ADMIN_ID).strip() == u_id:
+            logger.warning("Adminni bloklashga urinish rad etildi: %s", u_id)
+            return False
+
+        loop = asyncio.get_running_loop()
+        def _set():
+            with self._get_sqlite_conn() as conn:
+                cur = conn.cursor()
+                cur.execute("""
+                    INSERT INTO users (user_id, is_blocked, blocked_reason, last_active)
+                    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT(user_id) DO UPDATE SET
+                        is_blocked = excluded.is_blocked,
+                        blocked_reason = excluded.blocked_reason,
+                        last_active = CURRENT_TIMESTAMP;
+                """, (u_id, 1 if is_blocked else 0, reason if is_blocked else ""))
+                conn.commit()
+                return True
+        return await loop.run_in_executor(None, _set)
+
+    async def get_all_users(self) -> list[dict]:
+        """Barcha ro'yxatdan o'tgan foydalanuvchilar ro'yxatini qaytaradi."""
+        loop = asyncio.get_running_loop()
+        def _get():
+            with self._get_sqlite_conn() as conn:
+                cur = conn.cursor()
+                cur.execute("""
+                    SELECT user_id, username, first_name, last_name, role, is_blocked, blocked_reason, message_count, created_at, last_active
+                    FROM users
+                    ORDER BY last_active DESC;
+                """)
+                rows = cur.fetchall()
+                res = []
+                for r in rows:
+                    res.append({
+                        "user_id": r[0],
+                        "username": r[1],
+                        "first_name": r[2],
+                        "last_name": r[3],
+                        "role": r[4],
+                        "is_blocked": bool(r[5]),
+                        "blocked_reason": r[6],
+                        "message_count": r[7],
+                        "created_at": r[8],
+                        "last_active": r[9],
+                    })
+                return res
+        return await loop.run_in_executor(None, _get)
+
+    async def increment_user_message_count(self, user_id: str | int) -> None:
+        """Foydalanuvchining xabarlar hisoblagichini oshiradi."""
+        u_id = str(user_id).strip()
+        loop = asyncio.get_running_loop()
+        def _inc():
+            with self._get_sqlite_conn() as conn:
+                cur = conn.cursor()
+                cur.execute("""
+                    UPDATE users
+                    SET message_count = message_count + 1, last_active = CURRENT_TIMESTAMP
+                    WHERE user_id = ?;
+                """, (u_id,))
+                conn.commit()
+        await loop.run_in_executor(None, _inc)
 
     def close(self) -> None:
         """Ma'lumotlar bazasi resurslarini tozalash va yopish."""
