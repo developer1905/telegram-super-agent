@@ -199,9 +199,41 @@ async def require_webapp_auth(request: web.Request) -> Optional[web.Response]:
         except (ValueError, TypeError):
             is_admin = str_user_id == str(ADMIN_ID)
 
+    # 1. Foydalanuvchi bloklanganligini tekshirish (Admin hech qachon bloklanmaydi)
+    from core.database import db
+    if not is_admin and await db.is_user_blocked(str_user_id):
+        return web.json_response(
+            {"error": "Sizning hisobingiz bloklangan. Administratorga murojaat qiling.", "code": "USER_BLOCKED"},
+            status=403,
+            headers=SECURITY_HEADERS,
+        )
+
+    # Foydalanuvchini bazada yangilash (last_active)
+    try:
+        await db.register_or_update_user(str_user_id)
+    except Exception:
+        pass
+
     request["authenticated_user_id"] = str_user_id
     request["is_admin"] = is_admin
     request["role"] = "admin" if is_admin else "user"
+
+    # 2. Astrologiya bo'limi: Faqat bot egasi (Administrator) uchun ochiq
+    if request.path.startswith("/api/astrology") and not is_admin:
+        return web.json_response(
+            {"error": "Astrologiya bo'limi shaxsiy rejimda bo'lib, faqat bot egasi uchun ochiq.", "code": "FORBIDDEN"},
+            status=403,
+            headers=SECURITY_HEADERS,
+        )
+
+    # 3. Admin Panel endpointlari: Faqat bot egasi uchun ochiq
+    if request.path.startswith("/api/admin") and not is_admin:
+        return web.json_response(
+            {"error": "Admin panel faqat tizim administratori uchun ochiq.", "code": "FORBIDDEN"},
+            status=403,
+            headers=SECURITY_HEADERS,
+        )
+
     return None
 
 
