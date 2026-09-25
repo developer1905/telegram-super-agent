@@ -88,6 +88,28 @@ def build_reply_keyboard_menu() -> ReplyKeyboardMarkup:
     )
 
 
+def build_user_reply_keyboard_menu() -> ReplyKeyboardMarkup:
+    """Oddiy va mehmon foydalanuvchilar uchun xavfsiz klaviatura (Astrologiya va maxfiy funksiyalarsiz)."""
+    buttons = [
+        [
+            KeyboardButton(text="📱 Mening Mini Appim"),
+        ],
+        [
+            KeyboardButton(text="🎨 AI Rasm Chizish"),
+            KeyboardButton(text="🔬 AI Tadqiqot"),
+        ],
+        [
+            KeyboardButton(text="💻 Kod Yordamchisi"),
+            KeyboardButton(text="❓ Yordam"),
+        ],
+    ]
+    return ReplyKeyboardMarkup(
+        keyboard=buttons,
+        resize_keyboard=True,
+        is_persistent=True,
+    )
+
+
 def build_reply_ai_studio_menu() -> ReplyKeyboardMarkup:
     """1-guruh: AI & Kreativ Studio vositalari."""
     buttons = [
@@ -222,6 +244,30 @@ def build_main_menu() -> InlineKeyboardMarkup:
     )
     builder.row(
         InlineKeyboardButton(text="📊 Holat & Statistika", callback_data="menu:status"),
+        InlineKeyboardButton(text="❓ Yordam", callback_data="menu:help"),
+    )
+    return builder.as_markup()
+
+
+def build_user_main_menu() -> InlineKeyboardMarkup:
+    """Oddiy foydalanuvchilar uchun inline menyu (Astrologiya va Admin sozlamalarisiz)."""
+    builder = InlineKeyboardBuilder()
+
+    target_web_url = get_clean_webapp_url()
+    if target_web_url:
+        builder.row(
+            InlineKeyboardButton(
+                text="📱 Mening Shaxsiy Mini Appim",
+                web_app=WebAppInfo(url=target_web_url)
+            )
+        )
+
+    builder.row(
+        InlineKeyboardButton(text="🎨 AI Rasm Chizish", callback_data="menu:image_studio"),
+        InlineKeyboardButton(text="🔬 AI Tadqiqot", callback_data="menu:deep_research"),
+    )
+    builder.row(
+        InlineKeyboardButton(text="💻 Kod Auditi", callback_data="menu:code_audit"),
         InlineKeyboardButton(text="❓ Yordam", callback_data="menu:help"),
     )
     return builder.as_markup()
@@ -376,36 +422,78 @@ def build_roles_menu() -> InlineKeyboardMarkup:
 
 # ─── Buyruqlar ────────────────────────────────────────────────
 
-@router.message(ADMIN_FILTER, Command("start"))
+@router.message(Command("start"))
 async def cmd_start(message: Message, ai_manager: AIManager) -> None:
-    """Bot ishga tushganda asosiy salomlashish xabari va doimiy klaviatura menyusi."""
-    role_name = ROLES.get(ai_manager.current_role, {}).get("name", "Noma'lum")
-    if ai_manager.current_provider == "gemini":
-        model_info = f"Gemini ({GEMINI_MODEL})"
-    else:
-        model_key = ai_manager.current_or_model
-        model_id = OPENROUTER_MODELS.get(model_key, model_key)
-        model_info = f"OpenRouter ({model_id.split('/')[-1]})"
+    """Bot ishga tushganda asosiy salomlashish xabari va menyu (Admin va Oddiy foydalanuvchilar uchun moslashuvchan)."""
+    user = message.from_user
+    if not user:
+        return
+    user_id = user.id
 
-    text = (
-        f"👋 Salom, **Super-Agent 2.0 Enterprise** ishga tayyor!\n\n"
-        f"🤖 Joriy model: `{model_info}`\n"
-        f"🎭 Joriy rol: `{role_name}`\n\n"
-        f"**Asosiy Imkoniyatlar:**\n"
-        f"• 🎙 Ovozli buyruqlar (Voice-to-Task)\n"
-        f"• 📬 Muhim shaxsiy xabarlarni saralash (Smart Inbox Triage)\n"
-        f"• 🧠 Doimiy Xotira (Supabase + SQLite RAG)\n"
-        f"• 🌐 Jonli veb-havola tahlili va post generatsiyasi\n"
-        f"• 📊 Excel va CSV jadvallarini tahlil qilish\n"
-        f"• ⏰ SMM taymerli postlar va raqobatchilar tahlili\n"
-        f"• 📧 Shaxsiy pochtani boshqarish (Email Agent)\n"
-        f"• 📱 Telegram Mini App boshqaruv paneli\n\n"
-        f"Barcha bo'limlar pastdagi **Klaviatura Menyusi**da tayyor holatda joylashtirildi 👇"
+    # 1. Foydalanuvchini ro'yxatga olish / ma'lumotlarini yangilash
+    await db.register_or_update_user(
+        user_id=user_id,
+        username=user.username,
+        first_name=user.first_name,
+        last_name=user.last_name,
     )
-    # Doimiy pastki klaviaturani o'rnatish
-    await message.answer(text, reply_markup=build_reply_keyboard_menu(), parse_mode="Markdown")
-    # Inline menyuni ham ko'rsatish
-    await message.answer("⚡ **Tezkor Boshqaruv:**", reply_markup=build_main_menu(), parse_mode="Markdown")
+
+    # 2. Bloklanganlikni tekshirish
+    if await db.is_user_blocked(user_id):
+        await message.answer(
+            "❌ **Kirish taqiqlangan:** Sizning hisobingiz administrator tomonidan bloklangan.",
+            parse_mode="Markdown",
+        )
+        return
+
+    await db.increment_user_message_count(user_id)
+
+    # 3. Administrator bo'lsa - to'liq shaxsiy boshqaruv menyusi (Astrologiya va sozlamalar bilan)
+    if user_id == ADMIN_ID:
+        role_name = ROLES.get(ai_manager.current_role, {}).get("name", "Noma'lum")
+        if ai_manager.current_provider == "gemini":
+            model_info = f"Gemini ({GEMINI_MODEL})"
+        else:
+            model_key = ai_manager.current_or_model
+            model_id = OPENROUTER_MODELS.get(model_key, model_key)
+            model_info = f"OpenRouter ({model_id.split('/')[-1]})"
+
+        text = (
+            f"👋 Salom, **Super-Agent 2.0 Enterprise** administrator paneli ishga tayyor!\n\n"
+            f"🤖 Joriy model: `{model_info}`\n"
+            f"🎭 Joriy rol: `{role_name}`\n\n"
+            f"**Asosiy Imkoniyatlar:**\n"
+            f"• 🎙 Ovozli buyruqlar (Voice-to-Task)\n"
+            f"• 📬 Muhim shaxsiy xabarlarni saralash (Smart Inbox Triage)\n"
+            f"• 🧠 Doimiy Xotira (Supabase + SQLite RAG)\n"
+            f"• 🔮 Professional Astrologiya & Natal Karta (Shaxsiy rejimda)\n"
+            f"• 🛡️ WebApp Foydalanuvchilar Boshqaruvi va Bloklash tizimi\n"
+            f"• 🌐 Jonli veb-havola tahlili va post generatsiyasi\n"
+            f"• 📊 Excel va CSV jadvallarini tahlil qilish\n"
+            f"• ⏰ SMM taymerli postlar va raqobatchilar tahlili\n"
+            f"• 📧 Shaxsiy pochtani boshqarish (Email Agent)\n"
+            f"• 📱 Telegram Mini App boshqaruv paneli\n\n"
+            f"Barcha bo'limlar pastdagi **Klaviatura Menyusi**da tayyor holatda joylashtirildi 👇"
+        )
+        await message.answer(text, reply_markup=build_reply_keyboard_menu(), parse_mode="Markdown")
+        await message.answer("⚡ **Administrator Boshqaruvi:**", reply_markup=build_main_menu(), parse_mode="Markdown")
+        return
+
+    # 4. Oddiy foydalanuvchi bo'lsa - shaxsiy yangi va xavfsiz sahifa (Astrologiya va admin qismlari mutlaqo ko'rinmaydi)
+    first_name = html.escape(user.first_name or "Foydalanuvchi")
+    text = (
+        f"👋 Assalomu alaykum, <b>{first_name}</b>!\n\n"
+        f"Men <b>Super-Agent AI</b> — sizning shaxsiy ko'p funksiyali sun'iy intellekt yordamchingizman.\n\n"
+        f"<b>Sizga nimalarda yordam bera olaman?</b>\n"
+        f"• 🤖 <b>Aqlli suhbat:</b> Har qanday savolingizga tezkor, aniq tahlil va javoblar\n"
+        f"• 🎨 <b>AI Rasm Chizish:</b> Matndan ajoyib fotorealistik san'at asarlari yaratish\n"
+        f"• 🔬 <b>Internet Tadqiqoti:</b> Mavzular bo'yicha chuqur manbali ma'lumot izlash\n"
+        f"• 💻 <b>Dasturlash:</b> Kod yozish, xatolarni tuzatish va tahlil\n"
+        f"• 📱 <b>Shaxsiy Mini App:</b> Siz uchun alohida yangi boshqaruv kabinetingiz\n\n"
+        f"Menga to'g'ridan-to'g'ri savolingizni yozishingiz yoki quyidagi menyudan foydalanishingiz mumkin 👇"
+    )
+    await message.answer(text, reply_markup=build_user_reply_keyboard_menu(), parse_mode="HTML")
+    await message.answer("⚡ <b>Tezkor menyu:</b>", reply_markup=build_user_main_menu(), parse_mode="HTML")
 
 
 # ─── Yordamchi: Xavfsiz Tahrirlash ───────────────────────────
@@ -926,10 +1014,18 @@ async def cb_chess_start(cb: CallbackQuery, bot: Bot) -> None:
         await handle_start_chess(cb.message, bot_white=bot, bot_black=sec_bot)
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"🔮 Astrologiya & Natal Karta", "Astrologiya & Natal Karta", "Astrologiya", "astrologiya", "/astrology", "/natal"}))
+@router.message(F.text.in_({"🔮 Astrologiya & Natal Karta", "Astrologiya & Natal Karta", "Astrologiya", "astrologiya", "/astrology", "/natal"}))
 async def rk_astrology(message: Message) -> None:
-    """Astrologiya va Natal Karta boshqaruv paneli."""
-    profile = await db.get_astrology_profile(str(message.from_user.id))
+    """Astrologiya va Natal Karta boshqaruv paneli (Faqat Bot Egasi uchun)."""
+    user_id = message.from_user.id if message.from_user else 0
+    if user_id != ADMIN_ID:
+        await message.answer(
+            "🔒 **Ruxsat yo'q:** Astrologiya bo'limi shaxsiy rejimda bo'lib, faqat bot egasi uchun ochiq.",
+            parse_mode="Markdown"
+        )
+        return
+
+    profile = await db.get_astrology_profile(str(user_id))
     has_profile = bool(profile and profile.get("chart"))
 
     if has_profile:
@@ -1064,10 +1160,13 @@ async def cmd_solar(message: Message, command: CommandObject) -> None:
     await message.answer(text, parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"🎨 Rasm Chizish", "Rasm Chizish", "rasm chizish", "🎨 Rasm Chizish Studio", "Rasm Chizish Studio", "🎨 Midjourney Rasm", "Midjourney Rasm", "midjourney rasm", "/imagine", "/midjourney"}))
+@router.message(F.text.in_({"🎨 Rasm Chizish", "Rasm Chizish", "rasm chizish", "🎨 Rasm Chizish Studio", "Rasm Chizish Studio", "🎨 Midjourney Rasm", "Midjourney Rasm", "midjourney rasm", "🎨 AI Rasm Chizish", "AI Rasm Chizish", "/imagine", "/midjourney"}))
 async def rk_midjourney(message: Message) -> None:
     """Reply keyboard '🎨 Rasm Chizish' tugmasi — interaktiv AI Studio paneli ochiladi."""
     user_id = message.from_user.id if message.from_user else 0
+    if await db.is_user_blocked(user_id):
+        await message.answer("❌ Sizning hisobingiz administrator tomonidan bloklangan.", parse_mode="Markdown")
+        return
     text, markup = build_image_studio_panel(user_id)
     await message.answer(text, reply_markup=markup, parse_mode="HTML")
 
@@ -1134,8 +1233,12 @@ async def rk_tts(message: Message) -> None:
     await message.answer(text, parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"🔬 Deep Research", "Deep Research", "/research", "/tadqiqot"}))
+@router.message(F.text.in_({"🔬 Deep Research", "Deep Research", "🔬 AI Tadqiqot", "AI Tadqiqot", "/research", "/tadqiqot"}))
 async def rk_deep_research(message: Message) -> None:
+    user_id = message.from_user.id if message.from_user else 0
+    if await db.is_user_blocked(user_id):
+        await message.answer("❌ Sizning hisobingiz administrator tomonidan bloklangan.", parse_mode="Markdown")
+        return
     text = (
         "🔬 **Deep Research Agent (Chuqur Internet Tadqiqoti)**\n\n"
         "OpenAI Deep Research tamoyilida ishlovchi avtonom agent!\n"
@@ -1147,8 +1250,12 @@ async def rk_deep_research(message: Message) -> None:
     await message.answer(text, parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"💻 Kod & Shartnoma Auditi", "Kod & Shartnoma Auditi", "/code", "/audit", "/inspect"}))
+@router.message(F.text.in_({"💻 Kod & Shartnoma Auditi", "Kod & Shartnoma Auditi", "💻 Kod Yordamchisi", "Kod Yordamchisi", "/code", "/audit", "/inspect"}))
 async def rk_code_audit(message: Message) -> None:
+    user_id = message.from_user.id if message.from_user else 0
+    if await db.is_user_blocked(user_id):
+        await message.answer("❌ Sizning hisobingiz administrator tomonidan bloklangan.", parse_mode="Markdown")
+        return
     text = (
         "💻 **Kod Auditi & Shartnoma Tahlilchisi**\n\n"
         "1. **Dasturiy Kod Auditi & Bug Fixer:**\n"
@@ -1424,20 +1531,25 @@ async def rk_clear_history(message: Message, ai_manager: AIManager) -> None:
     await message.answer(res, parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"❓ Yordam", "Yordam", "yordam", "/help", "help"}))
+@router.message(F.text.in_({"❓ Yordam", "Yordam", "yordam", "/help", "help"}))
 async def rk_help(message: Message) -> None:
     await cmd_help(message)
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"📱 Mini App Paneli", "Mini App Paneli", "mini app paneli", "Mini App", "mini app", "/webapp", "/panel"}))
+@router.message(F.text.in_({"📱 Mini App Paneli", "Mini App Paneli", "mini app paneli", "Mini App", "mini app", "📱 Mening Mini Appim", "Mening Mini Appim", "/webapp", "/panel"}))
 async def rk_mini_app(message: Message) -> None:
+    user_id = message.from_user.id if message.from_user else 0
+    if await db.is_user_blocked(user_id):
+        await message.answer("❌ **Kirish taqiqlangan:** Sizning hisobingiz administrator tomonidan bloklangan.", parse_mode="Markdown")
+        return
+
     target_web_url = get_clean_webapp_url()
     if target_web_url:
         builder = InlineKeyboardBuilder()
         builder.row(InlineKeyboardButton(text="🚀 Mini Appni Ochish (Ilova)", web_app=WebAppInfo(url=target_web_url)))
         builder.row(InlineKeyboardButton(text="🌐 Brauzerda Ochish", url=target_web_url))
         await message.answer(
-            f"📱 **Super-Agent 2.0 Telegram Mini App:**\n\n"
+            f"📱 **Super-Agent Mini App Boshqaruv Kabineti:**\n\n"
             f"⚡ Quyidagi **'🚀 Mini Appni Ochish (Ilova)'** tugmasini bosing yoki Telegram chat oynasining chap pastki burchagidagi **'📱 Mini App'** menyu tugmasidan foydalaning!\n\n"
             f"🔗 Manzil: `{target_web_url}`",
             reply_markup=builder.as_markup(),
@@ -1446,18 +1558,31 @@ async def rk_mini_app(message: Message) -> None:
     else:
         await message.answer(
             "📱 **Telegram Mini App Paneli:**\n\n"
-            "Mini Appni Telegram ichida to'g'ridan-to'g'ri ochish uchun `.env` faylingizda `WEBAPP_URL` manzilini ko'rsating:\n"
-            "`WEBAPP_URL=https://sizning-domen.onrender.com`\n\n"
-            "Shuningdek brauzerda ham kirish mumkin: `http://localhost:8080/webapp`",
+            "Mini Appni ochish uchun tizim administratori `WEBAPP_URL` manzilini sozlashi kerak.",
             parse_mode="Markdown",
         )
 
 
-@router.message(ADMIN_FILTER, Command("help"))
+@router.message(Command("help"))
 async def cmd_help(message: Message) -> None:
-    """Yordam xabari."""
+    """Yordam xabari (Admin va Foydalanuvchilar uchun moslashuvchan)."""
+    user_id = message.from_user.id if message.from_user else 0
+    if user_id != ADMIN_ID:
+        text = (
+            "📖 **Super-Agent AI Foydalanish Qo'llanmasi**\n\n"
+            "**🚀 Asosiy Imkoniyatlar:**\n"
+            "• 💬 **AI Suhbat** — Menga istalgan savolingizni yozing, to'liq va aqlli javob beraman.\n"
+            "• 🎨 `/imagine [tasvir]` — AI yordamida fotorealistik rasm chizish (bepul).\n"
+            "• 🔬 `/research [mavzu]` — Internetdan chuqur ma'lumot va ilmiy tahlil to'plash.\n"
+            "• 💻 `/code [kod]` — Dastur kodingizni tekshirish, xatolarni tuzatish va optimallashtirish.\n"
+            "• 📱 `/webapp` — Shaxsiy Mini App kabinetingizni ochish.\n\n"
+            "💡 _Barcha savol va takliflaringizni to'g'ridan-to'g'ri yozishingiz mumkin!_"
+        )
+        await message.answer(text, parse_mode="Markdown")
+        return
+
     text = (
-        "📖 **Super-Agent 2.0 Enterprise Qo'llanmasi**\n\n"
+        "📖 **Super-Agent 2.0 Enterprise Qo'llanmasi (Administrator)**\n\n"
         "**🚀 Agentik & AI Buyruqlari:**\n"
         "• `/imagine [tasvir]` — Midjourney v6 fotorealistik rasm chizish (100% bepul)\n"
         "• `/hermes [topshiriq]` — Nous Hermes 3 avtonom rejalashtiruvchi va chuqur fikrlovchi agent\n"
