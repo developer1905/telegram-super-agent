@@ -399,7 +399,7 @@ async def cb_midjourney_action(cb: CallbackQuery, ai_manager: AIManager) -> None
 
 # ─── Video Musiqa va MP3 Callbacklari ────────────────────────
 
-@router.callback_query(ADMIN_FILTER, F.data.startswith("media:mp3:"))
+@router.callback_query(F.data.startswith("media:mp3:"))
 async def cb_media_mp3(cb: CallbackQuery) -> None:
     task_id = cb.data.split(":")[-1]
     v_info = _media_cache.get(task_id)
@@ -436,7 +436,7 @@ async def cb_media_mp3(cb: CallbackQuery) -> None:
         await cb.message.reply("❌ Videodan MP3 musiqani ajratib bo'lmadi.")
 
 
-@router.callback_query(ADMIN_FILTER, F.data.startswith("media:shazam:"))
+@router.callback_query(F.data.startswith("media:shazam:"))
 async def cb_media_shazam(cb: CallbackQuery, ai_manager: AIManager) -> None:
     task_id = cb.data.split(":")[-1]
     v_info = _media_cache.get(task_id)
@@ -462,7 +462,7 @@ async def cb_media_shazam(cb: CallbackQuery, ai_manager: AIManager) -> None:
     await cb.message.reply(f"🔍 <b>Videodagi Qo'shiq Tahlili (Shazam AI):</b>\n\n{res}", parse_mode="HTML")
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "read_voice_msg")
+@router.callback_query(F.data == "read_voice_msg")
 async def cb_read_voice_msg(cb: CallbackQuery) -> None:
     await cb.answer("🎙 Ovoz tayyorlanmoqda...")
     text_to_speak = cb.message.text or cb.message.caption or ""
@@ -510,7 +510,7 @@ async def cb_disk_status(cb: CallbackQuery) -> None:
 
 # ─── TodoList & Notion Callbacks ──────────────────────────────
 
-@router.callback_query(ADMIN_FILTER, F.data.startswith("todo:done:"))
+@router.callback_query(F.data.startswith("todo:done:"))
 async def cb_todo_done(cb: CallbackQuery) -> None:
     task_id = int(cb.data.replace("todo:done:", ""))
     await db.complete_task(task_id)
@@ -520,7 +520,7 @@ async def cb_todo_done(cb: CallbackQuery) -> None:
     await safe_edit_text(cb, text, reply_markup=markup, parse_mode="Markdown")
 
 
-@router.callback_query(ADMIN_FILTER, F.data.startswith("todo:del:"))
+@router.callback_query(F.data.startswith("todo:del:"))
 async def cb_todo_del(cb: CallbackQuery) -> None:
     task_id = int(cb.data.replace("todo:del:", ""))
     await db.delete_task(task_id)
@@ -530,7 +530,7 @@ async def cb_todo_del(cb: CallbackQuery) -> None:
     await safe_edit_text(cb, text, reply_markup=markup, parse_mode="Markdown")
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "todo:refresh")
+@router.callback_query(F.data == "todo:refresh")
 async def cb_todo_refresh(cb: CallbackQuery) -> None:
     await cb.answer("🔄 Yangilanmoqda...")
     from core.todo_notion_agent import format_tasks_list_report
@@ -538,7 +538,7 @@ async def cb_todo_refresh(cb: CallbackQuery) -> None:
     await safe_edit_text(cb, text, reply_markup=markup, parse_mode="Markdown")
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "todo:add_hint")
+@router.callback_query(F.data == "todo:add_hint")
 async def cb_todo_add_hint(cb: CallbackQuery) -> None:
     await cb.answer()
     hint_text = (
@@ -556,7 +556,7 @@ async def cb_todo_add_hint(cb: CallbackQuery) -> None:
 
 # ─── Uptime Monitoring Callbacks ──────────────────────────────
 
-@router.callback_query(ADMIN_FILTER, F.data == "uptime:check_now")
+@router.callback_query(F.data == "uptime:check_now")
 async def cb_uptime_check_now(cb: CallbackQuery) -> None:
     await cb.answer("⏳ Saytlar tekshirilmoqda...")
     from core.uptime_agent import run_uptime_batch_check, format_uptime_dashboard_report
@@ -565,7 +565,7 @@ async def cb_uptime_check_now(cb: CallbackQuery) -> None:
     await safe_edit_text(cb, text, reply_markup=markup, parse_mode="Markdown")
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "uptime:add_hint")
+@router.callback_query(F.data == "uptime:add_hint")
 async def cb_uptime_add_hint(cb: CallbackQuery) -> None:
     await cb.answer()
     text = (
@@ -582,7 +582,7 @@ async def cb_uptime_add_hint(cb: CallbackQuery) -> None:
 
 # ─── RSS & Real Madrid Callbacks ──────────────────────────────
 
-@router.callback_query(ADMIN_FILTER, F.data.startswith("news:"))
+@router.callback_query(F.data.startswith("news:"))
 async def cb_news_topic(cb: CallbackQuery, ai_manager: AIManager) -> None:
     topic = cb.data.replace("news:", "")
     await cb.answer("⏳ Yangiliklar yuklanmoqda...")
@@ -593,7 +593,7 @@ async def cb_news_topic(cb: CallbackQuery, ai_manager: AIManager) -> None:
 
 # ─── Eslatmalar Callbacks ──────────────────────────────────────
 
-@router.callback_query(ADMIN_FILTER, F.data.startswith("done_rem:"))
+@router.callback_query(F.data.startswith("done_rem:"))
 async def cb_done_reminder(cb: CallbackQuery) -> None:
     await cb.answer("✅ Bajarildi deb belgilandi")
     rem_id = int(cb.data.replace("done_rem:", ""))
@@ -601,7 +601,7 @@ async def cb_done_reminder(cb: CallbackQuery) -> None:
     await cb.message.edit_text("✅ **Vazifa bajarildi deb belgilandi!**", parse_mode="Markdown")
 
 
-@router.callback_query(ADMIN_FILTER, F.data.startswith("snooze_rem:"))
+@router.callback_query(F.data.startswith("snooze_rem:"))
 async def cb_snooze_reminder(cb: CallbackQuery) -> None:
     parts = cb.data.split(":")
     rem_id = int(parts[1])
@@ -615,7 +615,7 @@ async def cb_snooze_reminder(cb: CallbackQuery) -> None:
     )
 
 
-@router.callback_query(ADMIN_FILTER, F.data.startswith("del_rem:"))
+@router.callback_query(F.data.startswith("del_rem:"))
 async def cb_delete_reminder(cb: CallbackQuery) -> None:
     await cb.answer("Bekor qilindi")
     rem_id = int(cb.data.replace("del_rem:", ""))
@@ -646,18 +646,9 @@ async def handle_ai_chat(message: Message, ai_manager: AIManager) -> None:
     user_text_lower = user_text.lower()
     await db.log_event("user_msg", user_text[:80])
 
-    # Maxfiylik va Xavfsizlik: Oddiy foydalanuvchilar uchun Astrologiya va Maxsus buyruqlarni cheklash
+    # Maxfiylik va Xavfsizlik: Oddiy foydalanuvchilar uchun Administrator va Userbot buyruqlarini cheklash
     if not is_admin:
-        # 1. Astrologiya so'rovlari: Faqat bot egasi uchun
-        astro_words = ["astrologiya", "natal karta", "goroskop", "/astrology", "/natal", "/transit", "/solar", "munajjim"]
-        if any(w in user_text_lower for w in astro_words):
-            await message.answer(
-                "🔒 **Ruxsat yo'q:** Astrologiya bo'limi shaxsiy rejimda bo'lib, faqat bot egasi uchun ochiq.",
-                parse_mode="Markdown",
-            )
-            return
-
-        # 2. Administrator/Userbot nazorat buyruqlari
+        # Administrator/Userbot nazorat buyruqlari
         admin_blocked_prefixes = (
             "/post", "/clean_server", "/cleandisk", "/del_site", "/add_site",
             "/add_competitor", "/remove_competitor", "/sync", "/sync_history",
