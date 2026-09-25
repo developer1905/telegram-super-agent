@@ -45,7 +45,7 @@ _pending_rewrites: dict[int, tuple[bytes, str, str]] = {}
 
 # ─── Hujjat Handleri ─────────────────────────────────────────
 
-@router.message(ADMIN_FILTER, F.document)
+@router.message(F.document)
 async def handle_document(message: Message, bot: Bot, ai_manager: AIManager) -> None:
     """
     Foydalanuvchi yuborgan hujjatni qayta ishlaydi:
@@ -53,6 +53,11 @@ async def handle_document(message: Message, bot: Bot, ai_manager: AIManager) -> 
     - XLSX, XLS, CSV jadvallarini chuqur tahlil qilish (Data Analytics)
     - Doimiy xotiraga saqlash
     """
+    user_id = message.from_user.id if message.from_user else 0
+    if await db.is_user_blocked(user_id):
+        await message.answer("❌ Sizning hisobingiz administrator tomonidan bloklangan.")
+        return
+
     doc = message.document
     mime_type = doc.mime_type or ""
     filename = doc.file_name or "fayl"
@@ -198,7 +203,7 @@ async def handle_document(message: Message, bot: Bot, ai_manager: AIManager) -> 
 
 # ─── Shartnoma Auditi Callback ────────────────────────────────
 
-@router.callback_query(ADMIN_FILTER, F.data.startswith("contract_audit:"))
+@router.callback_query(F.data.startswith("contract_audit:"))
 async def cb_contract_audit(cb: CallbackQuery, ai_manager: AIManager) -> None:
     """Hujjatdagi shartnoma xatarlari va noqulay bandlarni tahlil qiladi."""
     msg_id_str = cb.data.replace("contract_audit:", "")
@@ -225,7 +230,7 @@ async def cb_contract_audit(cb: CallbackQuery, ai_manager: AIManager) -> None:
 
 # ─── Qayta Yozish Callback ────────────────────────────────────
 
-@router.callback_query(ADMIN_FILTER, F.data.startswith("rewrite_file:"))
+@router.callback_query(F.data.startswith("rewrite_file:"))
 async def cb_rewrite_file(cb: CallbackQuery, ai_manager: AIManager) -> None:
     """Faylni AI bilan qayta yozib yuboradi."""
     msg_id_str = cb.data.replace("rewrite_file:", "")
@@ -281,7 +286,7 @@ async def cb_rewrite_file(cb: CallbackQuery, ai_manager: AIManager) -> None:
 
 # ─── Chuqur Tahlil Callback ───────────────────────────────────
 
-@router.callback_query(ADMIN_FILTER, F.data.startswith("deep_analyze:"))
+@router.callback_query(F.data.startswith("deep_analyze:"))
 async def cb_deep_analyze(cb: CallbackQuery, ai_manager: AIManager) -> None:
     """Fayl mazmunini chuqurroq tahlil qiladi."""
     msg_id_str = cb.data.replace("deep_analyze:", "")
@@ -337,7 +342,7 @@ async def cb_deep_analyze(cb: CallbackQuery, ai_manager: AIManager) -> None:
 
 # ─── Doimiy Xotiraga Saqlash Callback ─────────────────────────
 
-@router.callback_query(ADMIN_FILTER, F.data.startswith("save_kb:"))
+@router.callback_query(F.data.startswith("save_kb:"))
 async def cb_save_kb(cb: CallbackQuery) -> None:
     """Fayl matnini doimiy xotiraga (Knowledge Base) saqlaydi."""
     msg_id_str = cb.data.replace("save_kb:", "")
@@ -363,7 +368,8 @@ async def cb_save_kb(cb: CallbackQuery) -> None:
     success = await db.save_fact(
         key=fact_key,
         content=original_text[:4000],
-        category="document"
+        category="document",
+        user_id=str(cb.from_user.id),
     )
 
     if success:
