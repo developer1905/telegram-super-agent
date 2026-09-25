@@ -479,21 +479,24 @@ async def cmd_start(message: Message, ai_manager: AIManager) -> None:
         await message.answer("⚡ **Administrator Boshqaruvi:**", reply_markup=build_main_menu(), parse_mode="Markdown")
         return
 
-    # 4. Oddiy foydalanuvchi bo'lsa - shaxsiy yangi va xavfsiz sahifa (Astrologiya va admin qismlari mutlaqo ko'rinmaydi)
+    # 4. Barcha foydalanuvchilar uchun: to'liq barcha bo'limlar va alohida shaxsiy xotira
     first_name = html.escape(user.first_name or "Foydalanuvchi")
     text = (
         f"👋 Assalomu alaykum, <b>{first_name}</b>!\n\n"
         f"Men <b>Super-Agent AI</b> — sizning shaxsiy ko'p funksiyali sun'iy intellekt yordamchingizman.\n\n"
-        f"<b>Sizga nimalarda yordam bera olaman?</b>\n"
-        f"• 🤖 <b>Aqlli suhbat:</b> Har qanday savolingizga tezkor, aniq tahlil va javoblar\n"
-        f"• 🎨 <b>AI Rasm Chizish:</b> Matndan ajoyib fotorealistik san'at asarlari yaratish\n"
-        f"• 🔬 <b>Internet Tadqiqoti:</b> Mavzular bo'yicha chuqur manbali ma'lumot izlash\n"
-        f"• 💻 <b>Dasturlash:</b> Kod yozish, xatolarni tuzatish va tahlil\n"
+        f"<b>Siz uchun mavjud barcha imkoniyatlar:</b>\n"
+        f"• 🔮 <b>Astrologiya & Natal Karta:</b> Shaxsiy tug'ilgan kuningiz bo'yicha professional astronomik xarita\n"
+        f"• 🎨 <b>AI Rasm Studio:</b> FLUX.1 va Midjourney fotorealistik rasm chizish\n"
+        f"• ⚡ <b>Hermes 3 Agent:</b> Avtonom fikrlash, chuqur mantiq va biznes hisob-kitoblar\n"
+        f"• 🔬 <b>Deep Research:</b> Ko'p manbali internet tadqiqoti\n"
+        f"• 💼 <b>Ish & Unumdorlik:</b> Shaxsiy vazifalar (Notion), eslatmalar, uptime monitoring\n"
+        f"• 📈 <b>SMM & Marketing:</b> Trend postlar va kontent strategiya\n"
+        f"• ⚙️ <b>AI Modellar & Rollar:</b> Gemini, DeepSeek, Mistral, Nemotron va tizim rollari\n"
         f"• 📱 <b>Shaxsiy Mini App:</b> Siz uchun alohida yangi boshqaruv kabinetingiz\n\n"
-        f"Menga to'g'ridan-to'g'ri savolingizni yozishingiz yoki quyidagi menyudan foydalanishingiz mumkin 👇"
+        f"Barcha bo'limlar pastdagi <b>Klaviatura Menyusi</b> va <b>Asosiy Menyu</b>da siz uchun tayyor holatda joylashtirildi 👇"
     )
-    await message.answer(text, reply_markup=build_user_reply_keyboard_menu(), parse_mode="HTML")
-    await message.answer("⚡ <b>Tezkor menyu:</b>", reply_markup=build_user_main_menu(), parse_mode="HTML")
+    await message.answer(text, reply_markup=build_reply_keyboard_menu(), parse_mode="HTML")
+    await message.answer("⚡ <b>Asosiy Menyu:</b>", reply_markup=build_main_menu(), parse_mode="HTML")
 
 
 # ─── Yordamchi: Xavfsiz Tahrirlash ───────────────────────────
@@ -517,7 +520,7 @@ async def safe_edit_text(
 
 # ─── Doimiy Pastki Klaviatura Handleri (Reply Keyboard) ──────
 
-@router.message(ADMIN_FILTER, F.text.in_({"🎨 AI & Kreativ Studio", "AI & Kreativ Studio", "AI Studio", "ai studio"}))
+@router.message(F.text.in_({"🎨 AI & Kreativ Studio", "AI & Kreativ Studio", "AI Studio", "ai studio"}))
 async def rk_group_ai_studio(message: Message) -> None:
     """1-toifa: AI & Kreativ Studio guruh menyusi."""
     text = (
@@ -533,7 +536,7 @@ async def rk_group_ai_studio(message: Message) -> None:
     await message.answer(text, reply_markup=build_reply_ai_studio_menu(), parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"💼 Ish & Unumdorlik", "Ish & Unumdorlik", "Unumdorlik", "unumdorlik"}))
+@router.message(F.text.in_({"💼 Ish & Unumdorlik", "Ish & Unumdorlik", "Unumdorlik", "unumdorlik"}))
 async def rk_group_productivity(message: Message) -> None:
     """2-toifa: Ish & Unumdorlik guruh menyusi."""
     text = (
@@ -549,7 +552,7 @@ async def rk_group_productivity(message: Message) -> None:
     await message.answer(text, reply_markup=build_reply_productivity_menu(), parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"📈 SMM & Marketing", "SMM & Marketing", "SMM", "smm"}))
+@router.message(F.text.in_({"📈 SMM & Marketing", "SMM & Marketing", "SMM", "smm"}))
 async def rk_group_smm(message: Message) -> None:
     """3-toifa: SMM & Marketing guruh menyusi."""
     text = (
@@ -564,7 +567,7 @@ async def rk_group_smm(message: Message) -> None:
     await message.answer(text, reply_markup=build_reply_smm_menu(), parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"⚙️ Sozlamalar & Xotira", "Sozlamalar & Xotira", "Sozlamalar", "sozlamalar"}))
+@router.message(F.text.in_({"⚙️ Sozlamalar & Xotira", "Sozlamalar & Xotira", "Sozlamalar", "sozlamalar"}))
 async def rk_group_settings(message: Message) -> None:
     """4-toifa: Sozlamalar & Xotira guruh menyusi."""
     text = (
@@ -578,7 +581,7 @@ async def rk_group_settings(message: Message) -> None:
     await message.answer(text, reply_markup=build_reply_settings_menu(), parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"📊 Holat & Yordam", "Holat & Yordam", "Tizim & Yordam"}))
+@router.message(F.text.in_({"📊 Holat & Yordam", "Holat & Yordam", "Tizim & Yordam"}))
 async def rk_group_system(message: Message) -> None:
     """5-toifa: Holat & Yordam guruh menyusi."""
     text = (
@@ -591,7 +594,7 @@ async def rk_group_system(message: Message) -> None:
     await message.answer(text, reply_markup=build_reply_system_menu(), parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"🔙 Asosiy Menyu", "Asosiy Menyu", "asosiy menyu", "🔙 Orqaga", "Orqaga", "orqaga", "/menu", "menu", "Bosh Menyu", "bosh menyu"}))
+@router.message(F.text.in_({"🔙 Asosiy Menyu", "Asosiy Menyu", "asosiy menyu", "🔙 Orqaga", "Orqaga", "orqaga", "/menu", "menu", "Bosh Menyu", "bosh menyu"}))
 async def rk_back_to_main(message: Message) -> None:
     """Bosh menyuga qaytish."""
     await message.answer(
@@ -627,7 +630,7 @@ def build_astrology_menu(has_profile: bool = False) -> InlineKeyboardMarkup:
         builder.row(
             InlineKeyboardButton(text="◀️ Orqaga", callback_data="menu:cat_ai"),
         )
-@router.message(ADMIN_FILTER, Command("chess", "shaxmat"))
+@router.message(Command("chess", "shaxmat"))
 async def cmd_main_chess(message: Message, bot: Bot) -> None:
     """AI vs AI Shaxmat bahsini boshlash."""
     from core.bot_collab import handle_start_chess
@@ -636,7 +639,7 @@ async def cmd_main_chess(message: Message, bot: Bot) -> None:
     await handle_start_chess(message, bot_white=bot, bot_black=sec_bot)
 
 
-@router.message(ADMIN_FILTER, Command("stop_chess", "chess_stop", "shaxmat_tamom"))
+@router.message(Command("stop_chess", "chess_stop", "shaxmat_tamom"))
 async def cmd_main_stop_chess(message: Message) -> None:
     """Shaxmat bahsini to'xtatish."""
     from core.bot_collab import stop_chess_game
@@ -1003,7 +1006,7 @@ async def cb_main_collab_vote(callback: CallbackQuery) -> None:
     await callback.answer(f"✅ Ovozingiz qabul qilindi: {target_name} ({total} ta ovoz berildi)!", show_alert=False)
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "game:chess_start")
+@router.callback_query(F.data == "game:chess_start")
 async def cb_chess_start(cb: CallbackQuery, bot: Bot) -> None:
     """Menyudan shaxmat boshlash."""
     await cb.answer("♟️ Shaxmat o'yini boshlanmoqda...")
@@ -1018,11 +1021,8 @@ async def cb_chess_start(cb: CallbackQuery, bot: Bot) -> None:
 async def rk_astrology(message: Message) -> None:
     """Astrologiya va Natal Karta boshqaruv paneli (Faqat Bot Egasi uchun)."""
     user_id = message.from_user.id if message.from_user else 0
-    if user_id != ADMIN_ID:
-        await message.answer(
-            "🔒 **Ruxsat yo'q:** Astrologiya bo'limi shaxsiy rejimda bo'lib, faqat bot egasi uchun ochiq.",
-            parse_mode="Markdown"
-        )
+    if await db.is_user_blocked(user_id):
+        await message.answer("❌ Sizning hisobingiz administrator tomonidan bloklangan.", parse_mode="Markdown")
         return
 
     profile = await db.get_astrology_profile(str(user_id))
@@ -1055,7 +1055,7 @@ async def rk_astrology(message: Message) -> None:
     await message.answer(text, reply_markup=build_astrology_menu(has_profile), parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, Command("natal"))
+@router.message(Command("natal"))
 async def cmd_natal_param(message: Message, command: CommandObject) -> None:
     """'/natal YYYY-MM-DD HH:MM Shahar' buyrug'i orqali natal karta hisoblash va saqlash."""
     args = (command.args or "").strip()
@@ -1111,7 +1111,7 @@ async def cmd_natal_param(message: Message, command: CommandObject) -> None:
             pass
 
 
-@router.message(ADMIN_FILTER, Command("transit"))
+@router.message(Command("transit"))
 async def cmd_transits(message: Message) -> None:
     """Bugungi kun sayyoralarining natal kartaga ta'sirini ko'rish."""
     profile = await db.get_astrology_profile(str(message.from_user.id))
@@ -1134,7 +1134,7 @@ async def cmd_transits(message: Message) -> None:
     await message.answer("\n".join(lines), parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, Command("solar"))
+@router.message(Command("solar"))
 async def cmd_solar(message: Message, command: CommandObject) -> None:
     """Yillik Quyosh qaytishi (Solar Return) prognozi."""
     profile = await db.get_astrology_profile(str(message.from_user.id))
@@ -1171,7 +1171,7 @@ async def rk_midjourney(message: Message) -> None:
     await message.answer(text, reply_markup=markup, parse_mode="HTML")
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"⚡ Hermes Agent", "Hermes Agent", "hermes agent", "/hermes"}))
+@router.message(F.text.in_({"⚡ Hermes Agent", "Hermes Agent", "hermes agent", "/hermes"}))
 async def rk_hermes(message: Message, ai_manager: AIManager) -> None:
     ai_manager.switch_role("hermes_agent")
     text = (
@@ -1186,28 +1186,28 @@ async def rk_hermes(message: Message, ai_manager: AIManager) -> None:
     await message.answer(text, parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"📝 Vazifalar (Notion)", "Vazifalar (Notion)", "vazifalar", "vazifalarim", "/todo", "todolist"}))
+@router.message(F.text.in_({"📝 Vazifalar (Notion)", "Vazifalar (Notion)", "vazifalar", "vazifalarim", "/todo", "todolist"}))
 async def rk_todo(message: Message) -> None:
     from core.todo_notion_agent import format_tasks_list_report
     text, markup = await format_tasks_list_report()
     await message.answer(text, reply_markup=markup, parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"🌐 Saytlar (Uptime)", "Saytlar (Uptime)", "saytlar", "uptime", "/uptime"}))
+@router.message(F.text.in_({"🌐 Saytlar (Uptime)", "Saytlar (Uptime)", "saytlar", "uptime", "/uptime"}))
 async def rk_uptime(message: Message) -> None:
     from core.uptime_agent import format_uptime_dashboard_report
     text, markup = await format_uptime_dashboard_report()
     await message.answer(text, reply_markup=markup, parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"📰 Yangiliklar & Tahlil", "Yangiliklar & Tahlil", "yangiliklar", "yangilik", "/news"}))
+@router.message(F.text.in_({"📰 Yangiliklar & Tahlil", "Yangiliklar & Tahlil", "yangiliklar", "yangilik", "/news"}))
 async def rk_news(message: Message, ai_manager: AIManager) -> None:
     from core.news_football_agent import get_topic_news
     text, markup = await get_topic_news("dasturlash", ai_manager)
     await message.answer(text, reply_markup=markup, parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"👤 Shaxsiy Profil (Mem0)", "Shaxsiy Profil (Mem0)", "profilim", "Profilim", "/profile", "profil memo", "memo", "mem0"}))
+@router.message(F.text.in_({"👤 Shaxsiy Profil (Mem0)", "Shaxsiy Profil (Mem0)", "profilim", "Profilim", "/profile", "profil memo", "memo", "mem0"}))
 async def rk_profile(message: Message) -> None:
     from core.mem0_agent import get_user_profile_report, build_profile_keyboard
     wait_msg = await message.answer("⏳ Mem0 xotirasi tekshirilmoqda...")
@@ -1215,7 +1215,7 @@ async def rk_profile(message: Message) -> None:
     await wait_msg.edit_text(profile_text, reply_markup=build_profile_keyboard(), parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"🎙 Ovozli Agent (STT & TTS)", "🎙 Ovozli Agent (TTS)", "Ovozli Agent (TTS)", "ovozli xabar", "Ovozli xabar", "/voice"}))
+@router.message(F.text.in_({"🎙 Ovozli Agent (STT & TTS)", "🎙 Ovozli Agent (TTS)", "Ovozli Agent (TTS)", "ovozli xabar", "Ovozli xabar", "/voice"}))
 async def rk_tts(message: Message) -> None:
     text = (
         "🎙 **Ovozli AI Agent (Speech-to-Text & Text-to-Speech)**\n\n"
@@ -1269,7 +1269,7 @@ async def rk_code_audit(message: Message) -> None:
     await message.answer(text, parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"🎯 Viral SMM", "Viral SMM", "/smm", "/viral", "/post"}))
+@router.message(F.text.in_({"🎯 Viral SMM", "Viral SMM", "/smm", "/viral", "/post"}))
 async def rk_viral_smm(message: Message) -> None:
     text = (
         "🎯 **Viral SMM & Content Strategy Agent**\n\n"
@@ -1286,7 +1286,7 @@ async def rk_viral_smm(message: Message) -> None:
     await message.answer(text, parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"🤖 Avtonom Agent Skillari", "Avtonom Agent Skillari", "Avtonom Agent", "/autotask", "/autonomous"}))
+@router.message(F.text.in_({"🤖 Avtonom Agent Skillari", "Avtonom Agent Skillari", "Avtonom Agent", "/autotask", "/autonomous"}))
 async def rk_autonomous_skills(message: Message) -> None:
     """Avtonom Agentning 4 ta asosiy skillari qo'llanmasi."""
     text = (
@@ -1310,7 +1310,7 @@ async def rk_autonomous_skills(message: Message) -> None:
     await message.answer(text, parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"🎬 Video Yuklovchi", "Video Yuklovchi", "video yukla", "/video", "/dl"}))
+@router.message(F.text.in_({"🎬 Video Yuklovchi", "Video Yuklovchi", "video yukla", "/video", "/dl"}))
 async def rk_video_downloader(message: Message) -> None:
     text = (
         "🎬 **Instagram, TikTok, YouTube Video Yuklovchi Agenti**\n\n"
@@ -1324,25 +1324,25 @@ async def rk_video_downloader(message: Message) -> None:
     await message.answer(text, parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"/deepseek", "deepseek", "DeepSeek"}))
+@router.message(F.text.in_({"/deepseek", "deepseek", "DeepSeek"}))
 async def cmd_quick_deepseek(message: Message, ai_manager: AIManager) -> None:
     res = ai_manager.switch_openrouter_model("deepseek_v4")
     await message.answer(f"🧠 **DeepSeek V4 Flash (1M) Faollashtirildi!**\n\n{res}\n\n💡 1 Million token kontekstli eng kuchli mantiqiy model.", parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"/qwen", "qwen", "Qwen"}))
+@router.message(F.text.in_({"/qwen", "qwen", "Qwen"}))
 async def cmd_quick_qwen(message: Message, ai_manager: AIManager) -> None:
     res = ai_manager.switch_openrouter_model("qwen38")
     await message.answer(f"⚡ **Qwen 3.8 27B Agent Faollashtirildi!**\n\n{res}\n\n💡 Asboblarni boshqarish va dasturlash bo'yicha kuchli agent rejimida.", parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"/laguna", "laguna", "Laguna"}))
+@router.message(F.text.in_({"/laguna", "laguna", "Laguna"}))
 async def cmd_quick_laguna(message: Message, ai_manager: AIManager) -> None:
     res = ai_manager.switch_openrouter_model("laguna")
     await message.answer(f"🌊 **Poolside Laguna S 2.1 Faollashtirildi!**\n\n{res}\n\n💡 Dasturiy arxitektura va avtonom erkin fikrlash rejimi faol.", parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"/nemotron", "nemotron", "Nemotron"}))
+@router.message(F.text.in_({"/nemotron", "nemotron", "Nemotron"}))
 async def cmd_quick_nemotron(message: Message, ai_manager: AIManager) -> None:
     res = ai_manager.switch_provider("nvidia")
     await message.answer(
@@ -1353,25 +1353,25 @@ async def cmd_quick_nemotron(message: Message, ai_manager: AIManager) -> None:
     )
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"/dots", "dots", "Dots"}))
+@router.message(F.text.in_({"/dots", "dots", "Dots"}))
 async def cmd_quick_dots(message: Message, ai_manager: AIManager) -> None:
     res = ai_manager.switch_openrouter_model("dots_note")
     await message.answer(f"📝 **Dots-3 Note (512K) Faollashtirildi!**\n\n{res}\n\n💡 Katta hujjatlar va tadqiqotlarni chuqur tahlil qilish uchun faol.", parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"🤖 AI Modellar", "AI Modellar", "ai modellar", "Modellar", "modellar", "/models"}))
+@router.message(F.text.in_({"🤖 AI Modellar", "AI Modellar", "ai modellar", "Modellar", "modellar", "/models"}))
 async def rk_models(message: Message) -> None:
     await message.answer("🤖 **AI Modelini tanlang:**", reply_markup=build_models_menu(), parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"🎭 Tizim Rollari", "Tizim Rollari", "tizim rollari", "Rollar", "rollar", "/roles"}))
+@router.message(F.text.in_({"🎭 Tizim Rollari", "Tizim Rollari", "tizim rollari", "Rollar", "rollar", "/roles"}))
 async def rk_roles(message: Message) -> None:
     await message.answer("🎭 **Tizim rolini tanlang:**", reply_markup=build_roles_menu(), parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"🧠 Doimiy Xotira", "Doimiy Xotira", "doimiy xotira", "Xotira", "xotira", "/memory", "/kb"}))
+@router.message(F.text.in_({"🧠 Doimiy Xotira", "Doimiy Xotira", "doimiy xotira", "Xotira", "xotira", "/memory", "/kb"}))
 async def rk_memory(message: Message) -> None:
-    facts = await db.get_all_facts()
+    facts = await db.get_all_facts(user_id=str(message.from_user.id))
     if not facts:
         text = (
             "🧠 **Doimiy Xotira (RAG Knowledge Base)**\n\n"
@@ -1390,7 +1390,7 @@ async def rk_memory(message: Message) -> None:
     await message.answer(text[:4000], parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"📊 Holat & Statistika", "Holat & Statistika", "holat & statistika", "Statistika", "statistika", "Holat", "holat", "/status"}))
+@router.message(F.text.in_({"📊 Holat & Statistika", "Holat & Statistika", "holat & statistika", "Statistika", "statistika", "Holat", "holat", "/status"}))
 async def rk_status(message: Message, ai_manager: AIManager) -> None:
     from core.cleaner_agent import get_system_storage_info
     status_info = ai_manager.status()
@@ -1414,7 +1414,7 @@ async def rk_status(message: Message, ai_manager: AIManager) -> None:
     await message.answer(text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"📧 Email Pochta", "Email Pochta", "email pochta", "Pochta", "pochta", "Email", "email", "/email"}))
+@router.message(F.text.in_({"📧 Email Pochta", "Email Pochta", "email pochta", "Pochta", "pochta", "Email", "email", "/email"}))
 async def rk_email(message: Message, ai_manager: AIManager) -> None:
     from handlers.email_handler import get_email_agent, build_email_menu
     agent = get_email_agent()
@@ -1434,7 +1434,7 @@ async def rk_tg_summary(message: Message, ai_manager: AIManager) -> None:
     await safe_edit_or_send_long_message(wait_msg, summary, parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"⏰ Eslatmalar", "Eslatmalar", "eslatmalar", "eslatmalarim", "/reminders"}))
+@router.message(F.text.in_({"⏰ Eslatmalar", "Eslatmalar", "eslatmalar", "eslatmalarim", "/reminders"}))
 async def rk_reminders(message: Message) -> None:
     active = await db.get_active_reminders(message.chat.id)
     if not active:
@@ -1458,7 +1458,7 @@ async def rk_reminders(message: Message) -> None:
     await message.answer("\n".join(lines), reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"⏰ Rejalashtirilgan Postlar", "Rejalashtirilgan Postlar", "rejalashtirilgan postlar", "Postlar", "postlar", "/schedule", "/posts"}))
+@router.message(F.text.in_({"⏰ Rejalashtirilgan Postlar", "Rejalashtirilgan Postlar", "rejalashtirilgan postlar", "Postlar", "postlar", "/schedule", "/posts"}))
 async def rk_scheduled_posts(message: Message) -> None:
     posts = await db.get_all_pending_posts()
     if not posts:
@@ -1476,7 +1476,7 @@ async def rk_scheduled_posts(message: Message) -> None:
     await message.answer("\n".join(lines)[:4000], parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"🔍 Raqobatchilar Tahlili", "Raqobatchilar Tahlili", "raqobatchilar tahlili", "Raqobatchilar", "raqobatchilar", "/competitors"}))
+@router.message(F.text.in_({"🔍 Raqobatchilar Tahlili", "Raqobatchilar Tahlili", "raqobatchilar tahlili", "Raqobatchilar", "raqobatchilar", "/competitors"}))
 async def rk_competitors(message: Message) -> None:
     comps = await db.get_competitors()
     if not comps:
@@ -1525,7 +1525,7 @@ async def rk_sync_history(message: Message, ai_manager: AIManager) -> None:
         await safe_message_reply(message, f"❌ Xatolik: {exc}", parse_mode=None)
 
 
-@router.message(ADMIN_FILTER, F.text.in_({"🧹 Xotirani Tozalash", "Xotirani Tozalash", "xotirani tozalash", "Tozalash", "tozalash", "/clear"}))
+@router.message(F.text.in_({"🧹 Xotirani Tozalash", "Xotirani Tozalash", "xotirani tozalash", "Tozalash", "tozalash", "/clear"}))
 async def rk_clear_history(message: Message, ai_manager: AIManager) -> None:
     res = ai_manager.clear_history(chat_id=str(message.chat.id))
     await message.answer(res, parse_mode="Markdown")
@@ -1617,18 +1617,18 @@ async def cmd_help(message: Message) -> None:
     await message.answer(text, parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, Command("status"))
+@router.message(Command("status"))
 async def cmd_status(message: Message, ai_manager: AIManager) -> None:
     await message.answer(ai_manager.status(chat_id=str(message.chat.id)), parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, Command("clear"))
+@router.message(Command("clear"))
 async def cmd_clear(message: Message, ai_manager: AIManager) -> None:
     result = ai_manager.clear_history(chat_id=str(message.chat.id))
     await message.answer(result, parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, Command("log"))
+@router.message(Command("log"))
 async def cmd_log(message: Message) -> None:
     collector = LogCollector()
     summary = collector.build_summary_text()
@@ -1643,7 +1643,7 @@ async def cmd_userbot(message: Message) -> None:
 
 # ─── Callback Handlerlari ─────────────────────────────────────
 
-@router.callback_query(ADMIN_FILTER, F.data == "menu:main")
+@router.callback_query(F.data == "menu:main")
 async def cb_main_menu(cb: CallbackQuery, ai_manager: AIManager) -> None:
     await cb.answer()
     await safe_edit_text(
@@ -1653,7 +1653,7 @@ async def cb_main_menu(cb: CallbackQuery, ai_manager: AIManager) -> None:
     )
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "menu:cat_ai")
+@router.callback_query(F.data == "menu:cat_ai")
 async def cb_cat_ai(cb: CallbackQuery) -> None:
     """Inline: AI & Kreativ Studio toifasi."""
     await cb.answer()
@@ -1664,7 +1664,7 @@ async def cb_cat_ai(cb: CallbackQuery) -> None:
     )
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "menu:astrology")
+@router.callback_query(F.data == "menu:astrology")
 async def cb_menu_astrology(cb: CallbackQuery) -> None:
     """Astrologiya bosh menyusi."""
     await cb.answer()
@@ -1692,7 +1692,7 @@ async def cb_menu_astrology(cb: CallbackQuery) -> None:
     await safe_edit_text(cb, text, reply_markup=build_astrology_menu(has_profile))
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "astro:view_natal")
+@router.callback_query(F.data == "astro:view_natal")
 async def cb_astro_view_natal(cb: CallbackQuery) -> None:
     """Natal kartani ko'rish."""
     await cb.answer()
@@ -1720,7 +1720,7 @@ async def cb_astro_view_natal(cb: CallbackQuery) -> None:
     await safe_edit_text(cb, text, reply_markup=builder.as_markup())
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "astro:view_transits")
+@router.callback_query(F.data == "astro:view_transits")
 async def cb_astro_view_transits(cb: CallbackQuery) -> None:
     """Joriy tranzitlarni ko'rish."""
     await cb.answer()
@@ -1747,7 +1747,7 @@ async def cb_astro_view_transits(cb: CallbackQuery) -> None:
     await safe_edit_text(cb, "\n".join(lines), reply_markup=builder.as_markup())
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "astro:view_solar")
+@router.callback_query(F.data == "astro:view_solar")
 async def cb_astro_view_solar(cb: CallbackQuery) -> None:
     """Solyar hisobotni ko'rish."""
     await cb.answer()
@@ -1772,7 +1772,7 @@ async def cb_astro_view_solar(cb: CallbackQuery) -> None:
     await safe_edit_text(cb, text, reply_markup=builder.as_markup())
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "astro:view_arabic")
+@router.callback_query(F.data == "astro:view_arabic")
 async def cb_astro_view_arabic(cb: CallbackQuery) -> None:
     """Arab nuqtalarini ko'rish."""
     await cb.answer()
@@ -1793,7 +1793,7 @@ async def cb_astro_view_arabic(cb: CallbackQuery) -> None:
     await safe_edit_text(cb, "\n".join(lines), reply_markup=builder.as_markup())
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "astro:ai_report")
+@router.callback_query(F.data == "astro:ai_report")
 async def cb_astro_ai_report(cb: CallbackQuery, ai_manager: AIManager) -> None:
     """20 Yillik tajribali munajjim-olim (Nous Hermes 3 / Gemini) orqali to'liq voqeaviy prognoz."""
     await cb.answer("20 yillik munajjim-olim hisobot tayyorlamoqda...")
@@ -1834,7 +1834,7 @@ async def cb_astro_ai_report(cb: CallbackQuery, ai_manager: AIManager) -> None:
         ai_manager.current_or_model = prev_model
 
 
-@router.message(ADMIN_FILTER, Command("lots"))
+@router.message(Command("lots"))
 async def cmd_lots_management(message: Message) -> None:
     """Foydalanuvchining 513 ta Arab Lotlarini ko'rish yoki yangi lotlar qo'shish."""
     profile = await db.get_astrology_profile(str(message.from_user.id))
@@ -1867,7 +1867,7 @@ async def cmd_lots_management(message: Message) -> None:
     await safe_send_message(message.bot, message.chat.id, "\n".join(lines), reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "astro:setup")
+@router.callback_query(F.data == "astro:setup")
 async def cb_astro_setup(cb: CallbackQuery) -> None:
     await cb.answer()
     builder = InlineKeyboardBuilder()
@@ -1884,7 +1884,7 @@ async def cb_astro_setup(cb: CallbackQuery) -> None:
     await safe_edit_text(cb, text, reply_markup=builder.as_markup())
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "menu:cat_prod")
+@router.callback_query(F.data == "menu:cat_prod")
 async def cb_cat_prod(cb: CallbackQuery) -> None:
     """Inline: Ish & Unumdorlik toifasi."""
     await cb.answer()
@@ -1895,7 +1895,7 @@ async def cb_cat_prod(cb: CallbackQuery) -> None:
     )
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "menu:cat_smm")
+@router.callback_query(F.data == "menu:cat_smm")
 async def cb_cat_smm(cb: CallbackQuery) -> None:
     """Inline: SMM & Marketing toifasi."""
     await cb.answer()
@@ -1906,7 +1906,7 @@ async def cb_cat_smm(cb: CallbackQuery) -> None:
     )
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "menu:cat_settings")
+@router.callback_query(F.data == "menu:cat_settings")
 async def cb_cat_settings(cb: CallbackQuery) -> None:
     """Inline: Sozlamalar & Doimiy Xotira toifasi."""
     await cb.answer()
@@ -1917,7 +1917,7 @@ async def cb_cat_settings(cb: CallbackQuery) -> None:
     )
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "menu:deep_research")
+@router.callback_query(F.data == "menu:deep_research")
 async def cb_deep_research(cb: CallbackQuery) -> None:
     await cb.answer()
     builder = InlineKeyboardBuilder()
@@ -1933,7 +1933,7 @@ async def cb_deep_research(cb: CallbackQuery) -> None:
     )
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "menu:code_audit")
+@router.callback_query(F.data == "menu:code_audit")
 async def cb_code_audit(cb: CallbackQuery) -> None:
     await cb.answer()
     builder = InlineKeyboardBuilder()
@@ -1947,7 +1947,7 @@ async def cb_code_audit(cb: CallbackQuery) -> None:
     )
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "menu:viral_smm")
+@router.callback_query(F.data == "menu:viral_smm")
 async def cb_viral_smm(cb: CallbackQuery) -> None:
     await cb.answer()
     builder = InlineKeyboardBuilder()
@@ -1962,7 +1962,7 @@ async def cb_viral_smm(cb: CallbackQuery) -> None:
     )
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "menu:video_dl")
+@router.callback_query(F.data == "menu:video_dl")
 async def cb_video_dl(cb: CallbackQuery) -> None:
     await cb.answer()
     builder = InlineKeyboardBuilder()
@@ -1975,7 +1975,7 @@ async def cb_video_dl(cb: CallbackQuery) -> None:
     )
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "menu:competitors")
+@router.callback_query(F.data == "menu:competitors")
 async def cb_competitors(cb: CallbackQuery) -> None:
     await cb.answer()
     builder = InlineKeyboardBuilder()
@@ -2003,14 +2003,14 @@ async def cb_sync_history(cb: CallbackQuery, ai_manager: AIManager) -> None:
     await cb.message.answer(res.get("message", "Tayyor."), parse_mode="Markdown")
 
 
-@router.callback_query(ADMIN_FILTER, F.data.in_({"menu:image_studio", "menu:midjourney"}))
+@router.callback_query(F.data.in_({"menu:image_studio", "menu:midjourney"}))
 async def cb_image_studio(cb: CallbackQuery) -> None:
     await cb.answer()
     text, markup = build_image_studio_panel(cb.from_user.id)
     await safe_edit_text(cb, text, reply_markup=markup, parse_mode="HTML")
 
 
-@router.callback_query(ADMIN_FILTER, F.data.startswith("img_cfg:"))
+@router.callback_query(F.data.startswith("img_cfg:"))
 async def cb_img_config(cb: CallbackQuery) -> None:
     parts = cb.data.split(":")
     cfg_type = parts[1] if len(parts) > 1 else ""
@@ -2027,7 +2027,7 @@ async def cb_img_config(cb: CallbackQuery) -> None:
     await safe_edit_text(cb, text, reply_markup=markup, parse_mode="HTML")
 
 
-@router.callback_query(ADMIN_FILTER, F.data.startswith("img_idea:"))
+@router.callback_query(F.data.startswith("img_idea:"))
 async def cb_img_idea(cb: CallbackQuery, ai_manager: AIManager) -> None:
     idea_key = cb.data.replace("img_idea:", "").strip()
     idea_dict = {k: p for k, _, p in QUICK_IDEAS}
@@ -2090,7 +2090,7 @@ async def cb_img_idea(cb: CallbackQuery, ai_manager: AIManager) -> None:
         await wait_msg.edit_text(f"❌ Xatolik: {exc}")
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "menu:hermes")
+@router.callback_query(F.data == "menu:hermes")
 async def cb_hermes(cb: CallbackQuery, ai_manager: AIManager) -> None:
     await cb.answer()
     ai_manager.switch_role("hermes_agent")
@@ -2107,7 +2107,7 @@ async def cb_hermes(cb: CallbackQuery, ai_manager: AIManager) -> None:
     await safe_edit_text(cb, text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "menu:todo")
+@router.callback_query(F.data == "menu:todo")
 async def cb_menu_todo(cb: CallbackQuery) -> None:
     await cb.answer()
     from core.todo_notion_agent import format_tasks_list_report
@@ -2115,7 +2115,7 @@ async def cb_menu_todo(cb: CallbackQuery) -> None:
     await safe_edit_text(cb, text, reply_markup=markup, parse_mode="Markdown")
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "menu:uptime")
+@router.callback_query(F.data == "menu:uptime")
 async def cb_menu_uptime(cb: CallbackQuery) -> None:
     await cb.answer()
     from core.uptime_agent import format_uptime_dashboard_report
@@ -2123,7 +2123,7 @@ async def cb_menu_uptime(cb: CallbackQuery) -> None:
     await safe_edit_text(cb, text, reply_markup=markup, parse_mode="Markdown")
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "menu:news")
+@router.callback_query(F.data == "menu:news")
 async def cb_menu_news(cb: CallbackQuery, ai_manager: AIManager) -> None:
     await cb.answer()
     from core.news_football_agent import get_topic_news
@@ -2131,7 +2131,7 @@ async def cb_menu_news(cb: CallbackQuery, ai_manager: AIManager) -> None:
     await safe_edit_text(cb, text, reply_markup=markup, parse_mode="Markdown")
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "menu:mem0_profile")
+@router.callback_query(F.data == "menu:mem0_profile")
 async def cb_mem0_profile(cb: CallbackQuery) -> None:
     await cb.answer()
     from core.mem0_agent import get_user_profile_report, build_profile_keyboard
@@ -2139,7 +2139,7 @@ async def cb_mem0_profile(cb: CallbackQuery) -> None:
     await safe_edit_text(cb, profile_text, reply_markup=build_profile_keyboard(show_back=True), parse_mode="Markdown")
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "mem0:refresh")
+@router.callback_query(F.data == "mem0:refresh")
 async def cb_mem0_refresh(cb: CallbackQuery) -> None:
     await cb.answer("🔄 Yangilanmoqda...")
     from core.mem0_agent import get_user_profile_report, build_profile_keyboard
@@ -2147,7 +2147,7 @@ async def cb_mem0_refresh(cb: CallbackQuery) -> None:
     await safe_edit_text(cb, profile_text, reply_markup=build_profile_keyboard(show_back=True), parse_mode="Markdown")
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "mem0:add_help")
+@router.callback_query(F.data == "mem0:add_help")
 async def cb_mem0_add_help(cb: CallbackQuery) -> None:
     await cb.answer()
     builder = InlineKeyboardBuilder()
@@ -2166,7 +2166,7 @@ async def cb_mem0_add_help(cb: CallbackQuery) -> None:
     await safe_edit_text(cb, text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "mem0:clear")
+@router.callback_query(F.data == "mem0:clear")
 async def cb_mem0_clear(cb: CallbackQuery) -> None:
     await cb.answer("🗑 Profil tozalandi", show_alert=True)
     from core.mem0_agent import clear_user_profile, get_user_profile_report, build_profile_keyboard
@@ -2175,7 +2175,7 @@ async def cb_mem0_clear(cb: CallbackQuery) -> None:
     await safe_edit_text(cb, profile_text, reply_markup=build_profile_keyboard(show_back=True), parse_mode="Markdown")
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "menu:tts_info")
+@router.callback_query(F.data == "menu:tts_info")
 async def cb_tts_info(cb: CallbackQuery) -> None:
     await cb.answer()
     builder = InlineKeyboardBuilder()
@@ -2194,7 +2194,7 @@ async def cb_tts_info(cb: CallbackQuery) -> None:
     await safe_edit_text(cb, text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "menu:models")
+@router.callback_query(F.data == "menu:models")
 async def cb_models(cb: CallbackQuery) -> None:
     await cb.answer()
     await safe_edit_text(
@@ -2206,7 +2206,7 @@ async def cb_models(cb: CallbackQuery) -> None:
     )
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "menu:roles")
+@router.callback_query(F.data == "menu:roles")
 async def cb_roles(cb: CallbackQuery) -> None:
     await cb.answer()
     await safe_edit_text(
@@ -2218,7 +2218,7 @@ async def cb_roles(cb: CallbackQuery) -> None:
     )
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "menu:status")
+@router.callback_query(F.data == "menu:status")
 async def cb_status(cb: CallbackQuery, ai_manager: AIManager) -> None:
     await cb.answer()
     from core.cleaner_agent import get_system_storage_info
@@ -2239,7 +2239,7 @@ async def cb_status(cb: CallbackQuery, ai_manager: AIManager) -> None:
     )
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "menu:log")
+@router.callback_query(F.data == "menu:log")
 async def cb_log(cb: CallbackQuery) -> None:
     await cb.answer()
     collector = LogCollector()
@@ -2254,10 +2254,10 @@ async def cb_log(cb: CallbackQuery) -> None:
     )
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "menu:memory")
+@router.callback_query(F.data == "menu:memory")
 async def cb_memory(cb: CallbackQuery) -> None:
     await cb.answer()
-    facts = await db.get_all_facts()
+    facts = await db.get_all_facts(user_id=str(cb.from_user.id))
     builder = InlineKeyboardBuilder()
     builder.row(InlineKeyboardButton(text="◀️ Orqaga", callback_data="menu:main"))
 
@@ -2279,7 +2279,7 @@ async def cb_memory(cb: CallbackQuery) -> None:
     await safe_edit_text(cb, text[:4000], reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "menu:reminders")
+@router.callback_query(F.data == "menu:reminders")
 async def cb_reminders(cb: CallbackQuery) -> None:
     await cb.answer()
     active = await db.get_active_reminders(cb.message.chat.id)
@@ -2304,7 +2304,7 @@ async def cb_reminders(cb: CallbackQuery) -> None:
     await safe_edit_text(cb, text[:4000], reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "menu:scheduled_posts")
+@router.callback_query(F.data == "menu:scheduled_posts")
 async def cb_scheduled_posts(cb: CallbackQuery) -> None:
     await cb.answer()
     posts = await db.get_all_pending_posts()
@@ -2322,7 +2322,7 @@ async def cb_scheduled_posts(cb: CallbackQuery) -> None:
     await safe_edit_text(cb, text[:4000], reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "menu:clear")
+@router.callback_query(F.data == "menu:clear")
 async def cb_clear(cb: CallbackQuery, ai_manager: AIManager) -> None:
     chat_id = str(cb.message.chat.id) if cb.message else "0"
     await cb.answer("✅ Xotira tozalandi")
@@ -2369,7 +2369,7 @@ async def cb_tg_summary(cb: CallbackQuery, ai_manager: AIManager) -> None:
     )
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "menu:help")
+@router.callback_query(F.data == "menu:help")
 async def cb_help(cb: CallbackQuery) -> None:
     await cb.answer()
     builder = InlineKeyboardBuilder()
@@ -2393,7 +2393,7 @@ async def cb_help(cb: CallbackQuery) -> None:
 
 # ─── Model Callback'lari ──────────────────────────────────────
 
-@router.callback_query(ADMIN_FILTER, F.data == "model:gemini")
+@router.callback_query(F.data == "model:gemini")
 async def cb_model_gemini(cb: CallbackQuery, ai_manager: AIManager) -> None:
     await cb.answer("✅ Gemini tanlandi")
     result = ai_manager.switch_provider("gemini")
@@ -2402,7 +2402,7 @@ async def cb_model_gemini(cb: CallbackQuery, ai_manager: AIManager) -> None:
     await safe_edit_text(cb, result, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "model:omniroute")
+@router.callback_query(F.data == "model:omniroute")
 async def cb_model_omniroute(cb: CallbackQuery, ai_manager: AIManager) -> None:
     await cb.answer("✅ OmniRoute tanlandi")
     result = ai_manager.switch_provider("omniroute")
@@ -2419,7 +2419,7 @@ async def cb_model_omniroute(cb: CallbackQuery, ai_manager: AIManager) -> None:
     await safe_edit_text(cb, text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "model:nvidia")
+@router.callback_query(F.data == "model:nvidia")
 async def cb_model_nvidia(cb: CallbackQuery, ai_manager: AIManager) -> None:
     await cb.answer("✅ NVIDIA Nemotron tanlandi")
     result = ai_manager.switch_provider("nvidia")
@@ -2435,7 +2435,7 @@ async def cb_model_nvidia(cb: CallbackQuery, ai_manager: AIManager) -> None:
     await safe_edit_text(cb, text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-@router.callback_query(ADMIN_FILTER, F.data == "model:mistral")
+@router.callback_query(F.data == "model:mistral")
 async def cb_model_mistral(cb: CallbackQuery, ai_manager: AIManager) -> None:
     await cb.answer("✅ Mistral Codestral tanlandi")
     result = ai_manager.switch_provider("mistral")
@@ -2450,7 +2450,7 @@ async def cb_model_mistral(cb: CallbackQuery, ai_manager: AIManager) -> None:
     await safe_edit_text(cb, text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-@router.message(ADMIN_FILTER, Command("mistral", "codestral"))
+@router.message(Command("mistral", "codestral"))
 async def cmd_mistral_shortcut(message: Message, ai_manager: AIManager) -> None:
     """/mistral yoki /codestral orqali Mistral provayderiga o'tish."""
     res = ai_manager.switch_provider("mistral")
@@ -2460,7 +2460,7 @@ async def cmd_mistral_shortcut(message: Message, ai_manager: AIManager) -> None:
     )
 
 
-@router.callback_query(ADMIN_FILTER, F.data.startswith("model:or_"))
+@router.callback_query(F.data.startswith("model:or_"))
 async def cb_model_openrouter(cb: CallbackQuery, ai_manager: AIManager) -> None:
     await cb.answer("✅ Model tanlandi")
     model_key = cb.data.replace("model:or_", "")
@@ -2472,7 +2472,7 @@ async def cb_model_openrouter(cb: CallbackQuery, ai_manager: AIManager) -> None:
 
 # ─── Rol Callback'lari ────────────────────────────────────────
 
-@router.callback_query(ADMIN_FILTER, F.data.startswith("role:"))
+@router.callback_query(F.data.startswith("role:"))
 async def cb_role(cb: CallbackQuery, ai_manager: AIManager) -> None:
     role_key = cb.data.replace("role:", "")
     role_name = ROLES.get(role_key, {}).get("name", role_key)
