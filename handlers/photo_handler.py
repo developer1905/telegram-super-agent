@@ -16,6 +16,7 @@ from aiogram import Router, F, Bot
 from aiogram.types import Message, BufferedInputFile
 
 from config import ADMIN_ID
+from core.database import db
 from core.ai_manager import AIManager
 from core.image_editor import (
     apply_edit,
@@ -27,17 +28,19 @@ from services.scheduler import LogCollector
 logger = logging.getLogger(__name__)
 router = Router(name="photo")
 
-ADMIN_FILTER = F.from_user.id == ADMIN_ID
-
 
 # ─── Rasm Handler ─────────────────────────────────────────────
 
-@router.message(ADMIN_FILTER, F.photo)
+@router.message(F.photo)
 async def handle_photo(message: Message, bot: Bot, ai_manager: AIManager) -> None:
     """
     Rasm qabul qiladi.
     Caption asosida tahrirlash yoki multimodal tahlil bajaradi.
     """
+    user_id = message.from_user.id if message.from_user else 0
+    if await db.is_user_blocked(user_id):
+        await message.answer("❌ Sizning hisobingiz administrator tomonidan bloklangan.")
+        return
     caption = (message.caption or "").strip()
     photo = message.photo[-1]  # Eng yuqori sifatli versiya
 
