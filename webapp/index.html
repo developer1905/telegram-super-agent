@@ -4301,10 +4301,17 @@
           const mem = data.memory || {};
           const disk = data.disk || {};
 
-          const memPct = mem.percent || 0;
-          const diskPct = disk.percent || 0;
+          const memPct = Number(mem.percent) || 0;
+          const diskPct = Number(disk.percent) || 0;
 
-          const uptimeHours = (data.uptime_seconds / 3600).toFixed(1);
+          const uptimeHours = data.uptime_seconds != null ? (data.uptime_seconds / 3600).toFixed(1) : (data.uptime || '0');
+
+          let serverTimeDisplay = '—';
+          if (data.server_time) {
+            const rawTime = String(data.server_time).trim();
+            const timeParts = rawTime.split(/[\sT]+/);
+            serverTimeDisplay = timeParts.length > 1 ? timeParts[1].slice(0, 8) : rawTime;
+          }
 
           container.innerHTML = `
             <div class="d-flex flex-column gap-3">
@@ -4350,7 +4357,7 @@
                 <div class="col-6">
                   <div class="p-2 bg-light rounded-2 border">
                     <div class="text-muted" style="font-size: 11px;">Server Vaqti:</div>
-                    <div class="fw-bold text-dark small">${data.server_time ? data.server_time.split('T')[1].slice(0,8) : '—'}</div>
+                    <div class="fw-bold text-dark small">${serverTimeDisplay}</div>
                   </div>
                 </div>
               </div>
