@@ -287,6 +287,169 @@ async def api_admin_overview_handler(request: web.Request) -> web.Response:
     })
 
 
+async def api_admin_send_message_handler(request: web.Request) -> web.Response:
+    """Admin Panel: ma'lum bir foydalanuvchiga to'g'ridan-to'g'ri Telegram xabari yuborish (DM)."""
+    admin_err = check_admin(request)
+    if admin_err:
+        return admin_err
+
+    try:
+        data = await request.json()
+    except Exception:
+        return web.json_response({"status": "error", "message": "Noto'g'ri JSON formati"}, status=400)
+
+    user_id = str(data.get("user_id", "")).strip()
+    text = str(data.get("text", "")).strip()
+
+    if not user_id or not text:
+        return web.json_response({"status": "error", "message": "user_id va xabar matni kiritilishi shart"}, status=400)
+
+    bot: Optional[Bot] = request.app.get("bot")
+    if not bot:
+        return web.json_response({"status": "error", "message": "Telegram Bot ulanmagan"}, status=500)
+
+    try:
+        sent = await bot.send_message(chat_id=int(user_id), text=text, parse_mode="HTML")
+        await db.log_event("admin_direct_msg", f"User {user_id}: {text[:50]}")
+        return web.json_response({"status": "ok", "message": "Xabar foydalanuvchiga muvaffaqiyatli yetkazildi!", "msg_id": sent.message_id})
+    except Exception as exc:
+        logger.error("api_admin_send_message xatosi: %s", exc)
+        return web.json_response({"status": "error", "message": f"Telegram xatosi: {exc}"}, status=400)
+
+
+async def api_admin_broadcast_handler(request: web.Request) -> web.Response:
+    """Admin Panel: barcha faol foydalanuvchilarga ommaviy e'lon (Broadcast) yuborish."""
+    admin_err = check_admin(request)
+    if admin_err:
+        return admin_err
+
+    try:
+        data = await request.json()
+    except Exception:
+        return web.json_response({"status": "error", "message": "Noto'g'ri JSON formati"}, status=400)
+
+    text = str(data.get("text", "")).strip()
+    pin = bool(data.get("pin", False))
+
+    if not text:
+        return web.json_response({"status": "error", "message": "E'lon matni bo'sh bo'lishi mumkin emas"}, status=400)
+
+    bot: Optional[Bot] = request.app.get("bot")
+    if not bot:
+        return web.json_response({"status": "error", "message": "Telegram Bot ulanmagan"}, status=500)
+
+    users = await db.get_all_users()
+    sent_count = 0
+    fail_count = 0
+
+    for u in users:
+        if u.get("is_blocked"):
+            continue
+        try:
+            uid = int(u["user_id"])
+            msg = await bot.send_message(chat_id=uid, text=text, parse_mode="HTML")
+            if pin:
+                try:
+                    await bot.pin_chat_message(chat_id=uid, message_id=msg.message_id)
+                except Exception:
+                    pass
+            sent_count += 1
+            await asyncio.sleep(0.04)
+        except Exception:
+            fail_count += 1
+
+    await db.log_event("admin_broadcast", f"Sent: {sent_count}, Failed: {fail_count}")
+    return web.json_response({
+        "status": "ok",
+        "sent_count": sent_count,
+        "fail_count": fail_count,
+        "total_targets": sent_count + fail_count
+    })
+
+
+async def api_admin_system_health_handler(request: web.Request) -> web.Response:
+    """Admin Panel: jonli server xotirasi, disk, RAM, uptime va xavfsizlik audit statistikasi."""
+    admin_err = check_admin(request)
+    if admin_err:
+        return admin_err
+
+    from core.cleaner_agent import get_system_storage_info
+    storage = get_system_storage_info()
+    stats = await db.get_stats_summary()
+
+    try:
+        import psutil
+        vm = psutil.virtual_memory()
+        mem_info = {
+            "total_gb": round(vm.total / (1024**3), 2),
+            "used_gb": round(vm.used / (1024**3), 2),
+            "free_gb": round(vm.available / (1024**3), 2),
+            "percent": round(vm.percent, 1),
+        }
+    except Exception:
+        mem_info = {"total_gb": 0, "used_gb": 0, "free_gb": 0, "percent": 0}
+
+    disk_info = {
+        "total_gb": storage.get("total_gb", 0),
+        "used_gb": storage.get("used_gb", 0),
+        "free_gb": storage.get("free_gb", 0),
+        "percent": storage.get("percent", 0),
+    }
+
+    uptime_delta = datetime.now() - START_TIME
+    hours, rem = divmod(int(uptime_delta.total_seconds()), 3600)
+    minutes, seconds = divmod(rem, 60)
+    uptime_str = f"{hours}s {minutes}m {seconds}s"
+
+    return web.json_response({
+        "status": "ok",
+        "storage": storage,
+        "memory": mem_info,
+        "disk": disk_info,
+        "db_size_mb": storage.get("db_size_mb", 0),
+        "stats": stats,
+        "active_tasks": len(_BACKGROUND_TASKS),
+        "active_background_tasks": len(_BACKGROUND_TASKS),
+        "uptime": uptime_str,
+        "uptime_seconds": int(uptime_delta.total_seconds()),
+        "server_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    })
+
+
+
+async def api_admin_reset_user_handler(request: web.Request) -> web.Response:
+    """Admin Panel: foydalanuvchining bot bilan suhbat kontekstini tozalash."""
+    admin_err = check_admin(request)
+    if admin_err:
+        return admin_err
+
+    try:
+        data = await request.json()
+    except Exception:
+        return web.json_response({"status": "error", "message": "Noto'g'ri JSON formati"}, status=400)
+
+    user_id = str(data.get("user_id", "")).strip()
+    ai_manager = request.app.get("ai_manager")
+    if ai_manager and user_id:
+        ai_manager.clear_history(chat_id=user_id)
+    return web.json_response({"status": "ok", "message": f"Foydalanuvchi ({user_id}) chat konteksti muvaffaqiyatli tozalandi."})
+
+
+async def api_admin_export_users_handler(request: web.Request) -> web.Response:
+    """Admin Panel: barcha foydalanuvchilar ma'lumotlarini JSON formatda eksport qilish."""
+    admin_err = check_admin(request)
+    if admin_err:
+        return admin_err
+
+    users = await db.get_all_users()
+    return web.json_response({
+        "status": "ok",
+        "exported_at": datetime.now().isoformat(),
+        "total_users": len(users),
+        "users": users
+    })
+
+
 async def api_switch_model_handler(request: web.Request) -> web.Response:
     """Mini App orqali AI modelni almashtirish (Faqat Administrator uchun)."""
     admin_err = check_admin(request)
@@ -1170,6 +1333,11 @@ async def start_web_server(ai_manager: AIManager, bot: Optional[Bot] = None) -> 
     app.router.add_get("/api/admin/users", api_admin_users_handler)
     app.router.add_post("/api/admin/block_user", api_admin_block_user_handler)
     app.router.add_get("/api/admin/overview", api_admin_overview_handler)
+    app.router.add_post("/api/admin/send_message", api_admin_send_message_handler)
+    app.router.add_post("/api/admin/broadcast", api_admin_broadcast_handler)
+    app.router.add_get("/api/admin/system_health", api_admin_system_health_handler)
+    app.router.add_post("/api/admin/reset_user", api_admin_reset_user_handler)
+    app.router.add_get("/api/admin/export_users", api_admin_export_users_handler)
 
     port = int(os.getenv("PORT", "8080"))
     runner = web.AppRunner(app)
