@@ -137,3 +137,71 @@ def test_api_astrology_and_admin_security_guards():
             sa.validate_telegram_init_data = orig_validate
 
     asyncio.run(_test())
+
+
+def test_admin_soc_new_endpoints():
+    """Yangi Admin SOC endpointlari (health, export, reset, send_message, broadcast) testi."""
+    async def _test():
+        from main import (
+            api_admin_system_health_handler,
+            api_admin_export_users_handler,
+            api_admin_reset_user_handler,
+            api_admin_send_message_handler,
+            api_admin_broadcast_handler,
+        )
+        import json
+        from unittest.mock import AsyncMock, MagicMock
+
+        # 1. System health
+        req_health = make_mocked_request("GET", "/api/admin/system_health")
+        req_health["authenticated_user_id"] = str(ADMIN_ID)
+        req_health["is_admin"] = True
+        res_health = await api_admin_system_health_handler(req_health)
+        assert res_health.status == 200
+        health_data = json.loads(res_health.text)
+        assert health_data["status"] == "ok"
+        assert "memory" in health_data
+        assert "disk" in health_data
+        assert "db_size_mb" in health_data
+
+        # 2. Export users
+        req_export = make_mocked_request("GET", "/api/admin/export_users")
+        req_export["authenticated_user_id"] = str(ADMIN_ID)
+        req_export["is_admin"] = True
+        res_export = await api_admin_export_users_handler(req_export)
+        assert res_export.status == 200
+        export_data = json.loads(res_export.text)
+        assert export_data["status"] == "ok"
+        assert "users" in export_data
+
+        # 3. Reset user context
+        req_reset = make_mocked_request("POST", "/api/admin/reset_user")
+        req_reset["authenticated_user_id"] = str(ADMIN_ID)
+        req_reset["is_admin"] = True
+        req_reset.json = AsyncMock(return_value={"user_id": "123456"})
+        res_reset = await api_admin_reset_user_handler(req_reset)
+        assert res_reset.status == 200
+        reset_data = json.loads(res_reset.text)
+        assert reset_data["status"] == "ok"
+
+        # 4. Direct Telegram DM with mocked bot
+        mock_bot = MagicMock()
+        mock_msg = MagicMock()
+        mock_msg.message_id = 999
+        mock_bot.send_message = AsyncMock(return_value=mock_msg)
+
+        app = web.Application()
+        app["bot"] = mock_bot
+
+        req_dm = make_mocked_request("POST", "/api/admin/send_message", app=app)
+        req_dm["authenticated_user_id"] = str(ADMIN_ID)
+        req_dm["is_admin"] = True
+        req_dm.json = AsyncMock(return_value={"user_id": "123456", "text": "Salom test"})
+        res_dm = await api_admin_send_message_handler(req_dm)
+        assert res_dm.status == 200
+        dm_data = json.loads(res_dm.text)
+        assert dm_data["status"] == "ok"
+        mock_bot.send_message.assert_awaited_once()
+
+    asyncio.run(_test())
+
