@@ -52,8 +52,7 @@ def get_system_storage_info() -> Dict[str, Any]:
     try:
         total_size = 0
         for dirpath, dirnames, filenames in os.walk(ROOT_DIR):
-            if ".git" in dirpath:
-                continue
+            dirnames[:] = [d for d in dirnames if d not in {".git", ".venv", "venv", "__pycache__", "node_modules", ".gemini", ".pytest_cache"}]
             for f in filenames:
                 fp = os.path.join(dirpath, f)
                 if os.path.exists(fp) and not os.path.islink(fp):
